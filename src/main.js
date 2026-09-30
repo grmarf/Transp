@@ -223,12 +223,16 @@ function boot(seed, scenarioId, restoredPayload = null) {
     log("V14.1 : cache de routage et nettoyage des passagers terminés.");
     log("V14.2 : interface contrôlable et diagnostic heatmap.");
     log("V15.0 : événements urbains et demande dynamique.");
+    log("V16.0 : progression, réputation et objectifs récompensés.");
   }
 
   state.eventsEnabled = true;
   state.activeEvents ||= [];
   state.eventHistory ||= [];
   state.nextEventId ||= 1;
+  state.completedGoals ||= [];
+  state.progressionHistory ||= [];
+  state.reputation ||= 0;
   document.getElementById("seedInput").value = state.city.seed;
   document.getElementById("scenarioSelect").value = state.scenario?.id || "sandbox";
   document.getElementById("pauseBtn").textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";

@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "15.1",
+    version: "16.0",
     city,
     network: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,
@@ -46,5 +46,9 @@ export function createState(city, scenario = null) {
     eventHistory: [],
     nextEventId: 1,
     eventCooldownUntil: 0,
+    // V16: persistent milestone progression.
+    reputation: 0,
+    completedGoals: [],
+    progressionHistory: [],
   };
 }

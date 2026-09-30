@@ -79,3 +79,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .event-row { padding: 7px 8px; border-radius: 4px; background: rgba(255,255,255,.06); border-left: 3px solid #e0a83b; }
 .event-row b, .event-row span { display: block; }
 .event-row span { margin-top: 2px; color: #bbb; font-size: 11px; }
+
+
+/* V16.0 — progression and milestone rewards */
+#progressionPanel { display: grid; gap: 5px; }
+.progression-header { display: flex; justify-content: space-between; gap: 8px; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,.15); }
+.progression-header span { color: #bbb; font-size: 11px; }
+.goal-row { display: flex; justify-content: space-between; gap: 8px; padding: 4px 5px; color: #bbb; font-size: 11px; }
+.goal-row.completed { color: #a5d6a7; background: rgba(76,175,80,.1); border-radius: 3px; }

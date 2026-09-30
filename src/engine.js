@@ -20,6 +20,7 @@ import { growCity, serviceLevel } from "./growth.js";
 import { maybeStartRoadworks, maybeEndRoadworks } from "./disruptions.js";
 import { evaluateScenario } from "./scenarios.js";
 import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpiredEvents, startContextualEvent } from "./events.js";
+import { evaluateProgression } from "./progression.js";
 
 export {
   TICK_MINUTES, STOP_RADIUS, distance, vehiclePosition, buyVehicleForLine,
@@ -423,6 +424,11 @@ export function step(state, rng, log) {
     // V9.0: evaluated last, after this day's growth/economy/disruptions have
     // landed, using metrics computed here so scenarios.js needs no import
     // from engine.js (avoids an engine <-> scenarios cycle).
+    const intermodal = intermodalStats(state);
+    evaluateProgression(state, {
+      satisfaction: satisfaction(state),
+      transferShare: intermodal.shareWithTransfer
+    }, log);
     evaluateScenario(state, log, { net: networkFinancials(state).net, currentSatisfaction: satisfaction(state) });
 
     // V11.0 — record this day's income/expense/net delta (not the running

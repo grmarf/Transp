@@ -1,6 +1,7 @@
 import { STOP_RADIUS, vehiclePosition, satisfaction, lineHeadwayMinutes, networkFinancials, lineOccupancyRate, serviceLevel, networkOpportunities, intermodalStats } from "./engine.js";
 import { vehicleMode } from "./vehicles.js";
 import { eventSummary } from "./events.js";
+import { progressionSummary } from "./progression.js";
 
 // V11.0 — shared red/amber/green read on a 0-1 service level, used both on
 // the map (stop ring) and in the sidebar (stop info, line rows).
@@ -258,6 +259,13 @@ export function createRenderer(canvas, state) {
       const entries = state.journal || [];
       journalEl.innerHTML = entries.map(e => `<div class="journal-entry journal-${e.type}">${e.text}</div>`).join("");
     }
+    const progressionEl = document.getElementById("progressionPanel");
+    if (progressionEl) {
+      const transferShare = intermodalStats(state).shareWithTransfer;
+      const progression = progressionSummary(state, { satisfaction: satisfaction(state), transferShare });
+      progressionEl.innerHTML = `<div class="progression-header"><b>${progression.rank}</b><span>${progression.reputation} réputation · ${progression.completed}/${progression.total} objectifs</span></div>` + progression.goals.map(goal => `<div class="goal-row ${goal.completed ? "completed" : ""}"><span>${goal.completed ? "✓" : "○"} <b>${goal.label}</b></span><span>${goal.completed ? `+${goal.reward.toLocaleString("fr-FR")} €` : `${Math.round(goal.progress * 100)}%`}</span></div>`).join("");
+    }
+
     const eventsEl = document.getElementById("eventPanel");
     if (eventsEl) {
       const events = eventSummary(state);
