@@ -45,18 +45,20 @@ export function eventSummary(state) {
   });
 }
 
-export function triggerEvent(state, type, durationDays = null, log = () => {}) {
+export function triggerEvent(state, type, durationDays = null, log = () => {}, cause = "manual") {
   const definition = eventType(type);
   if (!definition) return null;
   if (!state.eventsEnabled) state.eventsEnabled = true;
   const event = {
     id: state.nextEventId++, type: definition.id,
     startedDay: state.elapsedDays || 0,
-    endsDay: (state.elapsedDays || 0) + (durationDays ?? definition.durationDays)
+    endsDay: (state.elapsedDays || 0) + (durationDays ?? definition.durationDays),
+    cause
   };
   state.activeEvents = [...(state.activeEvents || []).filter(e => e.endsDay > (state.elapsedDays || 0)), event];
   state.eventHistory = [...(state.eventHistory || []), event].slice(-20);
-  log(`${definition.icon} ${definition.label} : l'activité de la ville change pour ${event.endsDay - event.startedDay} jour(s).`);
+  state.eventCooldownUntil = Math.max(state.eventCooldownUntil || 0, event.endsDay + 1);
+  log(`${definition.icon} ${definition.label} : l'activité de la ville change pour ${event.endsDay - event.startedDay} jour(s).${cause !== "manual" ? ` Cause : ${cause}.` : ""}`);
   return event;
 }
 
@@ -73,17 +75,43 @@ export function finishExpiredEvents(state, log = () => {}) {
   return before.length - active.length;
 }
 
-/** Start at most one random event per day when the browser enables V15 events. */
-export function startDailyEvent(state, rng, log = () => {}) {
-  if (!state.eventsEnabled || activeEvents(state).length || rng() >= 0.32) return null;
-  const definition = EVENT_LIST[Math.floor(rng() * EVENT_LIST.length)];
-  return triggerEvent(state, definition.id, definition.durationDays, log);
+/**
+ * V15.1 — choose an event from the network's actual health rather than a
+ * blind random roll. A short cooldown prevents event churn after expiry.
+ */
+export function startContextualEvent(state, rng, log = () => {}, metrics = {}) {
+  if (!state.eventsEnabled || activeEvents(state).length) return null;
+  if ((state.eventCooldownUntil || 0) > (state.elapsedDays || 0)) return null;
+
+  const satisfaction = metrics.satisfaction ?? 50;
+  const abandonedRate = metrics.abandonedRate ?? 0;
+  const serviceRatio = metrics.serviceRatio ?? 0;
+  let type = null;
+  let cause = "conditions urbaines normales";
+
+  if (satisfaction <= 25 || abandonedRate >= 0.35) {
+    type = EVENT_TYPES.STRIKE;
+    cause = satisfaction <= 25 ? "satisfaction réseau très faible" : "trop de passagers abandonnent leur trajet";
+  } else if (satisfaction >= 78 && serviceRatio >= 0.35) {
+    type = EVENT_TYPES.FESTIVAL;
+    cause = "réseau performant et satisfaction élevée";
+  } else if (serviceRatio >= 0.20 && rng() < 0.45) {
+    type = EVENT_TYPES.MARKET;
+    cause = "fréquentation suffisante pour soutenir un marché central";
+  } else if (rng() < 0.08) {
+    type = EVENT_TYPES.HEATWAVE;
+    cause = "variation climatique saisonnière";
+  }
+  return type ? triggerEvent(state, type.id, type.durationDays, log, cause) : null;
 }
+
+// Kept as a compatibility alias for integrations written against V15.0.
+export const startDailyEvent = startContextualEvent;
 
 export function eventJournal(state) {
   return eventSummary(state).map(event => ({
     type: event.satisfactionDelta >= 0 ? "positive" : "warning",
-    text: `${event.icon} ${event.label} actif : demande ×${event.demandMultiplier.toFixed(2)}, encore ${event.remainingDays} jour(s).`
+    text: `${event.icon} ${event.label} actif : demande ×${event.demandMultiplier.toFixed(2)}, encore ${event.remainingDays} jour(s).${event.cause && event.cause !== "manual" ? ` Cause : ${event.cause}.` : ""}`
   }));
 }
 

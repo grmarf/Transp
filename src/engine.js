@@ -19,7 +19,7 @@ import {
 import { growCity, serviceLevel } from "./growth.js";
 import { maybeStartRoadworks, maybeEndRoadworks } from "./disruptions.js";
 import { evaluateScenario } from "./scenarios.js";
-import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpiredEvents, startDailyEvent } from "./events.js";
+import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpiredEvents, startContextualEvent } from "./events.js";
 
 export {
   TICK_MINUTES, STOP_RADIUS, distance, vehiclePosition, buyVehicleForLine,
@@ -412,7 +412,14 @@ export function step(state, rng, log) {
     maybeEndRoadworks(state, log);
     maybeStartRoadworks(state, rng, log);
     finishExpiredEvents(state, log);
-    startDailyEvent(state, rng, log);
+    const wait = waitStats(state);
+    const serviceRatio = state.totalDemand > 0 ? state.totalArrived / state.totalDemand : 0;
+    const activePassengers = state.passengers.length + state.totalArrived;
+    startContextualEvent(state, rng, log, {
+      satisfaction: satisfaction(state),
+      abandonedRate: activePassengers > 0 ? wait.abandonedCount / activePassengers : 0,
+      serviceRatio
+    });
     // V9.0: evaluated last, after this day's growth/economy/disruptions have
     // landed, using metrics computed here so scenarios.js needs no import
     // from engine.js (avoids an engine <-> scenarios cycle).

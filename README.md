@@ -63,3 +63,5 @@ La suite couvre les versions historiques V2.3 à V13 ainsi que le routage interm
 
 
 La V15 introduit les événements urbains dynamiques : festivals, marchés, mouvements sociaux et canicules. Ils modifient temporairement la demande, la tarification et la satisfaction, et sont visibles dans le panneau d’événements et le journal de ville.
+
+La V15.1 remplace le tirage aveugle par des événements déclenchés par la santé réelle du réseau, conserve leur cause dans l'historique et applique un cooldown pour éviter les répétitions.

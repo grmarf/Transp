@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "15.0",
+    version: "15.1",
     city,
     network: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,
@@ -45,5 +45,6 @@ export function createState(city, scenario = null) {
     activeEvents: [],
     eventHistory: [],
     nextEventId: 1,
+    eventCooldownUntil: 0,
   };
 }

@@ -5,7 +5,7 @@ import { generateDemand, satisfaction } from '../src/engine.js';
 import { PASSENGER_STATES, createPassenger } from '../src/passengers.js';
 import {
   activeEvents, eventDemandMultiplier, eventEffects, eventFareMultiplier,
-  eventJournal, eventSatisfactionDelta, eventSummary, finishExpiredEvents, triggerEvent
+  eventJournal, eventSatisfactionDelta, eventSummary, finishExpiredEvents, startContextualEvent, triggerEvent
 } from '../src/events.js';
 
 const city = createCity('V15-EVENTS');
@@ -40,5 +40,25 @@ state.elapsedDays = 2;
 assert.equal(finishExpiredEvents(state), 1);
 assert.equal(activeEvents(state).length, 0);
 assert.deepEqual(eventEffects(state), { demandMultiplier: 1, fareMultiplier: 1, satisfactionDelta: 0 });
+
+const contextual = createState(createCity('V15-CONTEXT'));
+contextual.eventsEnabled = true;
+const reasons = [];
+const strike = startContextualEvent(contextual, () => 0.9, reasons.push.bind(reasons), {
+  satisfaction: 15, abandonedRate: 0.1, serviceRatio: 0.1
+});
+assert.equal(strike.type, 'strike');
+assert.match(strike.cause, /satisfaction/);
+assert.equal(startContextualEvent(contextual, () => 0, () => {}, {
+  satisfaction: 90, abandonedRate: 0, serviceRatio: 1
+}), null);
+
+const success = createState(createCity('V15-SUCCESS'));
+success.eventsEnabled = true;
+const festivalFromPerformance = startContextualEvent(success, () => 0.9, () => {}, {
+  satisfaction: 90, abandonedRate: 0, serviceRatio: 0.8
+});
+assert.equal(festivalFromPerformance.type, 'festival');
+assert.match(festivalFromPerformance.cause, /performant/);
 
 console.log(JSON.stringify({ ok: true, event: festival.type, generatedRatio: eventState.totalGenerated / baseline.totalGenerated }));
