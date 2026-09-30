@@ -19,11 +19,13 @@ import {
 import { growCity, serviceLevel } from "./growth.js";
 import { maybeStartRoadworks, maybeEndRoadworks } from "./disruptions.js";
 import { evaluateScenario } from "./scenarios.js";
+import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpiredEvents, startDailyEvent } from "./events.js";
 
 export {
   TICK_MINUTES, STOP_RADIUS, distance, vehiclePosition, buyVehicleForLine,
   sellVehicleFromLine, lineOccupancyRate, lineHeadwayMinutes, ADD_VEHICLE_COST,
-  VEHICLE_RESALE_RATIO, vehicleMode, serviceLevel, congestionHeatmap, intermodalStats
+  VEHICLE_RESALE_RATIO, vehicleMode, serviceLevel, congestionHeatmap, intermodalStats,
+  eventDemandMultiplier, eventSatisfactionDelta
 };
 export function stopById(state, id) {
   return state.city.stops.find(s => s.id === id);
@@ -231,7 +233,7 @@ export function generateDemand(state, rng) {
 
     for (const origin of stops) {
       const base = rng() * TRIP_RATE * origin.population * rush * intervalFactor *
-        (state.scenario?.demandMultiplier ?? 1);
+        (state.scenario?.demandMultiplier ?? 1) * eventDemandMultiplier(state);
       if (base <= 0) continue;
 
       const candidates = stops.filter(s => s.id !== origin.id);
@@ -334,7 +336,7 @@ export function satisfaction(state) {
     : 0;
   const intermodal = intermodalStats(state);
   const intermodalBonus = intermodal.shareWithTransfer > 0.15 ? 5 : 0;
-  return Math.max(0, Math.min(100, 100 - waitPenalty - abandonPenalty + intermodalBonus));
+  return Math.max(0, Math.min(100, 100 - waitPenalty - abandonPenalty + intermodalBonus + eventSatisfactionDelta(state)));
 }
 
 /** Derived narrative entries for the V14 city journal. */
@@ -348,6 +350,7 @@ export function cityJournal(state) {
   if (unprofitableLine) entries.push({ type: "warning", text: `${unprofitableLine.line.name} perd de l'argent (${Math.round(unprofitableLine.net).toLocaleString("fr-FR")} €).` });
   if (saturatedLine) entries.push({ type: "warning", text: `${saturatedLine.line.name} est saturée (${(saturatedLine.occupancy * 100).toFixed(0)}% de remplissage).` });
   if (underservedStop) entries.push({ type: "info", text: `Le quartier ${underservedStop.stop.name} manque de transport (niveau de service ${(underservedStop.level * 100).toFixed(0)}%).` });
+  entries.push(...eventJournal(state));
   if (!entries.length) entries.push({ type: "positive", text: "Le réseau fonctionne correctement." });
   return entries;
 }
@@ -408,6 +411,8 @@ export function step(state, rng, log) {
     growCity(state, rng, log);
     maybeEndRoadworks(state, log);
     maybeStartRoadworks(state, rng, log);
+    finishExpiredEvents(state, log);
+    startDailyEvent(state, rng, log);
     // V9.0: evaluated last, after this day's growth/economy/disruptions have
     // landed, using metrics computed here so scenarios.js needs no import
     // from engine.js (avoids an engine <-> scenarios cycle).

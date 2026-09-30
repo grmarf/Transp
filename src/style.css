@@ -72,3 +72,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .heatmap-legend .heatmap-count { display: block; color: #ddd; margin-top: 2px; }
 .heatmap-legend .gradient { width: 100%; height: 9px; margin-top: 5px; background: linear-gradient(to right, rgba(255,255,0,.3), rgba(255,0,0,.8)); border-radius: 2px; }
 .heatmap-legend .legend-scale { display: flex; justify-content: space-between; color: #bbb; font-size: 10px; margin-top: 2px; }
+
+
+/* V15.0 — dynamic urban events */
+#eventPanel { display: grid; gap: 6px; }
+.event-row { padding: 7px 8px; border-radius: 4px; background: rgba(255,255,255,.06); border-left: 3px solid #e0a83b; }
+.event-row b, .event-row span { display: block; }
+.event-row span { margin-top: 2px; color: #bbb; font-size: 11px; }

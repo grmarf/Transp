@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "14.2",
+    version: "15.0",
     city,
     network: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,
@@ -40,5 +40,10 @@ export function createState(city, scenario = null) {
     showHeatmap: false,
     // V14.1: completed passenger records are retained for this many days.
     passengerRetentionDays: 2,
+    // V15: browser games enable dynamic city events; legacy engine tests opt in explicitly.
+    eventsEnabled: false,
+    activeEvents: [],
+    eventHistory: [],
+    nextEventId: 1,
   };
 }

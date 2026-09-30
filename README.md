@@ -1,4 +1,4 @@
-# Transport Tycoon — Transp V14.1
+# Transport Tycoon — Transp V15.0
 
 Jeu de gestion et de simulation de réseau de transport en JavaScript natif, Canvas et modules ES.
 
@@ -60,3 +60,6 @@ La suite couvre les versions historiques V2.3 à V13 ainsi que le routage interm
 - `src/persistence.js` : sauvegarde locale et fichiers JSON ;
 - `index.html` : shell de l’application ;
 - `tests/` : tests automatisés.
+
+
+La V15 introduit les événements urbains dynamiques : festivals, marchés, mouvements sociaux et canicules. Ils modifient temporairement la demande, la tarification et la satisfaction, et sont visibles dans le panneau d’événements et le journal de ville.

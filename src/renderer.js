@@ -1,5 +1,6 @@
 import { STOP_RADIUS, vehiclePosition, satisfaction, lineHeadwayMinutes, networkFinancials, lineOccupancyRate, serviceLevel, networkOpportunities, intermodalStats } from "./engine.js";
 import { vehicleMode } from "./vehicles.js";
+import { eventSummary } from "./events.js";
 
 // V11.0 — shared red/amber/green read on a 0-1 service level, used both on
 // the map (stop ring) and in the sidebar (stop info, line rows).
@@ -257,6 +258,14 @@ export function createRenderer(canvas, state) {
       const entries = state.journal || [];
       journalEl.innerHTML = entries.map(e => `<div class="journal-entry journal-${e.type}">${e.text}</div>`).join("");
     }
+    const eventsEl = document.getElementById("eventPanel");
+    if (eventsEl) {
+      const events = eventSummary(state);
+      eventsEl.innerHTML = events.length
+        ? events.map(event => `<div class="event-row"><b>${event.icon} ${event.label}</b><span>${event.remainingDays} j · demande ×${event.demandMultiplier.toFixed(2)} · satisfaction ${event.satisfactionDelta >= 0 ? "+" : ""}${event.satisfactionDelta}</span></div>`).join("")
+        : '<div class="muted">Aucun événement en cours.</div>';
+    }
+
     const intermodalEl = document.getElementById("intermodalStats");
     if (intermodalEl) {
       const stats = intermodalStats(state);
