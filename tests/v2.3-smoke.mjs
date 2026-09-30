@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { createCity, mulberry32 } from '../src/city.js';
+import { createNetwork } from '../src/network.js';
+import { createState } from '../src/state.js';
+import { generateDemand, distance } from '../src/engine.js';
+const city = createCity('V23-TEST');
+const state = createState(city);
+state.network = createNetwork(city);
+const rng = mulberry32(city.numericSeed ^ 0xA57E2);
+generateDemand(state, rng);
+const waiting = city.stops.reduce((sum,s)=>sum+Object.values(s.waitingByDestination).reduce((a,v)=>a+v,0),0);
+assert(waiting > 0);
+assert.equal(city.stops[0].waiting, 0);
+assert(city.stops.every(s=>Object.keys(s.waitingByDestination).every(id=>id !== s.id)));
+console.log(JSON.stringify({ok:true, stops:city.stops.length, waiting:Number(waiting.toFixed(3)), odPairs:city.stops.reduce((n,s)=>n+Object.keys(s.waitingByDestination).length,0)}));
