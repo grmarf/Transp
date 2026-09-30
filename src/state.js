@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "10.0+7.0",
+    version: "14.0",
     city,
     network: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,
@@ -36,5 +36,7 @@ export function createState(city, scenario = null) {
     // recorded at the last day boundary, used to derive each day's delta.
     dailyStats: [],
     dailyBaseline: { income: 0, expenses: 0 },
+    journal: [],
+    showHeatmap: false,
   };
 }

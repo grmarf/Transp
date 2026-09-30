@@ -1,6 +1,6 @@
 import { TICK_MINUTES, STOP_RADIUS, distance } from "./constants.js";
-import { findPassengerRoute } from "./routing.js";
-import { PASSENGER_STATES, createPassenger, waitStats } from "./passengers.js";
+import { findPassengerRoute, routeLegs } from "./routing.js";
+import { PASSENGER_STATES, createPassenger, waitStats, intermodalStats } from "./passengers.js";
 import {
   createVehicle,
   updateVehicles,
@@ -13,7 +13,8 @@ import {
   lineOperatingCost,
   vehicleMode,
   VEHICLE_RESALE_RATIO,
-  ADD_VEHICLE_COST
+  ADD_VEHICLE_COST,
+  congestionHeatmap
 } from "./vehicles.js";
 import { growCity, serviceLevel } from "./growth.js";
 import { maybeStartRoadworks, maybeEndRoadworks } from "./disruptions.js";
@@ -22,7 +23,7 @@ import { evaluateScenario } from "./scenarios.js";
 export {
   TICK_MINUTES, STOP_RADIUS, distance, vehiclePosition, buyVehicleForLine,
   sellVehicleFromLine, lineOccupancyRate, lineHeadwayMinutes, ADD_VEHICLE_COST,
-  VEHICLE_RESALE_RATIO, vehicleMode, serviceLevel
+  VEHICLE_RESALE_RATIO, vehicleMode, serviceLevel, congestionHeatmap, intermodalStats
 };
 export function stopById(state, id) {
   return state.city.stops.find(s => s.id === id);
@@ -192,7 +193,7 @@ export function deleteLine(state, lineId, log) {
   state.money += refund;
 
   for (const passenger of state.passengers) {
-    if (passenger.itinerary?.some(leg => leg.lineId === lineId)) {
+    if (routeLegs(passenger.itinerary).some(leg => leg.lineId === lineId)) {
       passenger.itinerary = null;
       if (passenger.legIndex) passenger.legIndex = 0;
     }
@@ -328,7 +329,24 @@ export function satisfaction(state) {
   const abandonPenalty = waitingCount + abandonedCount > 0
     ? (abandonedCount / (waitingCount + abandonedCount)) * 40
     : 0;
-  return Math.max(0, Math.min(100, 100 - waitPenalty - abandonPenalty));
+  const intermodal = intermodalStats(state);
+  const intermodalBonus = intermodal.shareWithTransfer > 0.15 ? 5 : 0;
+  return Math.max(0, Math.min(100, 100 - waitPenalty - abandonPenalty + intermodalBonus));
+}
+
+/** Derived narrative entries for the V14 city journal. */
+export function cityJournal(state) {
+  const entries = [];
+  const intermodal = intermodalStats(state);
+  if (intermodal.shareWithTransfer > 0.2) {
+    entries.push({ type: "positive", text: `Le réseau intermodal fonctionne : ${(intermodal.shareWithTransfer * 100).toFixed(0)}% des voyages utilisent des correspondances.` });
+  }
+  const { unprofitableLine, saturatedLine, underservedStop } = networkOpportunities(state);
+  if (unprofitableLine) entries.push({ type: "warning", text: `${unprofitableLine.line.name} perd de l'argent (${Math.round(unprofitableLine.net).toLocaleString("fr-FR")} €).` });
+  if (saturatedLine) entries.push({ type: "warning", text: `${saturatedLine.line.name} est saturée (${(saturatedLine.occupancy * 100).toFixed(0)}% de remplissage).` });
+  if (underservedStop) entries.push({ type: "info", text: `Le quartier ${underservedStop.stop.name} manque de transport (niveau de service ${(underservedStop.level * 100).toFixed(0)}%).` });
+  if (!entries.length) entries.push({ type: "positive", text: "Le réseau fonctionne correctement." });
+  return entries;
 }
 
 export function step(state, rng, log) {

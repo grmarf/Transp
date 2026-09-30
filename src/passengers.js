@@ -1,40 +1,24 @@
-/** V2.6 — passenger agents */
-
+/** Passenger agents and intermodal metrics. */
 export const PASSENGER_STATES = Object.freeze({
-  WAITING: "WAITING",
-  BOARDING: "BOARDING",
-  ON_VEHICLE: "ON_VEHICLE",
-  TRANSFERRING: "TRANSFERRING",
-  ARRIVED: "ARRIVED",
-  ABANDONED: "ABANDONED"
+  WAITING: "WAITING", BOARDING: "BOARDING", ON_VEHICLE: "ON_VEHICLE",
+  TRANSFERRING: "TRANSFERRING", ARRIVED: "ARRIVED", ABANDONED: "ABANDONED"
 });
 
 let nextPassengerId = 1;
 
 export function createPassenger({ originId, destinationId, createdAt = 0 }) {
   return {
-    id: nextPassengerId++,
-    originId,
-    destinationId,
-    currentStopId: originId,
-    state: PASSENGER_STATES.WAITING,
-    itinerary: null,
-    legIndex: 0,
-    vehicleId: null,
-    createdAt,
-    waitedMinutes: 0,
-    arrivedAt: null
+    id: nextPassengerId++, originId, destinationId, currentStopId: originId,
+    state: PASSENGER_STATES.WAITING, itinerary: null, legIndex: 0,
+    vehicleId: null, createdAt, waitedMinutes: 0, arrivedAt: null,
+    transfersDone: 0, travelMinutes: 0
   };
 }
 
-export function resetPassengerIds() {
-  nextPassengerId = 1;
-}
+export function resetPassengerIds() { nextPassengerId = 1; }
 
 export function waitingPassengers(state, stopId) {
-  return state.passengers.filter(p =>
-    p.currentStopId === stopId && p.state === PASSENGER_STATES.WAITING
-  );
+  return state.passengers.filter(p => p.currentStopId === stopId && p.state === PASSENGER_STATES.WAITING);
 }
 
 export function passengerStats(state) {
@@ -43,27 +27,30 @@ export function passengerStats(state) {
   return counts;
 }
 
-/** V3.0 — real waiting-time metrics, derived from passenger agents.
- * Replaces the legacy origin.waitingByDestination bucket (never decremented
- * since V2.3) as the basis for satisfaction and the UI's wait indicator.
- */
 export function waitStats(state) {
-  let waitingCount = 0;
-  let waitedTotal = 0;
-  let abandonedCount = 0;
-
+  let waitingCount = 0, waitedTotal = 0, abandonedCount = 0;
   for (const p of state.passengers) {
     if (p.state === PASSENGER_STATES.WAITING || p.state === PASSENGER_STATES.TRANSFERRING) {
-      waitingCount++;
-      waitedTotal += p.waitedMinutes;
-    } else if (p.state === PASSENGER_STATES.ABANDONED) {
-      abandonedCount++;
-    }
+      waitingCount++; waitedTotal += p.waitedMinutes || 0;
+    } else if (p.state === PASSENGER_STATES.ABANDONED) abandonedCount++;
   }
+  return { waitingCount, avgWaitMinutes: waitingCount ? waitedTotal / waitingCount : 0, abandonedCount };
+}
 
+export function intermodalStats(state) {
+  let arrived = 0, totalTransfers = 0, totalTravel = 0, withTransfer = 0;
+  for (const p of state.passengers) {
+    if (p.state !== PASSENGER_STATES.ARRIVED) continue;
+    arrived++;
+    const transfers = p.transfersDone || 0;
+    totalTransfers += transfers;
+    totalTravel += p.travelMinutes || 0;
+    if (transfers > 0) withTransfer++;
+  }
   return {
-    waitingCount,
-    avgWaitMinutes: waitingCount ? waitedTotal / waitingCount : 0,
-    abandonedCount
+    arrivedCount: arrived,
+    avgTransfersPerTrip: arrived ? totalTransfers / arrived : 0,
+    avgTravelMinutes: arrived ? totalTravel / arrived : 0,
+    shareWithTransfer: arrived ? withTransfer / arrived : 0
   };
 }

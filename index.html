@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Transport Tycoon — V14.0</title>
+  <meta name="theme-color" content="#182029">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div>
+    <h1>Transport Tycoon</h1>
+    <span class="version">V14.0 — réseau intermodal et analyse de congestion</span>
+  </div>
+  <div class="stats">
+    <span>💰 <b id="money">0 €</b></span>
+    <span>👥 <b id="passengers">0</b></span>
+    <span>😊 <b id="satisfaction">0%</b></span>
+    <span>🕒 <b id="clock">08:00</b></span>
+  </div>
+</header>
+
+<main>
+<section class="map-panel">
+  <div class="toolbar">
+    <button id="newLineBtn" type="button">＋ Nouvelle ligne</button>
+    <select id="modeSelect">
+      <option value="bus">Bus</option>
+      <option value="tram">Tramway</option>
+      <option value="metro">Métro</option>
+    </select>
+    <button id="finishLineBtn" type="button" hidden>✓ Terminer la ligne</button>
+    <button id="pauseBtn" type="button">⏸ Pause</button>
+    <button id="speedBtn" type="button">▶ 1×</button>
+    <button id="saveBtn" type="button">💾 Sauvegarder</button>
+    <button id="loadBtn" type="button">↩ Charger</button>
+  </div>
+
+  <div class="city-controls">
+    <label for="seedInput">Seed ville</label>
+    <input id="seedInput" type="text" maxlength="40" autocomplete="off" spellcheck="false">
+    <label for="scenarioSelect">Scénario</label>
+    <select id="scenarioSelect"></select>
+    <button id="newCityBtn" type="button">🏙 Générer la ville</button>
+    <span>Ville : <b id="cityName">—</b></span>
+  </div>
+
+  <div class="instructions" id="instructions"></div>
+  <div class="scenario-banner" id="scenarioBanner" hidden></div>
+  <canvas id="map" width="1000" height="650"></canvas>
+</section>
+
+<aside class="sidebar">
+  <section class="card">
+    <h2>Ville</h2>
+    <div class="save-status" id="saveStatus">Aucune sauvegarde locale.</div>
+    <div class="city-meta">
+      <div><small>Seed</small><strong id="seedValue">—</strong></div>
+      <div><small>Infrastructure</small><strong>V9.1+V7</strong></div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Réseau</h2>
+    <div id="networkStats"></div>
+  </section>
+  <section class="card">
+    <h2>Opportunités</h2>
+    <div id="opportunities"></div>
+  </section>
+  <section class="card">
+    <h2>Lignes</h2>
+    <div id="lines"></div>
+  </section>
+  <section class="card">
+    <h2>Arrêt sélectionné</h2>
+    <div id="stopInfo">Aucun arrêt sélectionné.</div>
+  </section>
+  <section class="card">
+    <h2>Vue d'ensemble de la ville</h2>
+    <div id="cityOverview"></div>
+  </section>
+  <section class="card">
+    <h2>Outils V14</h2>
+    <button id="toggleHeatmapBtn" type="button">Carte de congestion</button>
+    <div id="intermodalStats"></div>
+    <h3>Finances (14 jours)</h3>
+    <canvas id="financialChart" width="200" height="100"></canvas>
+  </section>
+  <section class="card">
+    <h2>Journal de ville</h2>
+    <div id="journal"></div>
+  </section>
+  <section class="card">
+    <h2>Sauvegarde fichier</h2>
+    <button id="exportBtn" type="button">Exporter JSON</button>
+    <label class="import-label">Importer JSON <input type="file" id="importFile" accept=".json" style="display:none"></label>
+  </section>
+  <section class="card log-card">
+    <h2>Journal</h2>
+    <div id="log"></div>
+  </section>
+</aside>
+</main>
+
+<footer>V14.0 : routage intermodal, correspondances, heatmap de congestion, journal de ville et export/import JSON.
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

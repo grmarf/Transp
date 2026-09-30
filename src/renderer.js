@@ -1,4 +1,4 @@
-import { STOP_RADIUS, vehiclePosition, satisfaction, lineHeadwayMinutes, networkFinancials, lineOccupancyRate, serviceLevel, networkOpportunities } from "./engine.js";
+import { STOP_RADIUS, vehiclePosition, satisfaction, lineHeadwayMinutes, networkFinancials, lineOccupancyRate, serviceLevel, networkOpportunities, intermodalStats } from "./engine.js";
 import { vehicleMode } from "./vehicles.js";
 
 // V11.0 — shared red/amber/green read on a 0-1 service level, used both on
@@ -62,7 +62,7 @@ function renderCityOverview(state) {
 export function createRenderer(canvas, state) {
   const ctx = canvas.getContext("2d");
 
-  function drawCity() {
+  function drawCity(heatmap = null) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#d5dadd";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -88,6 +88,17 @@ export function createRenderer(canvas, state) {
       if (closed) ctx.setLineDash([6, 6]);
       ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
       if (closed) ctx.setLineDash([]);
+    }
+
+    if (heatmap?.length) {
+      for (const segment of heatmap) {
+        ctx.save();
+        ctx.strokeStyle = `rgba(255, 40, 0, ${Math.min(0.8, 0.2 + segment.congestion * 0.6)})`;
+        ctx.lineWidth = 10 + Math.min(10, segment.load * 2);
+        ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(segment.a.x, segment.a.y); ctx.lineTo(segment.b.x, segment.b.y); ctx.stroke();
+        ctx.restore();
+      }
     }
 
     for (const line of state.lines) {
@@ -151,8 +162,8 @@ export function createRenderer(canvas, state) {
     }
   }
 
-  function render() {
-    drawCity();
+  function render(options = {}) {
+    drawCity(options.heatmap || null);
     const served = state.city.stops.filter(s => state.lines.some(l => l.stopIds.includes(s.id))).length;
     document.getElementById("money").textContent = Math.round(state.money).toLocaleString("fr-FR") + " €";
     document.getElementById("passengers").textContent = state.transported.toLocaleString("fr-FR");
@@ -240,6 +251,26 @@ export function createRenderer(canvas, state) {
     document.getElementById("log").innerHTML = state.logs.map(x => `<div class="log-entry">${x}</div>`).join("");
     document.getElementById("opportunities").innerHTML = renderOpportunities(state);
     document.getElementById("cityOverview").innerHTML = renderCityOverview(state);
+
+    const journalEl = document.getElementById("journal");
+    if (journalEl) {
+      const entries = state.journal || [];
+      journalEl.innerHTML = entries.map(e => `<div class="journal-entry journal-${e.type}">${e.text}</div>`).join("");
+    }
+    const intermodalEl = document.getElementById("intermodalStats");
+    if (intermodalEl) {
+      const stats = intermodalStats(state);
+      intermodalEl.innerHTML = `<div>Correspondances moyennes : ${stats.avgTransfersPerTrip.toFixed(2)}</div><div>Voyages avec correspondance : ${(stats.shareWithTransfer * 100).toFixed(1)}%</div><div>Temps de trajet moyen : ${stats.avgTravelMinutes.toFixed(0)} min</div>`;
+    }
+    const chart = document.getElementById("financialChart");
+    if (chart?.getContext) {
+      const c = chart.getContext("2d"); c.clearRect(0, 0, chart.width, chart.height);
+      const days = (state.dailyStats || []).slice(-14);
+      const max = Math.max(1, ...days.map(d => Math.abs(d.net)));
+      const mid = chart.height / 2;
+      c.strokeStyle = "#68727a"; c.beginPath(); c.moveTo(0, mid); c.lineTo(chart.width, mid); c.stroke();
+      days.forEach((d, i) => { const x = (i + 0.5) * chart.width / Math.max(1, days.length); const h = Math.min(mid - 4, Math.abs(d.net) / max * (mid - 8)); c.fillStyle = d.net >= 0 ? "#4caf6a" : "#e05a5a"; c.fillRect(x - 5, d.net >= 0 ? mid - h : mid, 10, h); });
+    }
   }
 
   function formatTime(minutes) {

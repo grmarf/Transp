@@ -1,10 +1,10 @@
 import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
-import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials } from "./engine.js";
+import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal, intermodalStats } from "./engine.js";
 import { createNetwork, routeLine, createUndergroundNetwork } from "./network.js";
 import { createRenderer } from "./renderer.js";
-import { saveGame, readSavedGame, SAVE_KEY } from "./persistence.js";
+import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 
 const canvas = document.getElementById("map");
 const rendererState = { current: null };
@@ -105,7 +105,7 @@ function clickMap(e) {
   }
 
   updateInstructions();
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
 }
 
 function bindMap() {
@@ -222,12 +222,13 @@ function boot(seed, scenarioId, restoredPayload = null) {
   rendererState.current = createRenderer(canvas, state);
   updateInstructions();
   updateScenarioBanner();
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
   updateSaveStatus();
 
   timer = setInterval(() => {
     step(state, rng, log);
-    rendererState.current.render();
+    state.journal = cityJournal(state);
+    rendererState.current.render({ heatmap: state.showHeatmap ? congestionHeatmap(state) : null });
     updateScenarioBanner();
   }, 1000);
 }
@@ -250,7 +251,7 @@ function saveCurrentGame() {
     saveGame(state, rng?.getState?.() ?? null);
     updateSaveStatus("Partie sauvegardée localement.");
     log("Partie sauvegardée.");
-    rendererState.current.render();
+    rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
   } catch (error) {
     updateSaveStatus("Échec de la sauvegarde.");
     log(`Sauvegarde impossible : ${error.message}`);
@@ -273,7 +274,7 @@ bindTap(document.getElementById("newLineBtn"), () => {
   if (state.lineMode) cancelLineMode(state);
   else createLine(state);
   updateInstructions();
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
 });
 
 bindTap(document.getElementById("finishLineBtn"), () => {
@@ -282,19 +283,19 @@ bindTap(document.getElementById("finishLineBtn"), () => {
   if (state.extendingLineId) finishExtendLine(state, log, routeLine);
   else finishLine(state, log, routeLine, document.getElementById("modeSelect").value);
   updateInstructions();
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
 });
 
 bindTap(document.getElementById("pauseBtn"), () => {
   state.paused = !state.paused;
   document.getElementById("pauseBtn").textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
 });
 
 bindTap(document.getElementById("speedBtn"), () => {
   state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : state.speed === 4 ? 1000 : 1;
   document.getElementById("speedBtn").textContent = `▶ ${state.speed}×`;
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
 });
 
 bindTap(document.getElementById("saveBtn"), saveCurrentGame);
@@ -311,7 +312,7 @@ bindMap();
 bindDelegatedTap(document.getElementById("lines"), "[data-buy-vehicle]", target => {
   const lineId = Number(target.dataset.buyVehicle);
   buyVehicleForLine(state, lineId, log);
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
 });
 
 // V11.0 — line management: sell one vehicle off a line, or scrap the whole line.
@@ -319,7 +320,7 @@ bindDelegatedTap(document.getElementById("lines"), "[data-sell-vehicle]", target
   const lineId = Number(target.dataset.sellVehicle);
   const vehicleId = Number(target.dataset.vehicleId);
   sellVehicleFromLine(state, lineId, vehicleId, log);
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
 });
 
 bindDelegatedTap(document.getElementById("lines"), "[data-delete-line]", target => {
@@ -327,7 +328,7 @@ bindDelegatedTap(document.getElementById("lines"), "[data-delete-line]", target 
   const line = state.lines.find(l => l.id === lineId);
   if (line && !window.confirm?.(`Supprimer ${line.name} ? Les véhicules seront revendus.`)) return;
   deleteLine(state, lineId, log);
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
 });
 
 // V12.0 — line editing: start extend-mode, then reuse the normal map-tap /
@@ -336,7 +337,30 @@ bindDelegatedTap(document.getElementById("lines"), "[data-extend-line]", target 
   const lineId = Number(target.dataset.extendLine);
   startExtendLine(state, lineId);
   updateInstructions();
-  rendererState.current.render();
+  rendererState.current.render({ heatmap: state?.showHeatmap ? congestionHeatmap(state) : null });
+});
+
+bindTap(document.getElementById("toggleHeatmapBtn"), () => {
+  state.showHeatmap = !state.showHeatmap;
+  rendererState.current.render({ heatmap: state.showHeatmap ? congestionHeatmap(state) : null });
+});
+
+bindTap(document.getElementById("exportBtn"), () => {
+  exportGameToFile(state, rng?.getState?.() ?? null);
+});
+
+document.getElementById("importFile")?.addEventListener("change", async event => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  try {
+    const payload = await importGameFromFile(file);
+    boot(payload.state.city.seed, payload.state.scenario?.id || "sandbox", payload);
+    log("Partie importée avec succès.");
+  } catch (error) {
+    log(`Échec de l'import : ${error.message}`);
+  } finally {
+    event.target.value = "";
+  }
 });
 
 const initialSeed = createSeedFromQuery();

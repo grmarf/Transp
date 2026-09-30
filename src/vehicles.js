@@ -3,7 +3,7 @@
  * the economic/time simulation while preserving the existing engine contract.
  */
 
-import { findPassengerRoute } from "./routing.js";
+import { findPassengerRoute, routeLegs } from "./routing.js";
 import { PASSENGER_STATES } from "./passengers.js";
 import { TICK_MINUTES } from "./constants.js";
 
@@ -226,34 +226,32 @@ function legFare(state, leg, arrivalStop) {
 function boardPassengers(state, line, vehicle, stop) {
   let free = Math.max(0, vehicle.capacity - vehicle.onboard.length);
   if (!free) return 0;
-
   const choices = state.passengers
     .filter(p => p.currentStopId === stop.id && p.state === PASSENGER_STATES.WAITING)
-    .map(p => {
-      if (!p.itinerary) p.itinerary = findPassengerRoute(state, stop.id, p.destinationId);
-      return p;
+    .map(p => { if (!p.itinerary) p.itinerary = findPassengerRoute(state, stop.id, p.destinationId); return p; })
+    .filter(p => {
+      const legs = routeLegs(p.itinerary);
+      return legs.length && legs[p.legIndex || 0]?.lineId === line.id;
     })
-    .filter(p => p.itinerary?.length && p.itinerary[p.legIndex || 0]?.lineId === line.id)
-    // V3.0 — fairness: passengers closer to their destination board first,
-    // and among equals, whoever has waited longest boards first.
-    .sort((a, b) =>
-      (a.itinerary.length - a.legIndex) - (b.itinerary.length - b.legIndex) ||
-      b.waitedMinutes - a.waitedMinutes
-    );
-
+    .sort((a, b) => {
+      const al = routeLegs(a.itinerary), bl = routeLegs(b.itinerary);
+      return (al.length - (a.legIndex || 0)) - (bl.length - (b.legIndex || 0)) ||
+        ((a.itinerary?.transfers || 0) - (a.transfersDone || 0)) - ((b.itinerary?.transfers || 0) - (b.transfersDone || 0)) ||
+        (b.waitedMinutes || 0) - (a.waitedMinutes || 0);
+    });
   let boarded = 0;
   for (const passenger of choices) {
-    if (free <= 0) break;
-    passenger.state = PASSENGER_STATES.BOARDING;
-    passenger.vehicleId = vehicle.id;
+    if (!free) break;
     passenger.state = PASSENGER_STATES.ON_VEHICLE;
+    passenger.vehicleId = vehicle.id;
     vehicle.onboard.push(passenger.id);
-    free--;
-    boarded++;
+    free--; boarded++;
   }
   state.totalBoarded += boarded;
   return boarded;
 }
+
+const TRANSFER_FARE_DISCOUNT = 0.5;
 
 function alightPassengers(state, line, vehicle, stop) {
   let alight = 0;
@@ -261,37 +259,30 @@ function alightPassengers(state, line, vehicle, stop) {
   for (const passengerId of vehicle.onboard) {
     const passenger = state.passengers.find(p => p.id === passengerId);
     if (!passenger) continue;
-    const leg = passenger.itinerary?.[passenger.legIndex || 0];
-    if (!leg || leg.to !== stop.id || leg.lineId !== line.id) {
-      remaining.push(passengerId);
-      continue;
-    }
+    const legs = routeLegs(passenger.itinerary);
+    const leg = legs[passenger.legIndex || 0];
+    if (!leg || leg.to !== stop.id || leg.lineId !== line.id) { remaining.push(passengerId); continue; }
 
-    if ((passenger.legIndex || 0) >= passenger.itinerary.length - 1) {
-      const fare = legFare(state, leg, stop);
+    const fullFare = legFare(state, leg, stop);
+    const fare = passenger.transfersDone > 0 ? fullFare * TRANSFER_FARE_DISCOUNT : fullFare;
+    line.riders++;
+    line.income += fare;
+    state.money += fare;
+    alight++;
+    if ((passenger.legIndex || 0) >= legs.length - 1) {
       passenger.currentStopId = stop.id;
       passenger.vehicleId = null;
       passenger.state = PASSENGER_STATES.ARRIVED;
       passenger.arrivedAt = state.time;
-      alight++;
       state.totalArrived++;
       state.transported++;
-      line.riders++;
-      line.income += fare;
-      state.money += fare;
     } else {
-      // V4.0: this leg is done even though the trip continues — the line
-      // that ran it earns its fare now, same as the final leg does.
-      const fare = legFare(state, leg, stop);
-      line.riders++;
-      line.income += fare;
-      state.money += fare;
-      passenger.legIndex += 1;
+      passenger.legIndex++;
+      passenger.transfersDone = (passenger.transfersDone || 0) + 1;
       passenger.currentStopId = stop.id;
       passenger.vehicleId = null;
-      passenger.state = PASSENGER_STATES.TRANSFERRING;
+      passenger.waitedMinutes = (passenger.waitedMinutes || 0) + 5 * state.speed;
       passenger.state = PASSENGER_STATES.WAITING;
-      alight++;
     }
   }
   vehicle.onboard = remaining;
@@ -323,6 +314,19 @@ export function computeEdgeLoad(state) {
     load.set(key, (load.get(key) || 0) + 1);
   }
   return load;
+}
+
+/** V14.0 — renderer-ready congestion data for occupied road segments. */
+export function congestionHeatmap(state) {
+  const load = computeEdgeLoad(state);
+  const heat = [];
+  for (const [key, count] of load) {
+    const [aId, bId] = key.split("|");
+    const a = stopById(state, aId), b = stopById(state, bId);
+    if (!a || !b) continue;
+    heat.push({ a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, load: count, congestion: 1 - congestionFactor(count) });
+  }
+  return heat;
 }
 
 function congestionFactor(sharing) {
@@ -373,6 +377,10 @@ export function updateVehicles(state, rng = () => 1, log = () => {}) {
     }
     vehicle.brokenMinutesLeft = 0;
     vehicle.brokenTicksLeft = 0;
+    for (const passengerId of vehicle.onboard) {
+      const passenger = state.passengers.find(p => p.id === passengerId);
+      if (passenger) passenger.travelMinutes = (passenger.travelMinutes || 0) + elapsedMinutes;
+    }
 
     const ids = line.route.nodeIds;
     // V9.1 — 1000x simulation speed: a vehicle can now cross several stops

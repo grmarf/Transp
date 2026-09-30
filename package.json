@@ -1,0 +1,10 @@
+{
+  "name": "transp-transport-tycoon",
+  "version": "14.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "for f in tests/*.mjs; do node \"$f\"; done",
+    "serve": "python3 -m http.server 8791 --bind 0.0.0.0"
+  }
+}

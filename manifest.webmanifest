@@ -1,0 +1,9 @@
+{
+  "name": "Transport Tycoon",
+  "short_name": "Transport Tycoon",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#11161c",
+  "theme_color": "#182029",
+  "lang": "fr"
+}

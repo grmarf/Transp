@@ -5,6 +5,7 @@
  * with no changes needed there.
  */
 import { routeLine, countComponents } from "./network.js";
+import { vehicleMode } from "./vehicles.js";
 
 export const ROADWORKS_DAILY_CHANCE = 0.15;
 export const ROADWORKS_DURATION_DAYS_MIN = 2;
@@ -17,7 +18,9 @@ export const ROADWORKS_DURATION_DAYS_MAX = 5;
  */
 export function refreshAllLineRoutes(state, log) {
   for (const line of state.lines) {
-    const newRoute = routeLine(state.network, line.stopIds);
+    const routeNetwork = vehicleMode(line.mode).id === "metro" && state.undergroundNetwork
+      ? state.undergroundNetwork : state.network;
+    const newRoute = routeLine(routeNetwork, line.stopIds);
     if (!newRoute) {
       log(`${line.name} : plus aucun itinéraire disponible tant que les travaux durent.`);
       continue;
