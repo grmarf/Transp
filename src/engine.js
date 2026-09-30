@@ -1,5 +1,5 @@
 import { TICK_MINUTES, STOP_RADIUS, distance } from "./constants.js";
-import { findPassengerRoute, routeLegs } from "./routing.js";
+import { findPassengerRoute, routeLegs, invalidateRoutingCache } from "./routing.js";
 import { PASSENGER_STATES, createPassenger, waitStats, intermodalStats } from "./passengers.js";
 import {
   createVehicle,
@@ -104,6 +104,7 @@ export function finishExtendLine(state, log, routeLine) {
   state.money -= cost;
   line.stopIds = newStopIds;
   line.route = route;
+  invalidateRoutingCache(state);
 
   const addedNames = state.pendingStops
     .map(id => stopById(state, id)?.name)
@@ -161,6 +162,7 @@ export function finishLine(state, log, routeLine, modeId = "bus") {
 
   state.money -= cost;
   state.lines.push(line);
+  invalidateRoutingCache(state);
 
   const vehicle = createVehicle(state, line.id, { mode: mode.id });
   state.vehicles.push(vehicle);
@@ -191,6 +193,7 @@ export function deleteLine(state, lineId, log) {
   state.vehicles = state.vehicles.filter(v => v.lineId !== lineId);
   state.lines = state.lines.filter(l => l.id !== lineId);
   state.money += refund;
+  invalidateRoutingCache(state);
 
   for (const passenger of state.passengers) {
     if (routeLegs(passenger.itinerary).some(leg => leg.lineId === lineId)) {
@@ -349,6 +352,28 @@ export function cityJournal(state) {
   return entries;
 }
 
+/**
+ * Remove terminal passenger agents after a bounded retention window. Agents
+ * still referenced by a vehicle are never removed. Historical totals remain
+ * in state counters, while active waiting/transferring/onboard agents stay.
+ */
+export function cleanupPassengers(state, retentionDays = state.passengerRetentionDays ?? 2) {
+  const now = (state.elapsedDays || 0) * 1440 + (state.time || 0);
+  const cutoff = now - Math.max(0, retentionDays) * 1440;
+  const onboard = new Set(state.vehicles.flatMap(vehicle => vehicle.onboard || []));
+  const before = state.passengers.length;
+  state.passengers = state.passengers.filter(passenger => {
+    const terminal = passenger.state === PASSENGER_STATES.ARRIVED || passenger.state === PASSENGER_STATES.ABANDONED;
+    if (!terminal || onboard.has(passenger.id)) return true;
+    // Older saves only have a clock-time `arrivedAt`, which is not an
+    // absolute timestamp once the simulation crosses midnight. Retain those
+    // records rather than risking premature deletion after migration.
+    const completedAt = passenger.completedAt ?? null;
+    return completedAt == null || completedAt > cutoff;
+  });
+  return before - state.passengers.length;
+}
+
 export function step(state, rng, log) {
   if (state.paused) return;
   for (const passenger of state.passengers) {
@@ -356,8 +381,10 @@ export function step(state, rng, log) {
       passenger.waitedMinutes += TICK_MINUTES * state.speed;
       if (passenger.waitedMinutes >= 120 && !findPassengerRoute(state, passenger.currentStopId, passenger.destinationId)) {
         passenger.state = PASSENGER_STATES.ABANDONED;
+        passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
       } else if (passenger.waitedMinutes >= 240) {
         passenger.state = PASSENGER_STATES.ABANDONED;
+        passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
       }
     }
   }
@@ -395,6 +422,7 @@ export function step(state, rng, log) {
     if (!state.dailyStats) state.dailyStats = [];
     state.dailyStats.push({ day: state.elapsedDays, income: dayIncome, expenses: dayExpenses, net: dayIncome - dayExpenses });
     if (state.dailyStats.length > 14) state.dailyStats.shift();
+    cleanupPassengers(state);
   }
   state.time = newTime % 1440;
   if (state.money < 0) {

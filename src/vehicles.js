@@ -274,6 +274,7 @@ function alightPassengers(state, line, vehicle, stop) {
       passenger.vehicleId = null;
       passenger.state = PASSENGER_STATES.ARRIVED;
       passenger.arrivedAt = state.time;
+      passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
       state.totalArrived++;
       state.transported++;
     } else {

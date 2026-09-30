@@ -1,6 +1,32 @@
-/** Passenger routing — V14 intermodal routing. */
+/** Passenger routing — V14 intermodal routing, V14.1 cached routes. */
 
 export const TRANSFER_PENALTY_HOPS = 3;
+const routeCaches = new WeakMap();
+
+function networkSignature(state) {
+  return state.lines.map(line => `${line.id}:${line.mode || ""}:${(line.stopIds || []).join(",")}`).join(";");
+}
+
+function cacheFor(state) {
+  const signature = networkSignature(state);
+  let cache = routeCaches.get(state);
+  if (!cache || cache.signature !== signature) {
+    cache = { signature, routes: new Map(), hits: 0, misses: 0 };
+    routeCaches.set(state, cache);
+  }
+  return cache;
+}
+
+/** Clear all cached passenger routes for a state after a network mutation. */
+export function invalidateRoutingCache(state) {
+  if (state) routeCaches.delete(state);
+}
+
+/** Diagnostic counters for performance tests and the debug console. */
+export function routingCacheStats(state) {
+  const cache = state ? routeCaches.get(state) : null;
+  return cache ? { entries: cache.routes.size, hits: cache.hits, misses: cache.misses } : { entries: 0, hits: 0, misses: 0 };
+}
 
 function buildLineAdjacency(line) {
   const stops = line.stopIds || [];
@@ -23,8 +49,18 @@ function buildLineAdjacency(line) {
  */
 export function findPassengerRoute(state, originId, destinationId) {
   if (originId === destinationId) return null;
+  const cache = cacheFor(state);
+  const cacheKey = `${originId}|${destinationId}`;
+  if (cache.routes.has(cacheKey)) {
+    cache.hits++;
+    return cache.routes.get(cacheKey);
+  }
+  cache.misses++;
   const lines = state.lines.filter(l => Array.isArray(l.stopIds) && l.stopIds.length >= 2);
-  if (!lines.length) return null;
+  if (!lines.length) {
+    cache.routes.set(cacheKey, null);
+    return null;
+  }
   const lineAdjs = lines.map(line => ({ line, adj: buildLineAdjacency(line) }));
 
   const startKey = `${originId}|@`;
@@ -61,7 +97,10 @@ export function findPassengerRoute(state, originId, destinationId) {
     }
   }
 
-  if (!destinationKey) return null;
+  if (!destinationKey) {
+    cache.routes.set(cacheKey, null);
+    return null;
+  }
   const legs = [];
   let cursor = destinationKey;
   let totalHops = 0;
@@ -83,6 +122,7 @@ export function findPassengerRoute(state, originId, destinationId) {
   merged.legs = merged;
   merged.transfers = Math.max(0, merged.length - 1);
   merged.totalHops = totalHops;
+  cache.routes.set(cacheKey, merged);
   return merged;
 }
 

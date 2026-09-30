@@ -1,4 +1,4 @@
-# Transport Tycoon — Transp
+# Transport Tycoon — Transp V14.1
 
 Jeu de gestion et de simulation de réseau de transport en JavaScript natif, Canvas et modules ES.
 
@@ -13,6 +13,11 @@ Jeu de gestion et de simulation de réseau de transport en JavaScript natif, Can
 - heatmap de congestion et journal de ville ;
 - sauvegarde locale et export/import JSON ;
 - interface adaptée au mobile.
+
+La V14.1 ajoute un cache de routage automatiquement invalidé lors des
+modifications de lignes, ainsi qu’un nettoyage borné des passagers arrivés ou
+abandonnés. Les compteurs historiques sont conservés et les passagers encore
+à bord ne sont jamais supprimés.
 
 ## Lancer le jeu
 

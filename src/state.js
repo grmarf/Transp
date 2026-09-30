@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "14.0",
+    version: "14.1",
     city,
     network: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,
@@ -38,5 +38,7 @@ export function createState(city, scenario = null) {
     dailyBaseline: { income: 0, expenses: 0 },
     journal: [],
     showHeatmap: false,
+    // V14.1: completed passenger records are retained for this many days.
+    passengerRetentionDays: 2,
   };
 }
