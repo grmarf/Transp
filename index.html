@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Transport Tycoon — V14.1</title>
+  <title>Transport Tycoon — V14.2</title>
   <meta name="theme-color" content="#182029">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +15,7 @@
 <header class="topbar">
   <div>
     <h1>Transport Tycoon</h1>
-    <span class="version">V14.1 — performance et robustesse du réseau</span>
+    <span class="version">V14.2 — interface et diagnostics visuels</span>
   </div>
   <div class="stats">
     <span>💰 <b id="money">0 €</b></span>
@@ -52,7 +52,8 @@
 
   <div class="instructions" id="instructions"></div>
   <div class="scenario-banner" id="scenarioBanner" hidden></div>
-  <canvas id="map" width="1000" height="650"></canvas>
+  <canvas id="map" width="1000" height="650" aria-label="Carte de la ville et du réseau de transport"></canvas>
+  <div id="heatmapLegend" class="heatmap-legend" hidden aria-hidden="true"><b>Congestion</b><span class="heatmap-count">0 segments</span><div class="gradient" aria-hidden="true"></div><div class="legend-scale"><span>fluide</span><span>saturé</span></div></div>
 </section>
 
 <aside class="sidebar">
@@ -86,7 +87,7 @@
   </section>
   <section class="card">
     <h2>Outils V14</h2>
-    <button id="toggleHeatmapBtn" type="button">Carte de congestion</button>
+    <button id="toggleHeatmapBtn" type="button" aria-pressed="false">Carte de congestion</button>
     <div id="intermodalStats"></div>
     <h3>Finances (14 jours)</h3>
     <canvas id="financialChart" width="200" height="100"></canvas>
@@ -107,7 +108,7 @@
 </aside>
 </main>
 
-<footer>V14.1 : routage intermodal, heatmap de congestion, export/import JSON, cache de routage et nettoyage des passagers.
+<footer>V14.2 : interface contrôlable, légende heatmap et diagnostics du réseau intermodal.
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

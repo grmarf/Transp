@@ -262,6 +262,14 @@ export function createRenderer(canvas, state) {
       const stats = intermodalStats(state);
       intermodalEl.innerHTML = `<div>Correspondances moyennes : ${stats.avgTransfersPerTrip.toFixed(2)}</div><div>Voyages avec correspondance : ${(stats.shareWithTransfer * 100).toFixed(1)}%</div><div>Temps de trajet moyen : ${stats.avgTravelMinutes.toFixed(0)} min</div>`;
     }
+    const heatmapLegend = document.getElementById("heatmapLegend");
+    if (heatmapLegend) {
+      const active = Array.isArray(options.heatmap) && options.heatmap.length > 0;
+      heatmapLegend.hidden = !active;
+      heatmapLegend.setAttribute("aria-hidden", String(!active));
+      if (active) heatmapLegend.querySelector(".heatmap-count")?.replaceChildren(document.createTextNode(`${options.heatmap.length} segment${options.heatmap.length > 1 ? "s" : ""}`));
+    }
+
     const chart = document.getElementById("financialChart");
     if (chart?.getContext) {
       const c = chart.getContext("2d"); c.clearRect(0, 0, chart.width, chart.height);

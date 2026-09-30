@@ -19,6 +19,10 @@ modifications de lignes, ainsi qu’un nettoyage borné des passagers arrivés o
 abandonnés. Les compteurs historiques sont conservés et les passagers encore
 à bord ne sont jamais supprimés.
 
+La V14.2 centralise les rafraîchissements de l’interface, expose l’état
+accessible de la heatmap, ajoute sa légende visuelle et vérifie le contrat
+HTML/JavaScript/CSS par un test Node sans dépendance de navigateur.
+
 ## Lancer le jeu
 
 Les modules ES doivent être servis par HTTP :
