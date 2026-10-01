@@ -233,6 +233,7 @@ function boot(seed, scenarioId, restoredPayload = null) {
   state.completedGoals ||= [];
   state.progressionHistory ||= [];
   state.reputation ||= 0;
+  state.progressionEnabled = true;
   document.getElementById("seedInput").value = state.city.seed;
   document.getElementById("scenarioSelect").value = state.scenario?.id || "sandbox";
   document.getElementById("pauseBtn").textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";

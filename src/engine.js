@@ -28,6 +28,17 @@ export {
   VEHICLE_RESALE_RATIO, vehicleMode, serviceLevel, congestionHeatmap, intermodalStats,
   eventDemandMultiplier, eventSatisfactionDelta
 };
+
+function progressionMetrics(state) {
+  const intermodal = intermodalStats(state);
+  return { satisfaction: satisfaction(state), transferShare: intermodal.shareWithTransfer };
+}
+
+/** V16.1 — browser actions unlock milestones without waiting for midnight. */
+export function evaluateLiveProgression(state, log = () => {}) {
+  if (!state.progressionEnabled) return [];
+  return evaluateProgression(state, progressionMetrics(state), log);
+}
 export function stopById(state, id) {
   return state.city.stops.find(s => s.id === id);
 }
@@ -170,6 +181,7 @@ export function finishLine(state, log, routeLine, modeId = "bus") {
   const vehicle = createVehicle(state, line.id, { mode: mode.id });
   state.vehicles.push(vehicle);
   line.vehicles.push(vehicle.id);
+  evaluateLiveProgression(state, log);
 
   const infraNote = infrastructureCost > 0 ? ` (dont ${infrastructureCost.toLocaleString("fr-FR")} € d'infrastructure ${mode.name.toLowerCase()})` : "";
   log(`${line.name} créée (${mode.name}) : ${line.stopIds.length} arrêts, ${route.nodeIds.length - 1} segments réseau, coût ${cost.toLocaleString("fr-FR")} €${infraNote}.`);
@@ -424,11 +436,7 @@ export function step(state, rng, log) {
     // V9.0: evaluated last, after this day's growth/economy/disruptions have
     // landed, using metrics computed here so scenarios.js needs no import
     // from engine.js (avoids an engine <-> scenarios cycle).
-    const intermodal = intermodalStats(state);
-    evaluateProgression(state, {
-      satisfaction: satisfaction(state),
-      transferShare: intermodal.shareWithTransfer
-    }, log);
+    if (state.progressionEnabled) evaluateProgression(state, progressionMetrics(state), log);
     evaluateScenario(state, log, { net: networkFinancials(state).net, currentSatisfaction: satisfaction(state) });
 
     // V11.0 — record this day's income/expense/net delta (not the running

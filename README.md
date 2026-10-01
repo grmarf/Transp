@@ -67,3 +67,7 @@ La V15 introduit les événements urbains dynamiques : festivals, marchés, mouv
 La V15.1 remplace le tirage aveugle par des événements déclenchés par la santé réelle du réseau, conserve leur cause dans l'historique et applique un cooldown pour éviter les répétitions.
 
 La V16 ajoute une progression persistante : objectifs de réseau, réputation, rang opérateur et récompenses financières.
+
+La V16.1 évalue les objectifs immédiatement après les actions du joueur dans
+le jeu web : créer une ligne ou ouvrir un métro peut donc débloquer sa
+récompense sans attendre le prochain changement de jour.
