@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "17.0",
+    version: "18.0",
     city,
     network: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,
@@ -56,5 +56,8 @@ export function createState(city, scenario = null) {
     contractHistory: [],
     contractCycle: 0,
     contractsEndDay: 0,
+    // V18: rolling daily operating reports.
+    dailyReports: [],
+    latestReport: null,
   };
 }

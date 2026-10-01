@@ -94,3 +94,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .contract-row { display: flex; justify-content: space-between; gap: 8px; padding: 5px; background: rgba(255,255,255,.06); border-left: 3px solid #45bfc1; font-size: 11px; }
 .contract-row span { color: #bbb; }
 .contract-row.completed { border-left-color: #4caf6a; color: #a5d6a7; }
+
+
+/* V18.0 — daily operating report */
+#reportPanel { display: grid; gap: 5px; }
+.report-header { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.15); padding-bottom: 5px; }
+.report-header .positive { color: #a5d6a7; } .report-header .negative { color: #ef9a9a; }
+.report-metrics { color: #bbb; font-size: 11px; }
+.report-recommendations { font-size: 11px; line-height: 1.45; }

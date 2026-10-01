@@ -3,6 +3,7 @@ import { vehicleMode } from "./vehicles.js";
 import { eventSummary } from "./events.js";
 import { progressionSummary } from "./progression.js";
 import { contractSummary } from "./contracts.js";
+import { latestReport } from "./reports.js";
 
 // V11.0 — shared red/amber/green read on a 0-1 service level, used both on
 // the map (stop ring) and in the sidebar (stop info, line rows).
@@ -260,6 +261,12 @@ export function createRenderer(canvas, state) {
       const entries = state.journal || [];
       journalEl.innerHTML = entries.map(e => `<div class="journal-entry journal-${e.type}">${e.text}</div>`).join("");
     }
+    const reportEl = document.getElementById("reportPanel");
+    if (reportEl) {
+      const report = latestReport(state);
+      reportEl.innerHTML = report ? `<div class="report-header"><b>Jour ${report.day}</b><span class="${report.net >= 0 ? "positive" : "negative"}">${report.net >= 0 ? "+" : ""}${Math.round(report.net).toLocaleString("fr-FR")} €</span></div><div class="report-metrics">Satisfaction ${report.satisfaction}% · Attente ${Math.round(report.avgWaitMinutes)} min · Abandons ${report.abandonedCount}</div><div class="report-recommendations">${report.recommendations.map(item => `<div>• ${item}</div>`).join("")}</div>` : '<div class="muted">Le premier rapport sera disponible à la fin du jour 1.</div>';
+    }
+
     const contractsEl = document.getElementById("contractsPanel");
     if (contractsEl) {
       const coverage = state.city.stops.length ? state.lines.reduce((sum, line) => sum + new Set(line.stopIds || []).size, 0) / state.city.stops.length : 0;

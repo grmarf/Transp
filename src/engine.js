@@ -22,6 +22,7 @@ import { evaluateScenario } from "./scenarios.js";
 import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpiredEvents, startContextualEvent } from "./events.js";
 import { evaluateProgression } from "./progression.js";
 import { ensureContracts, evaluateContracts, refreshContracts } from "./contracts.js";
+import { createDailyReport, recordDailyReport } from "./reports.js";
 
 export {
   TICK_MINUTES, STOP_RADIUS, distance, vehiclePosition, buyVehicleForLine,
@@ -437,11 +438,12 @@ export function step(state, rng, log) {
     // V9.0: evaluated last, after this day's growth/economy/disruptions have
     // landed, using metrics computed here so scenarios.js needs no import
     // from engine.js (avoids an engine <-> scenarios cycle).
-    if (state.progressionEnabled) evaluateProgression(state, progressionMetrics(state), log);
+    const goalsCompleted = state.progressionEnabled ? evaluateProgression(state, progressionMetrics(state), log) : [];
+    let contractsCompleted = [];
     if (state.contractsEnabled) {
       ensureContracts(state);
       refreshContracts(state);
-      evaluateContracts(state, { satisfaction: satisfaction(state), transferShare: intermodalStats(state).shareWithTransfer, coverage: state.city.stops.length ? state.lines.filter(line => line.stopIds?.length).reduce((sum, line) => sum + new Set(line.stopIds).size, 0) / state.city.stops.length : 0 }, log);
+      contractsCompleted = evaluateContracts(state, { satisfaction: satisfaction(state), transferShare: intermodalStats(state).shareWithTransfer, coverage: state.city.stops.length ? state.lines.filter(line => line.stopIds?.length).reduce((sum, line) => sum + new Set(line.stopIds).size, 0) / state.city.stops.length : 0 }, log);
     }
     evaluateScenario(state, log, { net: networkFinancials(state).net, currentSatisfaction: satisfaction(state) });
 
@@ -454,6 +456,21 @@ export function step(state, rng, log) {
     if (!state.dailyStats) state.dailyStats = [];
     state.dailyStats.push({ day: state.elapsedDays, income: dayIncome, expenses: dayExpenses, net: dayIncome - dayExpenses });
     if (state.dailyStats.length > 14) state.dailyStats.shift();
+    const waitReport = waitStats(state);
+    const intermodalReport = intermodalStats(state);
+    recordDailyReport(state, createDailyReport(state, {
+      income: dayIncome,
+      expenses: dayExpenses,
+      net: dayIncome - dayExpenses,
+      satisfaction: satisfaction(state),
+      arrived: state.totalArrived,
+      abandonedCount: waitReport.abandonedCount,
+      avgWaitMinutes: waitReport.avgWaitMinutes,
+      events: state.activeEvents || [],
+      contractsCompleted: contractsCompleted.length,
+      goalsCompleted: goalsCompleted.length,
+      transferShare: intermodalReport.shareWithTransfer
+    }));
     cleanupPassengers(state);
   }
   state.time = newTime % 1440;

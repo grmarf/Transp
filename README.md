@@ -1,4 +1,4 @@
-# Transport Tycoon — Transp V17.0
+# Transport Tycoon — Transp V18.0
 
 Jeu de gestion et de simulation de réseau de transport en JavaScript natif, Canvas et modules ES.
 
@@ -73,3 +73,5 @@ le jeu web : créer une ligne ou ouvrir un métro peut donc débloquer sa
 récompense sans attendre le prochain changement de jour.
 
 La V17 ajoute des contrats réseau renouvelables tous les trois jours, avec objectifs de fréquentation, qualité, couverture et intermodalité récompensés en argent et réputation.
+
+La V18 ajoute un rapport quotidien conservant les 14 derniers bilans, avec finances, satisfaction, attente, abandons et recommandations actionnables.
