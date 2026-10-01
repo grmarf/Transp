@@ -57,7 +57,9 @@ export function triggerEvent(state, type, durationDays = null, log = () => {}, c
   };
   state.activeEvents = [...(state.activeEvents || []).filter(e => e.endsDay > (state.elapsedDays || 0)), event];
   state.eventHistory = [...(state.eventHistory || []), event].slice(-20);
-  state.eventCooldownUntil = Math.max(state.eventCooldownUntil || 0, event.endsDay + 1);
+  // V20.1 — cooldown étendu à endsDay + 2 : à endsDay + 1 l’événement venait
+  // d’expirer et se redéclenchait immédiatement (grèves en boucle).
+  state.eventCooldownUntil = Math.max(state.eventCooldownUntil || 0, event.endsDay + 2);
   log(`${definition.icon} ${definition.label} : l'activité de la ville change pour ${event.endsDay - event.startedDay} jour(s).${cause !== "manual" ? ` Cause : ${cause}.` : ""}`);
   return event;
 }

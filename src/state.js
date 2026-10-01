@@ -29,7 +29,8 @@ export function createState(city, scenario = null) {
     totalDemand: 0,
     totalGenerated: 0,
     totalBoarded: 0,
-    totalArrived: 0,
+    // V20.1 — total cumulé des abandons (affiché dans le bandeau de stats).
+    totalAbandoned: 0,
     logs: [],
     // V11.0 — per-day financial history (last 14 days), for cash-flow
     // trend display; dailyBaseline is the cumulative income/expenses total

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "for f in tests/*.mjs; do node \"$f\"; done",
+    "test": "node tests/run-all.mjs",
     "serve": "python3 -m http.server 8791 --bind 0.0.0.0"
   }
 }

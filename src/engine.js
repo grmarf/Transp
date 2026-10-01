@@ -280,7 +280,13 @@ export function generateDemand(state, rng) {
           });
           passenger.id = state.nextPassengerId++;
           passenger.itinerary = findPassengerRoute(state, origin.id, destination.id);
-          if (!passenger.itinerary) passenger.state = PASSENGER_STATES.ABANDONED;
+          if (!passenger.itinerary) {
+            // V20.1 — horodate l’abandon immédiat (sinon le passager reste
+            // en mémoire indéfiniment car cleanupPassengers exige completedAt).
+            passenger.state = PASSENGER_STATES.ABANDONED;
+            passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
+            state.totalAbandoned = (state.totalAbandoned || 0) + 1;
+          }
           state.passengers.push(passenger);
         }
       });
@@ -401,9 +407,11 @@ export function step(state, rng, log) {
       if (passenger.waitedMinutes >= 120 && !findPassengerRoute(state, passenger.currentStopId, passenger.destinationId)) {
         passenger.state = PASSENGER_STATES.ABANDONED;
         passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
+        state.totalAbandoned = (state.totalAbandoned || 0) + 1;
       } else if (passenger.waitedMinutes >= 240) {
         passenger.state = PASSENGER_STATES.ABANDONED;
         passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
+        state.totalAbandoned = (state.totalAbandoned || 0) + 1;
       }
     }
   }

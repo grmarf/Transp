@@ -81,3 +81,13 @@ La V19 introduit un calendrier saisonnier de 28 jours : les saisons modifient la
 La V20 utilise un format de sauvegarde strict courant. Les fichiers doivent
 être explicitement au format V20 ; aucune migration des formats historiques
 V13–V19 n’est incluse, car aucune sauvegarde de ces versions n’est à importer.
+
+## V20.1 — Correctifs
+
+- **Passagers fantômes** : les voyageurs sans itinéraire sont désormais horodatés (`completedAt`) et comptés (`totalAbandoned`) dès leur abandon, puis purgés normalement par `cleanupPassengers`. Ils ne s'accumulent plus en mémoire.
+- **Stat « Abandons »** : le bandeau affiche le total cumulé de la partie au lieu du nombre d'abandons encore en mémoire (valeur trompeuse).
+- **Événements en boucle** : le cooldown après un événement passe de `endsDay + 1` à `endsDay + 2` — les grèves ne se redéclenchent plus indéfiniment le jour de leur expiration.
+- **index.html** : balise `</footer>` manquante refermée.
+- **`npm test`** : lanceur multi-plateforme `tests/run-all.mjs` (remplace la boucle shell incompatible Windows) + nouveau test de régression `tests/v21-cleanup.mjs`.
+
+Les sauvegardes V20 restent compatibles (`totalAbandoned` est lu défensivement via `|| 0`).
