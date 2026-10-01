@@ -327,7 +327,7 @@ export function congestionHeatmap(state) {
     const [aId, bId] = key.split("|");
     const a = stopById(state, aId), b = stopById(state, bId);
     if (!a || !b) continue;
-    heat.push({ a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, load: count, congestion: 1 - congestionFactor(count) });
+    heat.push({ a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, load: count, congestion: Math.max(0, 1 - congestionFactor(count)) });
   }
   return heat;
 }

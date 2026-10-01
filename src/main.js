@@ -258,15 +258,24 @@ function boot(seed, scenarioId, restoredPayload = null) {
 
 function updateSaveStatus(message = null) {
   const el = document.getElementById("saveStatus");
+  const text = document.getElementById("saveStatusText");
   if (!el) return;
-  if (message) { el.textContent = message; return; }
+  if (message) { (text || el).textContent = message; return; }
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) { el.textContent = "Aucune sauvegarde locale."; return; }
+    if (!raw) { (text || el).textContent = "Aucune sauvegarde locale."; return; }
     const payload = JSON.parse(raw);
     const date = payload.savedAt ? new Date(payload.savedAt).toLocaleString("fr-FR") : "date inconnue";
-    el.textContent = `Sauvegarde locale : ${date}`;
-  } catch { el.textContent = "Sauvegarde locale indisponible."; }
+    (text || el).textContent = `Sauvegarde locale : ${date}`;
+  } catch { (text || el).textContent = "Sauvegarde locale indisponible."; }
+}
+
+function setSaveActivity(active, label = "Sauvegarde…") {
+  const activity = document.getElementById("saveActivity");
+  if (!activity) return;
+  activity.hidden = !active;
+  activity.setAttribute("aria-hidden", String(!active));
+  activity.textContent = label;
 }
 
 function saveCurrentGame() {
@@ -371,12 +380,15 @@ bindTap(document.getElementById("toggleHeatmapBtn"), () => {
 });
 
 bindTap(document.getElementById("exportBtn"), () => {
-  exportGameToFile(state, rng?.getState?.() ?? null);
+  setSaveActivity(true, "Export…");
+  try { exportGameToFile(state, rng?.getState?.() ?? null); }
+  finally { setSaveActivity(false); }
 });
 
 document.getElementById("importFile")?.addEventListener("change", async event => {
   const file = event.target.files?.[0];
   if (!file) return;
+  setSaveActivity(true, "Import…");
   try {
     const payload = await importGameFromFile(file);
     boot(payload.state.city.seed, payload.state.scenario?.id || "sandbox", payload);
@@ -385,6 +397,7 @@ document.getElementById("importFile")?.addEventListener("change", async event =>
   } catch (error) {
     log(`Échec de l'import : ${error.message}`);
   } finally {
+    setSaveActivity(false);
     event.target.value = "";
   }
 });

@@ -1,6 +1,8 @@
 /** V20.0 — strict current-save persistence, no historical migrations. */
 
-export const SAVE_VERSION = 2;
+export const SAVE_FORMAT_VERSION = 2;
+// Backward-compatible export for callers using the pre-V20 name.
+export const SAVE_VERSION = SAVE_FORMAT_VERSION;
 export const SAVE_KEY = "transport-tycoon-v20-save";
 const SAVE_FORMAT = "transport-tycoon-save";
 const STATE_VERSION = "20.0";
@@ -12,7 +14,7 @@ function invalid(message) { throw new Error(`Sauvegarde V20 invalide : ${message
 export function validateSavePayload(payload) {
   if (!payload || typeof payload !== "object") invalid("objet absent");
   if (payload.format !== SAVE_FORMAT) invalid("format inconnu");
-  if (payload.version !== SAVE_VERSION) invalid("version de format non supportée");
+  if (payload.version !== SAVE_FORMAT_VERSION) invalid(`Format de sauvegarde invalide (attendu: ${SAVE_FORMAT_VERSION}) : version de format non supportée`);
   if (!payload.savedAt || Number.isNaN(Date.parse(payload.savedAt))) invalid("date absente ou invalide");
   if (payload.rngState !== null && payload.rngState !== undefined && !Number.isInteger(payload.rngState)) invalid("état du générateur aléatoire invalide");
 
@@ -40,9 +42,13 @@ export function serializeState(state, rngState = null) {
       closedEdgeIds: [...(state.network.closedEdgeIds || [])],
       roadworksReopenDay: [...(state.network.roadworksReopenDay || [])]
     } : null,
-    undergroundNetwork: null
+    undergroundNetwork: state.undergroundNetwork ? {
+      version: state.undergroundNetwork.version,
+      closedEdgeIds: [...(state.undergroundNetwork.closedEdgeIds || [])],
+      roadworksReopenDay: [...(state.undergroundNetwork.roadworksReopenDay || [])]
+    } : null
   });
-  const payload = { format: SAVE_FORMAT, version: SAVE_VERSION, savedAt: new Date().toISOString(), rngState, state: clean };
+  const payload = { format: SAVE_FORMAT, version: SAVE_FORMAT_VERSION, savedAt: new Date().toISOString(), rngState, state: clean };
   return validateSavePayload(payload);
 }
 
@@ -77,7 +83,7 @@ export function exportGameToFile(state, rngState = null) {
   anchor.href = url;
   anchor.download = `transport-tycoon-v20-${state.city?.seed || "save"}.json`;
   anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
   return payload;
 }
 

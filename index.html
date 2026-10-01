@@ -12,123 +12,93 @@
   <link rel="stylesheet" href="src/style.css">
 </head>
 <body>
-<header class="topbar">
+<header class="topbar" aria-label="En-tête du jeu">
   <div>
     <h1>Transport Tycoon</h1>
     <span class="version">V20.0 — sauvegardes strictes et validation</span>
   </div>
-  <div class="stats">
-    <span>💰 <b id="money">0 €</b></span>
-    <span>👥 <b id="passengers">0</b></span>
-    <span>😊 <b id="satisfaction">0%</b></span>
-    <span>🕒 <b id="clock">08:00</b></span>
+  <div class="stats" aria-label="Statistiques principales">
+    <span aria-label="Budget">💰 <b id="money">0 €</b></span>
+    <span aria-label="Passagers transportés">👥 <b id="passengers">0</b></span>
+    <span aria-label="Satisfaction">😊 <b id="satisfaction">0%</b></span>
+    <span aria-label="Heure de jeu">🕒 <b id="clock">08:00</b></span>
   </div>
 </header>
 
-<main>
-<section class="map-panel">
-  <div class="toolbar">
-    <button id="newLineBtn" type="button">＋ Nouvelle ligne</button>
-    <select id="modeSelect">
-      <option value="bus">Bus</option>
-      <option value="tram">Tramway</option>
-      <option value="metro">Métro</option>
-    </select>
-    <button id="finishLineBtn" type="button" hidden>✓ Terminer la ligne</button>
-    <button id="pauseBtn" type="button">⏸ Pause</button>
-    <button id="speedBtn" type="button">▶ 1×</button>
-    <button id="saveBtn" type="button">💾 Sauvegarder</button>
-    <button id="loadBtn" type="button">↩ Charger</button>
-  </div>
+<main class="app-shell">
+  <section class="map-panel" aria-label="Carte et commandes de transport">
+    <div class="toolbar" role="toolbar" aria-label="Commandes de partie">
+      <button id="newLineBtn" type="button" aria-label="Créer ou annuler une nouvelle ligne">＋ Nouvelle ligne</button>
+      <label class="sr-only" for="modeSelect">Mode de transport</label>
+      <select id="modeSelect" aria-label="Mode de transport">
+        <option value="bus">Bus</option>
+        <option value="tram">Tramway</option>
+        <option value="metro">Métro</option>
+      </select>
+      <button id="finishLineBtn" type="button" aria-label="Terminer la ligne" hidden>✓ Terminer la ligne</button>
+      <button id="pauseBtn" type="button" aria-label="Mettre en pause ou reprendre la partie">⏸ Pause</button>
+      <button id="speedBtn" type="button" aria-label="Modifier la vitesse de simulation">▶ 1×</button>
+      <button id="saveBtn" type="button" aria-label="Sauvegarder la partie">💾 Sauvegarder</button>
+      <button id="loadBtn" type="button" aria-label="Charger la partie sauvegardée">↩ Charger</button>
+    </div>
 
-  <div class="city-controls">
-    <label for="seedInput">Seed ville</label>
-    <input id="seedInput" type="text" maxlength="40" autocomplete="off" spellcheck="false">
-    <label for="scenarioSelect">Scénario</label>
-    <select id="scenarioSelect"></select>
-    <button id="newCityBtn" type="button">🏙 Générer la ville</button>
-    <span>Ville : <b id="cityName">—</b></span>
-  </div>
+    <div class="city-controls" aria-label="Paramètres de ville">
+      <label for="seedInput">Seed ville</label>
+      <input id="seedInput" type="text" maxlength="40" autocomplete="off" spellcheck="false" aria-label="Seed de la ville">
+      <label for="scenarioSelect">Scénario</label>
+      <select id="scenarioSelect" aria-label="Scénario de jeu"></select>
+      <button id="newCityBtn" type="button" aria-label="Générer une nouvelle ville">🏙 Générer la ville</button>
+      <span>Ville : <b id="cityName">—</b></span>
+    </div>
 
-  <div class="instructions" id="instructions"></div>
-  <div class="scenario-banner" id="scenarioBanner" hidden></div>
-  <canvas id="map" width="1000" height="650" aria-label="Carte de la ville et du réseau de transport"></canvas>
-  <div id="heatmapLegend" class="heatmap-legend" hidden aria-hidden="true"><b>Congestion</b><span class="heatmap-count">0 segments</span><div class="gradient" aria-hidden="true"></div><div class="legend-scale"><span>fluide</span><span>saturé</span></div></div>
-</section>
-
-<aside class="sidebar">
-  <section class="card">
-    <h2>Ville</h2>
-    <div class="save-status" id="saveStatus">Aucune sauvegarde locale.</div>
-    <div class="city-meta">
-      <div><small>Seed</small><strong id="seedValue">—</strong></div>
-      <div><small>Infrastructure</small><strong>V9.1+V7</strong></div>
+    <div class="instructions" id="instructions" aria-live="polite"></div>
+    <div class="scenario-banner" id="scenarioBanner" aria-live="polite" hidden></div>
+    <div class="canvas-wrap">
+      <canvas id="map" width="1000" height="650" aria-label="Carte de la ville et du réseau de transport"></canvas>
+      <div id="heatmapLegend" class="heatmap-legend" hidden aria-hidden="true"><b>Congestion</b><span class="heatmap-count">0 segments</span><div class="gradient" aria-hidden="true"></div><div class="legend-scale"><span>fluide</span><span>saturé</span></div></div>
     </div>
   </section>
-  <section class="card">
-    <h2>Réseau</h2>
-    <div id="networkStats"></div>
-  </section>
-  <section class="card">
-    <h2>Opportunités</h2>
-    <div id="opportunities"></div>
-  </section>
-  <section class="card">
-    <h2>Lignes</h2>
-    <div id="lines"></div>
-  </section>
-  <section class="card">
-    <h2>Arrêt sélectionné</h2>
-    <div id="stopInfo">Aucun arrêt sélectionné.</div>
-  </section>
-  <section class="card">
-    <h2>Vue d'ensemble de la ville</h2>
-    <div id="cityOverview"></div>
-  </section>
-  <section class="card">
-    <h2>Calendrier V19</h2>
-    <div id="seasonPanel" aria-live="polite"><div class="muted">Le calendrier saisonnier sera initialisé au démarrage.</div></div>
-  </section>
-  <section class="card">
-    <h2>Rapport quotidien V18</h2>
-    <div id="reportPanel" aria-live="polite"><div class="muted">Le premier rapport sera disponible à la fin du jour 1.</div></div>
-  </section>
-  <section class="card">
-    <h2>Contrats réseau V17</h2>
-    <div id="contractsPanel" aria-live="polite"><div class="muted">Les contrats seront proposés au prochain jour.</div></div>
-  </section>
-  <section class="card">
-    <h2>Progression V16</h2>
-    <div id="progressionPanel" aria-live="polite"><div class="muted">Les objectifs apparaîtront après le premier jour.</div></div>
-  </section>
-  <section class="card">
-    <h2>Événements urbains V15</h2>
-    <div id="eventPanel" aria-live="polite"><div class="muted">Aucun événement en cours.</div></div>
-  </section>
-  <section class="card">
-    <h2>Outils V14</h2>
-    <button id="toggleHeatmapBtn" type="button" aria-pressed="false">Carte de congestion</button>
-    <div id="intermodalStats"></div>
-    <h3>Finances (14 jours)</h3>
-    <canvas id="financialChart" width="200" height="100"></canvas>
-  </section>
-  <section class="card">
-    <h2>Journal de ville</h2>
-    <div id="journal"></div>
-  </section>
-  <section class="card">
-    <h2>Sauvegarde fichier</h2>
-    <button id="exportBtn" type="button">Exporter JSON</button>
-    <label class="import-label">Importer JSON <input type="file" id="importFile" accept=".json" style="display:none"></label>
-  </section>
-  <section class="card log-card">
-    <h2>Journal</h2>
-    <div id="log"></div>
-  </section>
-</aside>
+
+  <aside class="dashboard" aria-label="Tableau de bord">
+    <section class="card">
+      <h2>Ville</h2>
+      <div class="save-status" id="saveStatus" role="status" aria-live="polite">
+        <span id="saveActivity" class="save-activity" hidden aria-hidden="true">Sauvegarde…</span>
+        <span id="saveStatusText">Aucune sauvegarde locale.</span>
+      </div>
+      <div class="city-meta">
+        <div><small>Seed</small><strong id="seedValue">—</strong></div>
+        <div><small>Infrastructure</small><strong>V9.1+V7</strong></div>
+      </div>
+    </section>
+    <section class="card"><h2>Réseau</h2><div id="networkStats"></div></section>
+    <section class="card"><h2>Opportunités</h2><div id="opportunities"></div></section>
+    <section class="card"><h2>Lignes</h2><div id="lines"></div></section>
+    <section class="card"><h2>Arrêt sélectionné</h2><div id="stopInfo">Aucun arrêt sélectionné.</div></section>
+    <section class="card"><h2>Vue d'ensemble de la ville</h2><div id="cityOverview"></div></section>
+    <section class="card"><h2>Calendrier V19</h2><div id="seasonPanel" aria-live="polite"><div class="muted">Le calendrier saisonnier sera initialisé au démarrage.</div></div></section>
+    <section class="card"><h2>Rapport quotidien V18</h2><div id="reportPanel" aria-live="polite"><div class="muted">Le premier rapport sera disponible à la fin du jour 1.</div></div></section>
+    <section class="card"><h2>Contrats réseau V17</h2><div id="contractsPanel" aria-live="polite"><div class="muted">Les contrats seront proposés au prochain jour.</div></div></section>
+    <section class="card"><h2>Progression V16</h2><div id="progressionPanel" aria-live="polite"><div class="muted">Les objectifs apparaîtront après le premier jour.</div></div></section>
+    <section class="card"><h2>Événements urbains V15</h2><div id="eventPanel" aria-live="polite"><div class="muted">Aucun événement en cours.</div></div></section>
+    <section class="card">
+      <h2>Outils V14</h2>
+      <button id="toggleHeatmapBtn" type="button" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false">Carte de congestion</button>
+      <div id="intermodalStats"></div>
+      <h3>Finances (14 jours)</h3>
+      <canvas id="financialChart" width="200" height="100" aria-label="Graphique des finances sur quatorze jours"></canvas>
+    </section>
+    <section class="card"><h2>Journal de ville</h2><div id="journal" aria-live="polite"></div></section>
+    <section class="card">
+      <h2>Sauvegarde fichier</h2>
+      <button id="exportBtn" type="button" aria-label="Exporter la sauvegarde au format JSON">Exporter JSON</button>
+      <label class="import-label" for="importFile">Importer JSON <input type="file" id="importFile" accept=".json" aria-label="Importer une sauvegarde JSON"></label>
+    </section>
+    <section class="card log-card"><h2>Journal</h2><div id="log" aria-live="polite"></div></section>
+  </aside>
 </main>
 
-<footer>V20.0 : sauvegardes strictes, validation du format et import sécurisé.
+<footer>V20.0 : sauvegardes strictes, validation du format et import sécurisé.</footer>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>
