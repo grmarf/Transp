@@ -1,11 +1,36 @@
-/** V14.0 — versioned local and file persistence. */
-// Keep the serialized format at v1 for compatibility with existing V10 saves;
-// the game-state version is tracked independently in state.js.
-export const SAVE_VERSION = 1;
-export const SAVE_KEY = "transport-tycoon-v14-save";
-const LEGACY_SAVE_KEY = "transport-tycoon-v10-save";
+/** V20.0 — strict current-save persistence, no historical migrations. */
+
+export const SAVE_VERSION = 2;
+export const SAVE_KEY = "transport-tycoon-v20-save";
+const SAVE_FORMAT = "transport-tycoon-save";
+const STATE_VERSION = "20.0";
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
+
+function invalid(message) { throw new Error(`Sauvegarde V20 invalide : ${message}`); }
+
+export function validateSavePayload(payload) {
+  if (!payload || typeof payload !== "object") invalid("objet absent");
+  if (payload.format !== SAVE_FORMAT) invalid("format inconnu");
+  if (payload.version !== SAVE_VERSION) invalid("version de format non supportée");
+  if (!payload.savedAt || Number.isNaN(Date.parse(payload.savedAt))) invalid("date absente ou invalide");
+  if (payload.rngState !== null && payload.rngState !== undefined && !Number.isInteger(payload.rngState)) invalid("état du générateur aléatoire invalide");
+
+  const state = payload.state;
+  if (!state || typeof state !== "object") invalid("état absent");
+  if (state.version !== STATE_VERSION) invalid("version du jeu différente de V20.0");
+  if (!state.city || !Array.isArray(state.city.stops) || !Array.isArray(state.city.roads)) invalid("ville incomplète");
+  for (const field of ["lines", "vehicles", "passengers", "dailyStats", "dailyReports", "activeEvents", "activeContracts", "completedGoals"]) {
+    if (!Array.isArray(state[field])) invalid(`champ ${field} absent ou invalide`);
+  }
+  for (const field of ["money", "time", "elapsedDays", "nextLineId", "nextVehicleId"]) {
+    if (!Number.isFinite(state[field])) invalid(`champ numérique ${field} invalide`);
+  }
+  if (state.network && (!Array.isArray(state.network.closedEdgeIds) || !Array.isArray(state.network.roadworksReopenDay))) {
+    invalid("réseau sérialisé incomplet");
+  }
+  return payload;
+}
 
 export function serializeState(state, rngState = null) {
   const clean = clone({
@@ -17,7 +42,8 @@ export function serializeState(state, rngState = null) {
     } : null,
     undergroundNetwork: null
   });
-  return { format: "transport-tycoon-save", version: SAVE_VERSION, savedAt: new Date().toISOString(), rngState, state: clean };
+  const payload = { format: SAVE_FORMAT, version: SAVE_VERSION, savedAt: new Date().toISOString(), rngState, state: clean };
+  return validateSavePayload(payload);
 }
 
 export function saveGame(state, rngState, storage = globalThis.localStorage) {
@@ -28,23 +54,19 @@ export function saveGame(state, rngState, storage = globalThis.localStorage) {
 }
 
 export function hasSavedGame(storage = globalThis.localStorage) {
-  return !!storage && (!!storage.getItem(SAVE_KEY) || !!storage.getItem(LEGACY_SAVE_KEY));
+  return !!storage?.getItem(SAVE_KEY);
 }
 
 export function readSavedGame(storage = globalThis.localStorage) {
   if (!storage) return null;
-  const raw = storage.getItem(SAVE_KEY) || storage.getItem(LEGACY_SAVE_KEY);
+  const raw = storage.getItem(SAVE_KEY);
   if (!raw) return null;
-  const payload = JSON.parse(raw);
-  if (payload?.format !== "transport-tycoon-save" || ![1, SAVE_VERSION].includes(payload.version) || !payload.state?.city) {
-    throw new Error("Sauvegarde incompatible ou corrompue");
-  }
-  return payload;
+  try { return validateSavePayload(JSON.parse(raw)); }
+  catch (error) { throw new Error(error.message.startsWith("Sauvegarde V20 invalide") ? error.message : "Sauvegarde V20 invalide : JSON illisible"); }
 }
 
 export function clearSavedGame(storage = globalThis.localStorage) {
-  if (!storage) return;
-  storage.removeItem(SAVE_KEY); storage.removeItem(LEGACY_SAVE_KEY);
+  storage?.removeItem(SAVE_KEY);
 }
 
 export function exportGameToFile(state, rngState = null) {
@@ -53,7 +75,7 @@ export function exportGameToFile(state, rngState = null) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `transport-tycoon-${state.city?.seed || "save"}.json`;
+  anchor.download = `transport-tycoon-v20-${state.city?.seed || "save"}.json`;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
   return payload;
@@ -61,9 +83,8 @@ export function exportGameToFile(state, rngState = null) {
 
 export async function importGameFromFile(file) {
   if (!file) return null;
-  const payload = JSON.parse(await file.text());
-  if (payload?.format !== "transport-tycoon-save" || ![1, SAVE_VERSION].includes(payload.version) || !payload.state?.city) {
-    throw new Error("Fichier de sauvegarde incompatible ou corrompu");
-  }
-  return payload;
+  let payload;
+  try { payload = JSON.parse(await file.text()); }
+  catch { throw new Error("Fichier de sauvegarde V20 illisible"); }
+  return validateSavePayload(payload);
 }

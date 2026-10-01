@@ -32,7 +32,8 @@ const expectedRng = rng.getState();
 
 saveGame(state, expectedRng, fakeStorage);
 const payload = readSavedGame(fakeStorage);
-assert.equal(payload.version, 1);
+assert.equal(payload.version, 2);
+assert.equal(payload.state.version, '20.0');
 assert.equal(payload.state.money, 41234.5);
 assert.equal(payload.state.network.closedEdgeIds.length, 1);
 assert.deepEqual(payload.state.network.roadworksReopenDay, [[state.network.edges[0].id, 7]]);

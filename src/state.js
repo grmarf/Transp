@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "19.0",
+    version: "20.0",
     city,
     network: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,

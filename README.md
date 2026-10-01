@@ -1,4 +1,4 @@
-# Transport Tycoon — Transp V19.0
+# Transport Tycoon — Transp V20.0
 
 Jeu de gestion et de simulation de réseau de transport en JavaScript natif, Canvas et modules ES.
 
@@ -77,3 +77,7 @@ La V17 ajoute des contrats réseau renouvelables tous les trois jours, avec obje
 La V18 ajoute un rapport quotidien conservant les 14 derniers bilans, avec finances, satisfaction, attente, abandons et recommandations actionnables.
 
 La V19 introduit un calendrier saisonnier de 28 jours : les saisons modifient la demande, les tarifs, la croissance urbaine et apparaissent dans les rapports.
+
+La V20 utilise un format de sauvegarde strict courant. Les fichiers doivent
+être explicitement au format V20 ; aucune migration des formats historiques
+V13–V19 n’est incluse, car aucune sauvegarde de ces versions n’est à importer.

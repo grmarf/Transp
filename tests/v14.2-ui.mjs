@@ -20,6 +20,6 @@ assert.match(main, /setAttribute\("aria-pressed", String\(state\.showHeatmap\)\)
 assert.match(renderer, /function render\(options = \{\}\)/);
 assert.match(renderer, /heatmapLegend\.hidden = !active/);
 assert.match(css, /#toggleHeatmapBtn\[aria-pressed="true"\]/);
-assert.match(pkg.version, /^19\./);
+assert.match(pkg.version, /^20\./);
 
 console.log(JSON.stringify({ ok: true, version: pkg.version, checkedIds: 8 }));
