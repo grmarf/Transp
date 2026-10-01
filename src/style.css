@@ -102,3 +102,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .report-header .positive { color: #a5d6a7; } .report-header .negative { color: #ef9a9a; }
 .report-metrics { color: #bbb; font-size: 11px; }
 .report-recommendations { font-size: 11px; line-height: 1.45; }
+
+
+/* V19.0 — seasonal calendar */
+#seasonPanel { display: grid; gap: 4px; }
+.season-header { display: flex; justify-content: space-between; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,.15); }
+.season-header span, .season-effects { color: #bbb; font-size: 11px; }

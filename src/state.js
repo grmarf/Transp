@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "18.0",
+    version: "19.0",
     city,
     network: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,
@@ -59,5 +59,7 @@ export function createState(city, scenario = null) {
     // V18: rolling daily operating reports.
     dailyReports: [],
     latestReport: null,
+    // V19: browser games apply seasonal demand, fares and growth.
+    seasonsEnabled: false,
   };
 }

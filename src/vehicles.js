@@ -5,6 +5,7 @@
 
 import { findPassengerRoute, routeLegs } from "./routing.js";
 import { eventFareMultiplier } from "./events.js";
+import { seasonFareMultiplier } from "./seasons.js";
 import { PASSENGER_STATES } from "./passengers.js";
 import { TICK_MINUTES } from "./constants.js";
 
@@ -221,7 +222,7 @@ function isScheduledStop(line, nodeId) {
 function legFare(state, leg, arrivalStop) {
   const boardedAt = stopById(state, leg.from);
   const d = boardedAt ? distance(boardedAt, arrivalStop) : 0;
-  return (FARE_BASE_LEG + (d / 100) * FARE_PER_100PX) * eventFareMultiplier(state);
+  return (FARE_BASE_LEG + (d / 100) * FARE_PER_100PX) * eventFareMultiplier(state) * seasonFareMultiplier(state);
 }
 
 function boardPassengers(state, line, vehicle, stop) {

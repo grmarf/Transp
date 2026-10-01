@@ -21,6 +21,7 @@ export function createDailyReport(state, metrics = {}) {
     events: (metrics.events || []).map(event => event.type || event),
     contractsCompleted: metrics.contractsCompleted || 0,
     goalsCompleted: metrics.goalsCompleted || 0,
+    season: metrics.season?.id || null,
     recommendations
   };
 }

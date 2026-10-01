@@ -23,6 +23,7 @@ import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpi
 import { evaluateProgression } from "./progression.js";
 import { ensureContracts, evaluateContracts, refreshContracts } from "./contracts.js";
 import { createDailyReport, recordDailyReport } from "./reports.js";
+import { applySeasonalGrowth, seasonDemandMultiplier, seasonSummary } from "./seasons.js";
 
 export {
   TICK_MINUTES, STOP_RADIUS, distance, vehiclePosition, buyVehicleForLine,
@@ -248,7 +249,7 @@ export function generateDemand(state, rng) {
 
     for (const origin of stops) {
       const base = rng() * TRIP_RATE * origin.population * rush * intervalFactor *
-        (state.scenario?.demandMultiplier ?? 1) * eventDemandMultiplier(state);
+        (state.scenario?.demandMultiplier ?? 1) * eventDemandMultiplier(state) * seasonDemandMultiplier(state);
       if (base <= 0) continue;
 
       const candidates = stops.filter(s => s.id !== origin.id);
@@ -424,6 +425,7 @@ export function step(state, rng, log) {
   for (let d = 0; d < daysCrossed; d++) {
     state.elapsedDays = (state.elapsedDays || 0) + 1;
     growCity(state, rng, log);
+    applySeasonalGrowth(state);
     maybeEndRoadworks(state, log);
     maybeStartRoadworks(state, rng, log);
     finishExpiredEvents(state, log);
@@ -469,7 +471,8 @@ export function step(state, rng, log) {
       events: state.activeEvents || [],
       contractsCompleted: contractsCompleted.length,
       goalsCompleted: goalsCompleted.length,
-      transferShare: intermodalReport.shareWithTransfer
+      transferShare: intermodalReport.shareWithTransfer,
+      season: seasonSummary(state)
     }));
     cleanupPassengers(state);
   }

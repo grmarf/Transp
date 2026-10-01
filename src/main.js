@@ -239,6 +239,7 @@ function boot(seed, scenarioId, restoredPayload = null) {
   state.contractHistory ||= [];
   state.dailyReports ||= [];
   state.latestReport ||= null;
+  state.seasonsEnabled = true;
   document.getElementById("seedInput").value = state.city.seed;
   document.getElementById("scenarioSelect").value = state.scenario?.id || "sandbox";
   document.getElementById("pauseBtn").textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
