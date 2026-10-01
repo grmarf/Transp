@@ -87,3 +87,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .progression-header span { color: #bbb; font-size: 11px; }
 .goal-row { display: flex; justify-content: space-between; gap: 8px; padding: 4px 5px; color: #bbb; font-size: 11px; }
 .goal-row.completed { color: #a5d6a7; background: rgba(76,175,80,.1); border-radius: 3px; }
+
+
+/* V17.0 — renewable network contracts */
+#contractsPanel { display: grid; gap: 5px; }
+.contract-row { display: flex; justify-content: space-between; gap: 8px; padding: 5px; background: rgba(255,255,255,.06); border-left: 3px solid #45bfc1; font-size: 11px; }
+.contract-row span { color: #bbb; }
+.contract-row.completed { border-left-color: #4caf6a; color: #a5d6a7; }

@@ -21,6 +21,7 @@ import { maybeStartRoadworks, maybeEndRoadworks } from "./disruptions.js";
 import { evaluateScenario } from "./scenarios.js";
 import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpiredEvents, startContextualEvent } from "./events.js";
 import { evaluateProgression } from "./progression.js";
+import { ensureContracts, evaluateContracts, refreshContracts } from "./contracts.js";
 
 export {
   TICK_MINUTES, STOP_RADIUS, distance, vehiclePosition, buyVehicleForLine,
@@ -437,6 +438,11 @@ export function step(state, rng, log) {
     // landed, using metrics computed here so scenarios.js needs no import
     // from engine.js (avoids an engine <-> scenarios cycle).
     if (state.progressionEnabled) evaluateProgression(state, progressionMetrics(state), log);
+    if (state.contractsEnabled) {
+      ensureContracts(state);
+      refreshContracts(state);
+      evaluateContracts(state, { satisfaction: satisfaction(state), transferShare: intermodalStats(state).shareWithTransfer, coverage: state.city.stops.length ? state.lines.filter(line => line.stopIds?.length).reduce((sum, line) => sum + new Set(line.stopIds).size, 0) / state.city.stops.length : 0 }, log);
+    }
     evaluateScenario(state, log, { net: networkFinancials(state).net, currentSatisfaction: satisfaction(state) });
 
     // V11.0 — record this day's income/expense/net delta (not the running

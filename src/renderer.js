@@ -2,6 +2,7 @@ import { STOP_RADIUS, vehiclePosition, satisfaction, lineHeadwayMinutes, network
 import { vehicleMode } from "./vehicles.js";
 import { eventSummary } from "./events.js";
 import { progressionSummary } from "./progression.js";
+import { contractSummary } from "./contracts.js";
 
 // V11.0 — shared red/amber/green read on a 0-1 service level, used both on
 // the map (stop ring) and in the sidebar (stop info, line rows).
@@ -259,6 +260,13 @@ export function createRenderer(canvas, state) {
       const entries = state.journal || [];
       journalEl.innerHTML = entries.map(e => `<div class="journal-entry journal-${e.type}">${e.text}</div>`).join("");
     }
+    const contractsEl = document.getElementById("contractsPanel");
+    if (contractsEl) {
+      const coverage = state.city.stops.length ? state.lines.reduce((sum, line) => sum + new Set(line.stopIds || []).size, 0) / state.city.stops.length : 0;
+      const contracts = contractSummary(state, { satisfaction: satisfaction(state), transferShare: intermodalStats(state).shareWithTransfer, coverage });
+      contractsEl.innerHTML = contracts.length ? `<div class="muted">Renouvellement dans ${contracts[0].remainingDays} jour(s)</div>` + contracts.map(contract => `<div class="contract-row ${contract.completed ? "completed" : ""}"><b>${contract.completed ? "✓" : "○"} ${contract.label}</b><span>${Math.round(contract.progress * 100)}% · +${contract.reward.toLocaleString("fr-FR")} €</span></div>`).join("") : '<div class="muted">Les contrats seront proposés au prochain jour.</div>';
+    }
+
     const progressionEl = document.getElementById("progressionPanel");
     if (progressionEl) {
       const transferShare = intermodalStats(state).shareWithTransfer;
