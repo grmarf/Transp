@@ -26,9 +26,14 @@ const miniMapCanvas = document.getElementById("miniMapCanvas");
 const rendererState = { current: null };
 let state = null;
 let rng = null;
-let timer = null;
+let rafId = null;
 let bootCount = 0;
 
+// ---------------------------------------------------------------------------
+// CAMERA
+// cameraState.x / cameraState.y = coordonnées MONDE du CENTRE de l'écran.
+// Tous les calculs d'input se font en pixels CSS (canvas.clientWidth/Height).
+// ---------------------------------------------------------------------------
 const cameraState = {
   x: 0,
   y: 0,
@@ -38,6 +43,9 @@ const cameraState = {
   isDragging: false,
   lastDragX: 0,
   lastDragY: 0,
+  downX: 0,
+  downY: 0,
+  moved: false,
 };
 
 function log(msg) {
@@ -61,11 +69,36 @@ function syncCameraToRenderer() {
   renderer.camera.zoom = cameraState.zoom;
 }
 
-function resetCameraView() {
-  cameraState.x = 0;
-  cameraState.y = 0;
-  cameraState.zoom = 1;
+function getCanvasCssSize() {
+  const rect = canvas.getBoundingClientRect();
+  return { W: rect.width, H: rect.height, rect };
+}
+
+// Recentre la caméra sur le barycentre de la ville et ajuste le zoom pour
+// que l'ensemble des arrêts tienne à l'écran. Corrige le "bloqué dans un coin".
+function recenterCameraOnCity() {
+  if (!state?.city?.stops?.length) return;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const s of state.city.stops) {
+    if (s.x < minX) minX = s.x;
+    if (s.x > maxX) maxX = s.x;
+    if (s.y < minY) minY = s.y;
+    if (s.y > maxY) maxY = s.y;
+  }
+  cameraState.x = (minX + maxX) / 2;
+  cameraState.y = (minY + maxY) / 2;
+
+  const { W, H } = getCanvasCssSize();
+  const spanX = Math.max(1, maxX - minX);
+  const spanY = Math.max(1, maxY - minY);
+  const fit = Math.min(W / spanX, H / spanY) * 0.85;
+  cameraState.zoom = Math.max(cameraState.minZoom, Math.min(cameraState.maxZoom, fit));
+
   syncCameraToRenderer();
+}
+
+function resetCameraView() {
+  recenterCameraOnCity();
   refreshUI();
 }
 
@@ -119,21 +152,21 @@ function bindTap(el, handler) {
   }
 }
 
+// Convertit un événement souris/tactile en coordonnées MONDE.
+// sx, sy sont en pixels CSS relatifs au canvas.
 function screenPoint(e) {
   const rect = canvas.getBoundingClientRect();
   const source = e?.changedTouches?.[0] || e?.touches?.[0] || e;
   if (!source || !rect.width || !rect.height) return null;
 
-  const screenX = source.clientX - rect.left;
-  const screenY = source.clientY - rect.top;
+  const sx = source.clientX - rect.left;
+  const sy = source.clientY - rect.top;
 
-  const logicalX = screenX * (canvas.width / rect.width);
-  const logicalY = screenY * (canvas.height / rect.height);
+  const W = rect.width;
+  const H = rect.height;
 
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
-  const worldX = (logicalX - centerX) / cameraState.zoom + centerX / cameraState.zoom + cameraState.x;
-  const worldY = (logicalY - centerY) / cameraState.zoom + centerY / cameraState.zoom + cameraState.y;
+  const worldX = (sx - W / 2) / cameraState.zoom + cameraState.x;
+  const worldY = (sy - H / 2) / cameraState.zoom + cameraState.y;
 
   return { x: worldX, y: worldY };
 }
@@ -165,16 +198,26 @@ function clickMap(e) {
 }
 
 function bindMap() {
-  let lastTap = 0;
-
   const pointerDown = e => {
     cameraState.isDragging = true;
     cameraState.lastDragX = e.clientX;
     cameraState.lastDragY = e.clientY;
+    cameraState.downX = e.clientX;
+    cameraState.downY = e.clientY;
+    cameraState.moved = false;
   };
 
   const pointerMove = e => {
     if (!cameraState.isDragging) return;
+
+    if (!cameraState.moved) {
+      if (Math.hypot(e.clientX - cameraState.downX, e.clientY - cameraState.downY) > 4) {
+        cameraState.moved = true;
+      } else {
+        return;
+      }
+    }
+
     const deltaX = e.clientX - cameraState.lastDragX;
     const deltaY = e.clientY - cameraState.lastDragY;
 
@@ -183,58 +226,55 @@ function bindMap() {
 
     cameraState.lastDragX = e.clientX;
     cameraState.lastDragY = e.clientY;
+
     syncCameraToRenderer();
     refreshUI();
   };
 
-  const pointerUp = () => {
+  const pointerUp = e => {
+    const wasDragging = cameraState.isDragging;
     cameraState.isDragging = false;
-  };
-
-  const handleClick = e => {
-    const now = Date.now();
-    if (now - lastTap < 500) return;
-    lastTap = now;
+    if (!wasDragging) return;
+    if (cameraState.moved) return; // c'était un pan, pas un clic
+    // Clic sans déplacement → sélection d'arrêt
     e.preventDefault?.();
-    if (
-      Math.abs(cameraState.lastDragX - e.clientX) < 10 &&
-      Math.abs(cameraState.lastDragY - e.clientY) < 10
-    ) {
-      clickMap(e);
-    }
+    clickMap(e);
   };
 
   if (window.PointerEvent) {
     canvas.addEventListener("pointerdown", pointerDown, { passive: true });
     canvas.addEventListener("pointermove", pointerMove, { passive: true });
-    canvas.addEventListener("pointerup", pointerUp, { passive: true });
-    canvas.addEventListener("pointerup", handleClick, { passive: false });
-    canvas.addEventListener("click", handleClick);
+    canvas.addEventListener("pointerup", pointerUp, { passive: false });
+    canvas.addEventListener("pointercancel", () => { cameraState.isDragging = false; }, { passive: true });
   } else {
     canvas.addEventListener("touchstart", pointerDown, { passive: true });
     canvas.addEventListener("touchmove", pointerMove, { passive: true });
-    canvas.addEventListener("touchend", pointerUp, { passive: true });
-    canvas.addEventListener("touchend", handleClick, { passive: false });
-    canvas.addEventListener("click", handleClick);
+    canvas.addEventListener("touchend", pointerUp, { passive: false });
+    canvas.addEventListener("touchcancel", () => { cameraState.isDragging = false; }, { passive: true });
   }
 
   canvas.addEventListener("wheel", e => {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
 
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const { rect, W, H } = getCanvasCssSize();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
     const oldZoom = cameraState.zoom;
-    cameraState.zoom = Math.max(cameraState.minZoom, Math.min(cameraState.maxZoom, cameraState.zoom * delta));
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.max(cameraState.minZoom, Math.min(cameraState.maxZoom, oldZoom * delta));
+    if (newZoom === oldZoom) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const zoomRatio = cameraState.zoom / oldZoom;
+    // Point monde sous la souris AVANT le zoom
+    const wx = (sx - W / 2) / oldZoom + cameraState.x;
+    const wy = (sy - H / 2) / oldZoom + cameraState.y;
 
-    cameraState.x = cameraState.x + (mouseX - centerX) * (1 - zoomRatio) / (cameraState.zoom * centerX);
-    cameraState.y = cameraState.y + (mouseY - centerY) * (1 - zoomRatio) / (cameraState.zoom * centerY);
+    cameraState.zoom = newZoom;
+
+    // On veut que (sx, sy) pointe encore sur (wx, wy) après le zoom
+    cameraState.x = wx - (sx - W / 2) / newZoom;
+    cameraState.y = wy - (sy - H / 2) / newZoom;
 
     syncCameraToRenderer();
     refreshUI();
@@ -250,13 +290,11 @@ function bindZoomReset() {
   bindTap(resetBtn, resetCameraView);
 }
 
-function renderMiniMap() {
-  if (!miniMapCanvas || !state) return;
-
-  const miniCtx = miniMapCanvas.getContext("2d");
+// ---------------------------------------------------------------------------
+// MINI MAP
+// ---------------------------------------------------------------------------
+function computeMiniMapTransform() {
   const stops = state.city.stops;
-  if (!stops.length) return;
-
   const minX = Math.min(...stops.map(s => s.x));
   const maxX = Math.max(...stops.map(s => s.x));
   const minY = Math.min(...stops.map(s => s.y));
@@ -266,6 +304,16 @@ function renderMiniMap() {
     (miniMapCanvas.width - pad * 2) / Math.max(1, maxX - minX),
     (miniMapCanvas.height - pad * 2) / Math.max(1, maxY - minY)
   );
+  return { minX, maxX, minY, maxY, pad, scale };
+}
+
+function renderMiniMap() {
+  if (!miniMapCanvas || !state) return;
+  const stops = state.city.stops;
+  if (!stops.length) return;
+
+  const miniCtx = miniMapCanvas.getContext("2d");
+  const { minX, minY, pad, scale } = computeMiniMapTransform();
 
   miniCtx.clearRect(0, 0, miniMapCanvas.width, miniMapCanvas.height);
   miniCtx.fillStyle = "#101a22";
@@ -304,10 +352,12 @@ function renderMiniMap() {
     miniCtx.fill();
   }
 
-  const left = cameraState.x;
-  const top = cameraState.y;
-  const viewWidth = canvas.width / cameraState.zoom;
-  const viewHeight = canvas.height / cameraState.zoom;
+  // Rectangle de vue : camera.x/y = CENTRE monde de l'écran.
+  const rectCss = canvas.getBoundingClientRect();
+  const viewWidth = rectCss.width / cameraState.zoom;
+  const viewHeight = rectCss.height / cameraState.zoom;
+  const left = cameraState.x - viewWidth / 2;
+  const top = cameraState.y - viewHeight / 2;
   const rect = {
     x: pad + (left - minX) * scale,
     y: pad + (top - minY) * scale,
@@ -380,6 +430,45 @@ function refreshUI() {
   updateScenarioBanner();
 }
 
+// ---------------------------------------------------------------------------
+// BOUCLE PRINCIPALE — requestAnimationFrame, step simulé à 1 Hz.
+// ---------------------------------------------------------------------------
+const STEP_INTERVAL_MS = 1000;
+let accumulator = 0;
+let lastTs = 0;
+
+function loop(ts) {
+  if (!state) { rafId = requestAnimationFrame(loop); return; }
+
+  if (!lastTs) lastTs = ts;
+  accumulator += ts - lastTs;
+  lastTs = ts;
+
+  // Rattrape jusqu'à 5 steps max par frame pour éviter la spirale de la mort
+  let steps = 0;
+  while (accumulator >= STEP_INTERVAL_MS && steps < 5) {
+    accumulator -= STEP_INTERVAL_MS;
+    steps++;
+    if (!state.paused) {
+      step(state, rng, log);
+    }
+  }
+  if (accumulator > STEP_INTERVAL_MS * 5) accumulator = 0;
+
+  refreshUI();
+  rafId = requestAnimationFrame(loop);
+}
+
+function startLoop() {
+  if (rafId) cancelAnimationFrame(rafId);
+  accumulator = 0;
+  lastTs = 0;
+  rafId = requestAnimationFrame(loop);
+}
+
+// ---------------------------------------------------------------------------
+// BOOT
+// ---------------------------------------------------------------------------
 function boot(seed, scenarioId, restoredPayload = null) {
   bootCount += 1;
   let nextState;
@@ -439,12 +528,17 @@ function boot(seed, scenarioId, restoredPayload = null) {
   nextState.seasonsEnabled = true;
 
   const nextRenderer = createRenderer(canvas, nextState);
-  nextRenderer.render({ heatmap: nextState.showHeatmap ? congestionHeatmap(nextState) : null, camera: cameraState });
 
-  if (timer) clearInterval(timer);
-  timer = null;
   state = nextState;
   rng = nextRng;
+  rendererState.current = nextRenderer;
+
+  // Recentre la caméra AVANT le premier rendu.
+  recenterCameraOnCity();
+  nextRenderer.render({
+    heatmap: nextState.showHeatmap ? congestionHeatmap(nextState) : null,
+    camera: cameraState,
+  });
 
   const seedInput = document.getElementById("seedInput");
   if (seedInput) seedInput.value = state.city.seed;
@@ -458,7 +552,6 @@ function boot(seed, scenarioId, restoredPayload = null) {
   const speedBtn = document.getElementById("speedBtn");
   if (speedBtn) speedBtn.textContent = `▶ ${state.speed}×`;
 
-  rendererState.current = nextRenderer;
   syncCameraToRenderer();
   updateInstructions();
   const toggle = document.getElementById("toggleHeatmapBtn");
@@ -466,10 +559,7 @@ function boot(seed, scenarioId, restoredPayload = null) {
   refreshUI();
   updateSaveStatus();
 
-  timer = setInterval(() => {
-    step(state, rng, log);
-    refreshUI();
-  }, 1000);
+  startLoop();
 }
 
 function updateSaveStatus(message = null) {
@@ -531,6 +621,9 @@ function loadCurrentGame() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// BINDINGS UI
+// ---------------------------------------------------------------------------
 bindTap(document.getElementById("newLineBtn"), () => {
   if (!state) return;
   if (state.lineMode) cancelLineMode(state);
@@ -641,30 +734,29 @@ document.getElementById("importFile")?.addEventListener("change", async event =>
 
 if (miniMapCanvas) {
   miniMapCanvas.addEventListener("click", e => {
-    if (!state) return;
+    if (!state || !state.city.stops.length) return;
     const rect = miniMapCanvas.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * miniMapCanvas.width;
     const y = ((e.clientY - rect.top) / rect.height) * miniMapCanvas.height;
-    const minX = Math.min(...state.city.stops.map(s => s.x));
-    const maxX = Math.max(...state.city.stops.map(s => s.x));
-    const minY = Math.min(...state.city.stops.map(s => s.y));
-    const maxY = Math.max(...state.city.stops.map(s => s.y));
-    const pad = 10;
-    const scale = Math.min(
-      (miniMapCanvas.width - pad * 2) / Math.max(1, maxX - minX),
-      (miniMapCanvas.height - pad * 2) / Math.max(1, maxY - minY)
-    );
+
+    const { minX, minY, pad, scale } = computeMiniMapTransform();
+    if (!scale || !isFinite(scale)) return;
+
     const worldX = minX + (x - pad) / scale;
     const worldY = minY + (y - pad) / scale;
-    const dx = worldX - canvas.width / 2 / cameraState.zoom;
-    const dy = worldY - canvas.height / 2 / cameraState.zoom;
-    cameraState.x = dx;
-    cameraState.y = dy;
+
+    // camera.x/y = CENTRE monde de l'écran → on y place directement le point.
+    cameraState.x = worldX;
+    cameraState.y = worldY;
+
     syncCameraToRenderer();
     refreshUI();
   });
 }
 
+// ---------------------------------------------------------------------------
+// AMORÇAGE
+// ---------------------------------------------------------------------------
 const initialSeed = createSeedFromQuery();
 const seedInput = document.getElementById("seedInput");
 if (seedInput) seedInput.value = initialSeed;
@@ -677,4 +769,5 @@ window.__transportTycoon = {
   getBootCount: () => bootCount,
   clickMap,
   cameraState,
+  recenterCameraOnCity,
 };
