@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Transport Tycoon — V20.2</title>
-  <meta name="theme-color" content="#182029">
+  <title>Vie t'Lignes — construis ton réseau</title>
+  <meta name="theme-color" content="#ffd23f">
+  <meta name="description" content="Vie t'Lignes — trace des lignes de bus, tram et métro, relie ta ville et fais-la respirer. Un jeu de gestion urbaine où chaque ligne compte.">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,54 +15,60 @@
 </head>
 <body>
 <header class="topbar" aria-label="En-tête du jeu">
-  <div>
-    <h1>Transport Tycoon</h1>
-    <span class="version">V20.2 — interface et économie lisibles</span>
+  <div class="brand">
+    <span class="brand-bus" aria-hidden="true">🚌</span>
+    <div>
+      <h1>Vie t'Lignes</h1>
+      <span class="tagline">Vie la vie plus vite, en lignes !</span>
+    </div>
   </div>
   <div class="stats" aria-label="Statistiques principales">
-    <span aria-label="Budget">💰 <b id="money">0 €</b></span>
-    <span aria-label="Passagers transportés">👥 <b id="passengers">0</b></span>
-    <span aria-label="Satisfaction">😊 <b id="satisfaction">0%</b></span>
-    <span aria-label="Heure de jeu">🕒 <b id="clock">08:00</b></span>
+    <span class="stat-chip" aria-label="Budget">💰 <b id="money">0 €</b></span>
+    <span class="stat-chip" aria-label="Passagers transportés">👥 <b id="passengers">0</b></span>
+    <span class="stat-chip" aria-label="Satisfaction">😊 <b id="satisfaction">0%</b></span>
+    <span class="stat-chip" aria-label="Heure de jeu">🕒 <b id="clock">08:00</b></span>
   </div>
 </header>
 
 <main class="app-shell">
   <section class="map-panel" aria-label="Carte et commandes de transport">
     <div class="toolbar" role="toolbar" aria-label="Commandes de partie">
-      <button id="newLineBtn" type="button" aria-label="Créer ou annuler une nouvelle ligne">＋ Nouvelle ligne</button>
+      <button id="newLineBtn" type="button" class="btn btn-primary" aria-label="Créer ou annuler une nouvelle ligne">✏️ Nouvelle ligne</button>
       <label class="sr-only" for="modeSelect">Mode de transport</label>
       <select id="modeSelect" aria-label="Mode de transport">
-        <option value="bus">Bus</option>
-        <option value="tram">Tramway</option>
-        <option value="metro">Métro</option>
+        <option value="bus">🚌 Bus</option>
+        <option value="tram">🚊 Tramway</option>
+        <option value="metro">🚇 Métro</option>
       </select>
-      <button id="finishLineBtn" type="button" aria-label="Terminer la ligne" hidden>✓ Terminer la ligne</button>
-      <button id="pauseBtn" type="button" aria-label="Mettre en pause ou reprendre la partie">⏸ Pause</button>
-      <button id="speedBtn" type="button" aria-label="Modifier la vitesse de simulation">▶ 1×</button>
-      <button id="resetZoomBtn" type="button" aria-label="Réinitialiser la vue de la carte">⌂ Vue</button>
-      <button id="saveBtn" type="button" aria-label="Sauvegarder la partie">💾 Sauvegarder</button>
-      <button id="loadBtn" type="button" aria-label="Charger la partie sauvegardée">↩ Charger</button>
+      <button id="finishLineBtn" type="button" class="btn btn-success" aria-label="Terminer la ligne" hidden>✅ Terminer</button>
+      <button id="pauseBtn" type="button" class="btn" aria-label="Mettre en pause ou reprendre la partie">⏸ Pause</button>
+      <button id="speedBtn" type="button" class="btn" aria-label="Modifier la vitesse de simulation">▶ 1×</button>
+      <button id="resetZoomBtn" type="button" class="btn" aria-label="Recentrer la carte sur la ville">🎯 Recentrer</button>
+      <button id="saveBtn" type="button" class="btn" aria-label="Sauvegarder la partie">💾 Sauver</button>
+      <button id="loadBtn" type="button" class="btn" aria-label="Charger la partie sauvegardée">📂 Charger</button>
     </div>
 
     <div class="city-controls" aria-label="Paramètres de ville">
-      <label for="seedInput">Seed ville</label>
+      <label for="seedInput">🌱 Seed</label>
       <input id="seedInput" type="text" maxlength="40" autocomplete="off" spellcheck="false" aria-label="Seed de la ville">
-      <label for="scenarioSelect">Scénario</label>
+      <label for="scenarioSelect">🎲 Scénario</label>
       <select id="scenarioSelect" aria-label="Scénario de jeu"></select>
-      <button id="newCityBtn" type="button" aria-label="Générer une nouvelle ville">🏙 Générer la ville</button>
-      <span>Ville : <b id="cityName">—</b></span>
+      <button id="newCityBtn" type="button" class="btn btn-warn" aria-label="Générer une nouvelle ville">🏙️ Nouvelle ville</button>
+      <span class="city-name">🏷️ <b id="cityName">—</b></span>
     </div>
 
     <div class="instructions" id="instructions" aria-live="polite"></div>
     <div class="scenario-banner" id="scenarioBanner" aria-live="polite" hidden></div>
+
     <div class="canvas-wrap">
-      <canvas id="map" width="1000" height="650" aria-label="Carte de la ville et du réseau de transport"></canvas>
+      <canvas id="map" aria-label="Carte de la ville et du réseau de transport"></canvas>
+
       <div id="heatmapLegend" class="heatmap-legend" hidden aria-hidden="true">
-        <b>Congestion</b>
+        <b>🔥 Congestion</b>
         <span class="heatmap-count">0 segments</span>
         <div class="gradient" aria-hidden="true"></div>
       </div>
+
       <div id="miniMap" class="mini-map" aria-label="Mini-carte de la ville">
         <canvas id="miniMapCanvas" width="180" height="120"></canvas>
       </div>
@@ -69,33 +76,71 @@
   </section>
 
   <aside class="dashboard" aria-label="Tableau de bord">
-    <details class="dashboard-tab" open><summary>Vue d’ensemble</summary><div class="tab-content">
-      <section class="card"><h2>Ville</h2><div class="save-status" id="saveStatus" role="status" aria-live="polite"><span id="saveActivity" class="save-activity" hidden aria-hidden="true">Sauvegarde…</span><span id="saveStatusText">Aucune sauvegarde locale.</span></div></section>
-      <section class="card"><h2>Réseau</h2><div id="networkStats"></div></section>
-      <section class="card"><h2>Opportunités</h2><div id="opportunities"></div></section>
-      <section class="card"><h2>Arrêt sélectionné</h2><div id="stopInfo">Aucun arrêt sélectionné.</div></section>
-      <section class="card"><h2>Vue d'ensemble de la ville</h2><div id="cityOverview"></div></section>
-      <section class="card"><h2>Calendrier V19</h2><div id="seasonPanel" aria-live="polite"><div class="muted">Le calendrier saisonnier sera initialisé au démarrage.</div></div></section>
-      <section class="card"><h2>Rapport quotidien V18</h2><div id="reportPanel" aria-live="polite"><div class="muted">Le premier rapport sera disponible à la fin du jour 1.</div></div></section>
-    </div></details>
-    <details class="dashboard-tab"><summary>Lignes & flotte</summary><div class="tab-content">
-      <section class="card"><h2>Lignes</h2><div id="lines"></div></section>
-      <section class="card"><h2>Outils réseau</h2><button id="toggleHeatmapBtn" type="button" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false">Carte de congestion</button><div id="intermodalStats"></div><h3>Finances (14 jours)</h3><canvas id="financialChart" width="200" height="100" aria-label="Évolution financière sur 14 jours"></canvas></section>
-    </div></details>
-    <details class="dashboard-tab"><summary>Contrats & progression</summary><div class="tab-content">
-      <section class="card"><h2>Contrats réseau V17</h2><div id="contractsPanel" aria-live="polite"><div class="muted">Les contrats seront proposés au prochain jour.</div></div></section>
-      <section class="card"><h2>Progression V16</h2><div id="progressionPanel" aria-live="polite"><div class="muted">Les objectifs apparaîtront après le premier jour.</div></div></section>
-    </div></details>
-    <details class="dashboard-tab"><summary>Événements</summary><div class="tab-content"><section class="card"><h2>Événements urbains V15</h2><div id="eventPanel" aria-live="polite"><div class="muted">Aucun événement en cours.</div></div></section></div></details>
-    <details class="dashboard-tab"><summary>Journal & sauvegarde</summary><div class="tab-content">
-      <section class="card"><h2>Journal de ville</h2><div id="journal" aria-live="polite"></div></section>
-      <section class="card"><h2>Sauvegarde fichier</h2><button id="exportBtn" type="button" aria-label="Exporter la sauvegarde au format JSON">Exporter JSON</button><label class="import-label" for="importFile">Importer</label><input id="importFile" type="file" accept="application/json" aria-label="Importer une sauvegarde JSON"></section>
-      <section class="card log-card"><h2>Journal</h2><div id="log" aria-live="polite"></div></section>
-    </div></details>
+    <details class="dashboard-tab" open>
+      <summary>📊 Vue d’ensemble</summary>
+      <div class="tab-content">
+        <section class="card">
+          <h2>🏙️ Ma ville</h2>
+          <div class="save-status" id="saveStatus" role="status" aria-live="polite">
+            <span id="saveActivity" class="save-activity" hidden aria-hidden="true">Sauvegarde…</span>
+            <span id="saveStatusText">Aucune sauvegarde locale.</span>
+          </div>
+        </section>
+        <section class="card"><h2>🕸️ Mon réseau</h2><div id="networkStats"></div></section>
+        <section class="card"><h2>💡 Idées & alertes</h2><div id="opportunities"></div></section>
+        <section class="card"><h2>📍 Arrêt sélectionné</h2><div id="stopInfo">Clique sur un arrêt sur la carte !</div></section>
+        <section class="card"><h2>🗺️ Vue d'ensemble</h2><div id="cityOverview"></div></section>
+        <section class="card"><h2>🍂 Saison</h2><div id="seasonPanel" aria-live="polite"><div class="muted">La saison sera révélée au démarrage.</div></div></section>
+        <section class="card"><h2>📰 Rapport du jour</h2><div id="reportPanel" aria-live="polite"><div class="muted">Ton premier rapport arrivera à la fin du jour 1.</div></div></section>
+      </div>
+    </details>
+
+    <details class="dashboard-tab">
+      <summary>🚌 Lignes & flotte</summary>
+      <div class="tab-content">
+        <section class="card"><h2>🛣️ Mes lignes</h2><div id="lines"></div></section>
+        <section class="card">
+          <h2>🧰 Outils</h2>
+          <button id="toggleHeatmapBtn" type="button" class="btn" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false">🔥 Congestion</button>
+          <div id="intermodalStats"></div>
+          <h3>💹 Finances (14 jours)</h3>
+          <canvas id="financialChart" width="200" height="100" aria-label="Évolution financière sur 14 jours"></canvas>
+        </section>
+      </div>
+    </details>
+
+    <details class="dashboard-tab">
+      <summary>🏆 Défis & succès</summary>
+      <div class="tab-content">
+        <section class="card"><h2>📜 Contrats</h2><div id="contractsPanel" aria-live="polite"><div class="muted">Les contrats arriveront au prochain jour.</div></div></section>
+        <section class="card"><h2>⭐ Progression</h2><div id="progressionPanel" aria-live="polite"><div class="muted">Les objectifs apparaîtront après le premier jour.</div></div></section>
+      </div>
+    </details>
+
+    <details class="dashboard-tab">
+      <summary>🎉 Événements</summary>
+      <div class="tab-content">
+        <section class="card"><h2>🎪 En ville</h2><div id="eventPanel" aria-live="polite"><div class="muted">Aucun événement en cours.</div></div></section>
+      </div>
+    </details>
+
+    <details class="dashboard-tab">
+      <summary>📔 Journal & sauvegarde</summary>
+      <div class="tab-content">
+        <section class="card"><h2>📖 Journal de ville</h2><div id="journal" aria-live="polite"></div></section>
+        <section class="card">
+          <h2>💾 Sauvegarde fichier</h2>
+          <button id="exportBtn" type="button" class="btn" aria-label="Exporter la sauvegarde au format JSON">📤 Exporter</button>
+          <label class="import-label" for="importFile">📥 Importer</label>
+          <input id="importFile" type="file" accept="application/json" aria-label="Importer une sauvegarde JSON">
+        </section>
+        <section class="card log-card"><h2>🗒️ Journal technique</h2><div id="log" aria-live="polite"></div></section>
+      </div>
+    </details>
   </aside>
 </main>
 
-<footer>V20.2 : interface à onglets, économie instrumentée et import sécurisé.</footer>
+<footer>🚌 Vie t'Lignes — Vie la vie plus vite, en lignes !</footer>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>
