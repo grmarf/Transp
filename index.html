@@ -39,6 +39,7 @@
       <button id="finishLineBtn" type="button" aria-label="Terminer la ligne" hidden>✓ Terminer la ligne</button>
       <button id="pauseBtn" type="button" aria-label="Mettre en pause ou reprendre la partie">⏸ Pause</button>
       <button id="speedBtn" type="button" aria-label="Modifier la vitesse de simulation">▶ 1×</button>
+      <button id="resetZoomBtn" type="button" aria-label="Réinitialiser la vue de la carte">⌂ Vue</button>
       <button id="saveBtn" type="button" aria-label="Sauvegarder la partie">💾 Sauvegarder</button>
       <button id="loadBtn" type="button" aria-label="Charger la partie sauvegardée">↩ Charger</button>
     </div>
@@ -56,13 +57,20 @@
     <div class="scenario-banner" id="scenarioBanner" aria-live="polite" hidden></div>
     <div class="canvas-wrap">
       <canvas id="map" width="1000" height="650" aria-label="Carte de la ville et du réseau de transport"></canvas>
-      <div id="heatmapLegend" class="heatmap-legend" hidden aria-hidden="true"><b>Congestion</b><span class="heatmap-count">0 segments</span><div class="gradient" aria-hidden="true"></div><div class="legend-scale"><span>fluide</span><span>saturé</span></div></div>
+      <div id="heatmapLegend" class="heatmap-legend" hidden aria-hidden="true">
+        <b>Congestion</b>
+        <span class="heatmap-count">0 segments</span>
+        <div class="gradient" aria-hidden="true"></div>
+      </div>
+      <div id="miniMap" class="mini-map" aria-label="Mini-carte de la ville">
+        <canvas id="miniMapCanvas" width="180" height="120"></canvas>
+      </div>
     </div>
   </section>
 
   <aside class="dashboard" aria-label="Tableau de bord">
     <details class="dashboard-tab" open><summary>Vue d’ensemble</summary><div class="tab-content">
-      <section class="card"><h2>Ville</h2><div class="save-status" id="saveStatus" role="status" aria-live="polite"><span id="saveActivity" class="save-activity" hidden aria-hidden="true">Sauvegarde…</span><span id="saveStatusText">Aucune sauvegarde locale.</span></div><div class="city-meta"><div><small>Seed</small><strong id="seedValue">—</strong></div><div><small>Infrastructure</small><strong>V9.1+V7</strong></div></div></section>
+      <section class="card"><h2>Ville</h2><div class="save-status" id="saveStatus" role="status" aria-live="polite"><span id="saveActivity" class="save-activity" hidden aria-hidden="true">Sauvegarde…</span><span id="saveStatusText">Aucune sauvegarde locale.</span></div></section>
       <section class="card"><h2>Réseau</h2><div id="networkStats"></div></section>
       <section class="card"><h2>Opportunités</h2><div id="opportunities"></div></section>
       <section class="card"><h2>Arrêt sélectionné</h2><div id="stopInfo">Aucun arrêt sélectionné.</div></section>
@@ -72,7 +80,7 @@
     </div></details>
     <details class="dashboard-tab"><summary>Lignes & flotte</summary><div class="tab-content">
       <section class="card"><h2>Lignes</h2><div id="lines"></div></section>
-      <section class="card"><h2>Outils réseau</h2><button id="toggleHeatmapBtn" type="button" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false">Carte de congestion</button><div id="intermodalStats"></div><h3>Finances (14 jours)</h3><canvas id="financialChart" width="200" height="100" aria-label="Graphique des finances sur quatorze jours"></canvas></section>
+      <section class="card"><h2>Outils réseau</h2><button id="toggleHeatmapBtn" type="button" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false">Carte de congestion</button></section>
     </div></details>
     <details class="dashboard-tab"><summary>Contrats & progression</summary><div class="tab-content">
       <section class="card"><h2>Contrats réseau V17</h2><div id="contractsPanel" aria-live="polite"><div class="muted">Les contrats seront proposés au prochain jour.</div></div></section>
@@ -81,7 +89,7 @@
     <details class="dashboard-tab"><summary>Événements</summary><div class="tab-content"><section class="card"><h2>Événements urbains V15</h2><div id="eventPanel" aria-live="polite"><div class="muted">Aucun événement en cours.</div></div></section></div></details>
     <details class="dashboard-tab"><summary>Journal & sauvegarde</summary><div class="tab-content">
       <section class="card"><h2>Journal de ville</h2><div id="journal" aria-live="polite"></div></section>
-      <section class="card"><h2>Sauvegarde fichier</h2><button id="exportBtn" type="button" aria-label="Exporter la sauvegarde au format JSON">Exporter JSON</button><label class="import-label" for="importFile">Importer JSON <input type="file" id="importFile" accept=".json" aria-label="Importer une sauvegarde JSON"></label></section>
+      <section class="card"><h2>Sauvegarde fichier</h2><button id="exportBtn" type="button" aria-label="Exporter la sauvegarde au format JSON">Exporter JSON</button><label class="import-label" for="importFile">Importer</label><input id="importFile" type="file" accept="application/json" aria-label="Importer une sauvegarde JSON"></section>
       <section class="card log-card"><h2>Journal</h2><div id="log" aria-live="polite"></div></section>
     </div></details>
   </aside>
