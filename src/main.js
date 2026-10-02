@@ -184,30 +184,33 @@ function updateScenarioBanner() {
 
 function boot(seed, scenarioId, restoredPayload = null) {
   bootCount += 1;
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
-  }
-
+  let nextState;
+  let nextRng;
   if (restoredPayload) {
-    state = restoredPayload.state;
-    state.network = createNetwork(state.city);
+    // Rebuild everything in a candidate state first. The current game keeps
+    // running unchanged if a validated save still fails during reconstruction
+    // or rendering.
+    nextState = restoredPayload.state;
+    nextState.network = createNetwork(nextState.city);
     const savedNetwork = restoredPayload.state.network;
-    if (savedNetwork?.closedEdgeIds?.length) state.network.closedEdgeIds = new Set(savedNetwork.closedEdgeIds);
-    if (savedNetwork?.roadworksReopenDay?.length) state.network.roadworksReopenDay = new Map(savedNetwork.roadworksReopenDay);
-    state.network.pathCache.clear();
+    if (savedNetwork?.closedEdgeIds?.length) nextState.network.closedEdgeIds = new Set(savedNetwork.closedEdgeIds);
+    if (savedNetwork?.roadworksReopenDay?.length) nextState.network.roadworksReopenDay = new Map(savedNetwork.roadworksReopenDay);
+    nextState.network.pathCache.clear();
     // V13.0: rebuilt fresh from the current city (a complete graph over its
     // stops, no closures/roadworks ever apply to it) — nothing to restore.
-    state.undergroundNetwork = createUndergroundNetwork(state.city);
-    rng = mulberry32(state.city.numericSeed ^ 0xA57E2);
-    if (restoredPayload.rngState != null && rng.setState) rng.setState(restoredPayload.rngState);
+    nextState.undergroundNetwork = createUndergroundNetwork(nextState.city);
+    nextRng = mulberry32(nextState.city.numericSeed ^ 0xA57E2);
+    if (restoredPayload.rngState != null && nextRng.setState) nextRng.setState(restoredPayload.rngState);
   } else {
     const scenario = findScenario(scenarioId || document.getElementById("scenarioSelect").value);
     const city = createCity(seed);
-    state = createState(city, scenario.id === "sandbox" ? null : scenario);
-    state.network = createNetwork(city);
-    state.undergroundNetwork = createUndergroundNetwork(city);
-    rng = mulberry32(city.numericSeed ^ 0xA57E2);
+    nextState = createState(city, scenario.id === "sandbox" ? null : scenario);
+    nextState.network = createNetwork(city);
+    nextState.undergroundNetwork = createUndergroundNetwork(city);
+    nextRng = mulberry32(city.numericSeed ^ 0xA57E2);
+    // The initial game is trusted and the log helper writes to the new state.
+    state = nextState;
+    rng = nextRng;
     log(`Bienvenue. Votre budget initial est de ${state.money.toLocaleString("fr-FR")} €.`);
     log(`Ville générée avec la seed « ${city.seed} ».`);
     if (state.scenario?.objective) log(`Scénario : ${state.scenario.name} — ${state.scenario.objective.label}.`);
@@ -226,25 +229,35 @@ function boot(seed, scenarioId, restoredPayload = null) {
     log("V16.0 : progression, réputation et objectifs récompensés.");
   }
 
-  state.eventsEnabled = true;
-  state.activeEvents ||= [];
-  state.eventHistory ||= [];
-  state.nextEventId ||= 1;
-  state.completedGoals ||= [];
-  state.progressionHistory ||= [];
-  state.reputation ||= 0;
-  state.progressionEnabled = true;
-  state.contractsEnabled = true;
-  state.activeContracts ||= [];
-  state.contractHistory ||= [];
-  state.dailyReports ||= [];
-  state.latestReport ||= null;
-  state.seasonsEnabled = true;
+  nextState.eventsEnabled = true;
+  nextState.activeEvents ||= [];
+  nextState.eventHistory ||= [];
+  nextState.nextEventId ||= 1;
+  nextState.completedGoals ||= [];
+  nextState.progressionHistory ||= [];
+  nextState.reputation ||= 0;
+  nextState.progressionEnabled = true;
+  nextState.contractsEnabled = true;
+  nextState.activeContracts ||= [];
+  nextState.contractHistory ||= [];
+  nextState.dailyReports ||= [];
+  nextState.latestReport ||= null;
+  nextState.seasonsEnabled = true;
+
+  const nextRenderer = createRenderer(canvas, nextState);
+  // Render before committing global state. A renderer-level failure therefore
+  // cannot leave the application pointing at a half-loaded save.
+  nextRenderer.render({ heatmap: nextState.showHeatmap ? congestionHeatmap(nextState) : null });
+
+  if (timer) clearInterval(timer);
+  timer = null;
+  state = nextState;
+  rng = nextRng;
   document.getElementById("seedInput").value = state.city.seed;
   document.getElementById("scenarioSelect").value = state.scenario?.id || "sandbox";
   document.getElementById("pauseBtn").textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
   document.getElementById("speedBtn").textContent = `▶ ${state.speed}×`;
-  rendererState.current = createRenderer(canvas, state);
+  rendererState.current = nextRenderer;
   updateInstructions();
   document.getElementById("toggleHeatmapBtn")?.setAttribute("aria-pressed", String(!!state.showHeatmap));
   refreshUI();
