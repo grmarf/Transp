@@ -141,6 +141,31 @@
 </main>
 
 <footer>🚌 Vie t'Lignes — Vie la vie plus vite, en lignes !</footer>
-<script type="module" src="src/main.js"></script>
+<script type="module">
+  const modules = [
+    "./constants.js", "./html.js", "./persistence.js",
+    "./city.js", "./state.js", "./scenarios.js",
+    "./network.js", "./routing.js", "./vehicles.js",
+    "./passengers.js", "./growth.js", "./disruptions.js",
+    "./events.js", "./progression.js", "./contracts.js",
+    "./reports.js", "./seasons.js",
+    "./engine.js", "./renderer.js"
+  ];
+  const lines = [];
+  for (const m of modules) {
+    try {
+      const mod = await import(m);
+      lines.push("OK   " + m.padEnd(24) + " (" + Object.keys(mod).length + " exports)");
+    } catch (e) {
+      lines.push("KO   " + m.padEnd(24) + " → " + e.message);
+    }
+  }
+  const el = document.createElement("pre");
+  el.style.cssText = "position:fixed;inset:0;background:#000;color:#0f0;font:12px/1.4 ui-monospace,monospace;padding:12px;z-index:99999;overflow:auto;margin:0;white-space:pre-wrap;border:4px solid #0f0";
+  el.textContent = "=== Diagnostic Vie t'Lignes ===\n\n" + lines.join("\n") + "\n\n(touche pour fermer)";
+  el.addEventListener("click", () => el.remove());
+  document.body.appendChild(el);
+</script>
+<script type="module" src="src/main.js"></script><script type="module" src="src/main.js"></script>
 </body>
 </html>
