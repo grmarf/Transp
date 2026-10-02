@@ -1,8 +1,7 @@
 /* =====================================================================
    Vie t'Lignes — feuille de style « cartoon tycoon »
-   - Palette chaude : crème + orange + ciel + herbe
-   - Bords épais, ombres dures, boutons 3D
-   - Chaîne flex stricte : #map remplit exactement .canvas-wrap
+   Approche MOBILE-FIRST : le layout par défaut est en colonne.
+   Le desktop est une @media (min-width: 960px).
    ===================================================================== */
 
 * { box-sizing: border-box; }
@@ -10,13 +9,12 @@
 :root {
   font-family: "Nunito", "Quicksand", "Segoe UI", system-ui, -apple-system, sans-serif;
 
-  /* Palette jouet */
-  --ink:        #1f2340;   /* bleu nuit des contours */
+  --ink:        #1f2340;
   --ink-soft:   #3b3f5c;
-  --cream:      #fdf6e3;   /* fond plateau */
+  --cream:      #fdf6e3;
   --paper:      #ffffff;
   --paper-2:    #fff8ec;
-  --sun:        #ffd23f;   /* jaune soleil */
+  --sun:        #ffd23f;
   --orange:     #ff8c42;
   --coral:      #ef476f;
   --sky:        #4cc9f0;
@@ -29,7 +27,7 @@
   --radius:     14px;
   --radius-sm:  10px;
 
-  /* Alias rétro-compat (anciens noms utilisés ailleurs dans le JS) */
+  /* Alias rétro-compat */
   --color-bg: var(--cream);
   --color-surface: var(--paper);
   --color-surface-raised: var(--paper-2);
@@ -65,7 +63,6 @@ html, body {
   margin: 0;
   min-height: 100vh;
   background-color: var(--cream);
-  /* Petit motif de points façon plateau de jeu */
   background-image:
     radial-gradient(circle at 1px 1px, rgba(31, 35, 64, .08) 1px, transparent 0);
   background-size: 18px 18px;
@@ -73,84 +70,87 @@ html, body {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
+  color: var(--ink);
 }
 
 body {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  padding-bottom: env(safe-area-inset-bottom);
+  min-height: 100dvh;
+  overflow-x: hidden;
 }
 
-/* ------------------------------ Topbar ----------------------------- */
+/* ------------------------------ Topbar (mobile-first) -------------- */
 
 .topbar {
   flex: 0 0 auto;
-  min-height: 84px;
   background: linear-gradient(135deg, #ffe27a 0%, #ffc93c 60%, #ff9f4a 100%);
   border-bottom: 3px solid var(--ink);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 22px;
-  gap: 15px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 14px;
   box-shadow: 0 4px 0 rgba(31, 35, 64, .15);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  gap: 10px;
+  text-align: left;
 }
 
 .brand-bus {
-  font-size: 2rem;
+  font-size: 1.75rem;
   line-height: 1;
   filter: drop-shadow(2px 2px 0 rgba(31, 35, 64, .35));
   transform: rotate(-6deg);
 }
 
 .topbar h1 {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   margin: 0;
   font-weight: 900;
   letter-spacing: -.02em;
   color: var(--ink);
   text-shadow: 2px 2px 0 rgba(255, 255, 255, .5);
+  line-height: 1.1;
 }
 
 .tagline {
-  font-size: .8125rem;
+  font-size: .75rem;
   font-weight: 700;
   color: var(--ink-soft);
   opacity: .9;
   font-style: italic;
+  display: block;
+  margin-top: 2px;
 }
 
 .stats {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 
 .stat-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 10px;
   background: var(--paper);
   border: 2.5px solid var(--ink);
   border-radius: 999px;
-  font-size: .875rem;
+  font-size: .8125rem;
   font-weight: 700;
   box-shadow: 3px 3px 0 var(--ink);
-  transition: transform .15s ease, box-shadow .15s ease;
   white-space: nowrap;
-}
-
-.stat-chip:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stat-chip b { color: var(--ink); font-weight: 900; }
@@ -168,29 +168,24 @@ body {
   75% { transform: rotate(3deg); }
 }
 
-/* ------------------------------ Shell ------------------------------ */
+/* ------------------------------ Shell (mobile-first) --------------- */
 
 .app-shell {
   display: flex;
+  flex-direction: column;
   flex: 1;
-  min-height: 0;
-  height: calc(100vh - 124px);
-  padding: 14px;
-  gap: 14px;
+  min-width: 0;
+  gap: 12px;
+  padding: 10px;
+  overflow-x: hidden;
 }
 
 .map-panel {
   display: flex;
-  flex: 1 1 0;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  min-height: 0;
 }
-
-/* Tous les enfants directs gardent leur hauteur naturelle,
-   SAUF .canvas-wrap qui prend l'espace restant. */
-.map-panel > * { flex: 0 0 auto; }
 
 /* ------------------------------ Toolbar ---------------------------- */
 
@@ -199,7 +194,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .city-controls {
@@ -207,14 +202,17 @@ body {
   border: 2.5px solid var(--ink);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
-  font-size: .8125rem;
+  font-size: .75rem;
   color: var(--ink-soft);
   font-weight: 700;
   box-shadow: var(--shadow-sm);
 }
 
+.city-controls label { flex: 0 0 auto; }
+
 .city-controls input[type="text"] {
-  width: 190px;
+  flex: 1 1 130px;
+  min-width: 0;
   min-height: 40px;
   border: 2.5px solid var(--ink);
   background: var(--paper-2);
@@ -233,35 +231,47 @@ body {
 }
 
 .city-name {
-  margin-left: auto;
+  flex: 1 1 100%;
   padding: 4px 10px;
   background: var(--mint);
   border: 2px solid var(--ink);
   border-radius: 999px;
   color: var(--ink);
   font-weight: 800;
+  text-align: center;
 }
 
 /* ------------------------------ Boutons ---------------------------- */
 
 button, select {
   position: relative;
-  z-index: 10;
   -webkit-appearance: none;
   appearance: none;
   border: 2.5px solid var(--ink);
   background: var(--paper);
   color: var(--ink);
   border-radius: 10px;
-  padding: 9px 14px;
-  min-height: 44px;
+  padding: 8px 12px;
+  min-height: 42px;
   font: inherit;
   font-weight: 800;
-  font-size: .875rem;
+  font-size: .8125rem;
   cursor: pointer;
   touch-action: manipulation;
   box-shadow: var(--shadow-sm);
   transition: transform .08s ease, box-shadow .08s ease, background .15s ease;
+  white-space: nowrap;
+}
+
+/* Sur mobile : boutons de la toolbar en grille 2 colonnes */
+.toolbar button,
+.toolbar select {
+  flex: 1 1 calc(50% - 3px);
+  min-width: 0;
+  justify-content: center;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.15;
 }
 
 button:hover, select:hover {
@@ -283,7 +293,6 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
-/* Variantes de boutons */
 .btn-primary { background: var(--sun); }
 .btn-primary:hover { background: #ffdb66; }
 
@@ -293,10 +302,7 @@ summary:focus-visible {
 .btn-warn { background: var(--orange); color: #fff; }
 .btn-warn:hover { background: #ffa76b; }
 
-.btn-danger {
-  background: var(--coral);
-  color: #fff;
-}
+.btn-danger { background: var(--coral); color: #fff; }
 .btn-danger:hover { background: #f36a8b; }
 
 button:disabled {
@@ -306,10 +312,7 @@ button:disabled {
   box-shadow: var(--shadow-sm);
 }
 
-button.active {
-  background: var(--plum);
-  color: #fff;
-}
+button.active { background: var(--plum); color: #fff; }
 
 /* ------------------------------ Messages --------------------------- */
 
@@ -352,27 +355,25 @@ button.active {
 .scenario-banner.won { background: var(--mint); }
 .scenario-banner.lost { background: #ffd9e0; }
 
-/* ------------------------ Canvas principal -------------------------- */
+/* ------------------------ Canvas principal ------------------------- */
 
 .canvas-wrap {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 0;
   position: relative;
   width: 100%;
-  overflow: hidden;
+  height: 45vh;
+  min-height: 280px;
+  max-height: 520px;
   border: 3px solid var(--ink);
   border-radius: var(--radius);
   background: var(--paper);
   box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 .canvas-wrap #map {
   display: block;
   width: 100%;
   height: 100%;
-  min-width: 0;
-  min-height: 0;
   border-radius: calc(var(--radius) - 3px);
   background: #f2ecd9;
   cursor: grab;
@@ -388,16 +389,16 @@ button.active {
 
 .mini-map {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
-  width: 180px;
-  height: 120px;
+  right: 8px;
+  bottom: 8px;
+  width: 130px;
+  height: 90px;
   z-index: 3;
   border: 2.5px solid var(--ink);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   background: var(--paper-2);
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
 }
 
 .mini-map canvas {
@@ -411,18 +412,18 @@ button.active {
 
 .heatmap-legend {
   position: absolute;
-  left: 12px;
-  bottom: 12px;
+  left: 8px;
+  bottom: 8px;
   z-index: 3;
-  min-width: 150px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  min-width: 120px;
+  padding: 8px 10px;
+  border-radius: 8px;
   border: 2.5px solid var(--ink);
   background: var(--paper);
   color: var(--ink);
-  font-size: .75rem;
+  font-size: .6875rem;
   font-weight: 700;
-  box-shadow: 3px 3px 0 var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
   pointer-events: none;
 }
 
@@ -446,45 +447,33 @@ button.active {
 
 .dashboard {
   display: flex;
-  flex: 0 0 clamp(300px, 26vw, 420px);
   flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .dashboard-tab {
   display: flex;
-  flex: 0 0 auto;
   flex-direction: column;
-  min-height: 0;
   border: 2.5px solid var(--ink);
   border-radius: var(--radius);
   background: var(--paper);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  transition: box-shadow .15s ease, transform .15s ease;
-}
-
-.dashboard-tab[open] {
-  flex: 1 1 0;
-  box-shadow: var(--shadow);
 }
 
 .dashboard-tab summary {
   display: flex;
   align-items: center;
-  min-height: 48px;
+  min-height: 46px;
   padding: 10px 14px;
   cursor: pointer;
   font-size: .9375rem;
   font-weight: 900;
-  letter-spacing: .01em;
   color: var(--ink);
   list-style: none;
   background: linear-gradient(180deg, #fff8ec, #f7edd5);
   border-bottom: 2.5px solid transparent;
-  transition: background .2s ease;
 }
 
 .dashboard-tab[open] summary {
@@ -505,21 +494,8 @@ button.active {
 
 .dashboard-tab[open] summary::before { transform: rotate(90deg); }
 
-.dashboard-tab summary:hover { background: #fff3d0; }
-
 .tab-content {
-  min-height: 0;
-  overflow-y: auto;
   padding: 8px 10px 12px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--orange) transparent;
-}
-
-.tab-content::-webkit-scrollbar { width: 8px; }
-.tab-content::-webkit-scrollbar-thumb {
-  background: var(--orange);
-  border-radius: 4px;
-  border: 2px solid var(--paper);
 }
 
 /* ------------------------------ Cartes ------------------------------ */
@@ -531,12 +507,6 @@ button.active {
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   box-shadow: var(--shadow-sm);
-  transition: transform .15s ease, box-shadow .15s ease;
-}
-
-.card:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--ink);
 }
 
 .card h2 {
@@ -568,6 +538,7 @@ button.active {
   padding: 9px 10px;
   border-radius: 8px;
   border: 2px solid var(--ink);
+  min-width: 0;
 }
 
 .city-meta small,
@@ -581,7 +552,12 @@ button.active {
 }
 
 .city-meta strong,
-.stat strong { font-size: 1rem; font-weight: 900; color: var(--ink); }
+.stat strong {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--ink);
+  word-break: break-word;
+}
 
 .stat.negative strong { color: var(--coral); }
 .stat.positive strong { color: var(--grass); }
@@ -598,6 +574,7 @@ button.active {
   border-top: 2px dashed #d8cfb5;
   font-size: .8125rem;
   font-weight: 600;
+  word-break: break-word;
 }
 
 .line-row:first-child { border-top: none; }
@@ -607,6 +584,7 @@ button.active {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .line-head strong {
@@ -622,21 +600,27 @@ button.active {
   color: var(--ink);
   font-weight: 800;
   font-size: .6875rem;
+  white-space: nowrap;
 }
 
-.line-actions { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.line-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-top: 8px;
+}
 
 .line-row button.small {
   margin-top: 0;
   min-height: 36px;
   width: 100%;
-  font-size: .75rem;
-  padding: 6px 8px;
+  font-size: .6875rem;
+  padding: 6px 6px;
   box-shadow: 2px 2px 0 var(--ink);
+  white-space: normal;
+  line-height: 1.15;
 }
 
-.line-row button.small:hover { box-shadow: 3px 3px 0 var(--ink); }
-.line-row button.small:active { box-shadow: 0 0 0 var(--ink); }
 .line-row button.small.danger { background: var(--coral); color: #fff; }
 
 /* -------------------------- Opportunités ---------------------------- */
@@ -656,11 +640,12 @@ button.active {
 .overview-header,
 .overview-row {
   display: grid;
-  grid-template-columns: 2fr 1.4fr .8fr;
+  grid-template-columns: 1.6fr 1fr .7fr;
   gap: 6px;
   font-size: .75rem;
   padding: 5px 0;
   font-weight: 700;
+  align-items: center;
 }
 
 .overview-header {
@@ -680,6 +665,7 @@ button.active {
   color: var(--ink-soft);
   line-height: 1.55;
   font-weight: 600;
+  word-break: break-word;
 }
 
 #log {
@@ -689,6 +675,7 @@ button.active {
   overflow: auto;
   line-height: 1.5;
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  word-break: break-word;
 }
 
 .log-entry {
@@ -735,6 +722,7 @@ button.active {
   font-weight: 700;
   border: 2px solid var(--ink);
   box-shadow: 2px 2px 0 var(--ink);
+  word-break: break-word;
 }
 
 .journal-positive { background: var(--mint); color: var(--ink); }
@@ -788,6 +776,7 @@ button.active {
   background: linear-gradient(135deg, var(--sun), #ffb347);
   font-weight: 900;
   box-shadow: 2px 2px 0 var(--ink);
+  flex-wrap: wrap;
 }
 
 .progression-header span,
@@ -839,6 +828,7 @@ button.active {
   padding-bottom: 8px;
   font-weight: 900;
   font-size: .9375rem;
+  gap: 8px;
 }
 .report-header .positive { color: var(--grass); }
 .report-header .negative { color: var(--coral); }
@@ -861,6 +851,8 @@ button.active {
   background: linear-gradient(135deg, #ffe0f0, #ffc8e0);
   font-weight: 900;
   box-shadow: 2px 2px 0 var(--ink);
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* --------------------------- Heatmap btn ---------------------------- */
@@ -887,21 +879,148 @@ button.active {
   font-size: .875rem;
   color: var(--ink);
   box-shadow: var(--shadow-sm);
-  transition: transform .08s ease, box-shadow .08s ease, background .15s ease;
 }
 
-.import-label:hover {
-  background: #fff9ea;
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--ink);
-}
-
-.import-label:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--ink);
-}
+.import-label:hover { background: #fff9ea; }
 
 #financialChart {
   width: 100%;
   max-width: 220px;
-  background: var
+  background: var(--paper-2);
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  margin-top: 6px;
+}
+
+/* ------------------------------ Footer ------------------------------ */
+
+footer {
+  flex: 0 0 auto;
+  border-top: 3px solid var(--ink);
+  background: linear-gradient(180deg, #fff8ec, #ffe9b8);
+  color: var(--ink);
+  font-size: .75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  text-align: center;
+  font-style: italic;
+}
+
+/* ---------------------------- Utilitaires --------------------------- */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* =====================================================================
+   Grands écrans : on repasse en deux colonnes
+   ===================================================================== */
+
+@media (min-width: 960px) {
+  body { height: 100vh; overflow: hidden; }
+
+  .topbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 22px;
+    min-height: 84px;
+  }
+
+  .brand { justify-content: flex-start; }
+  .topbar h1 { font-size: 1.5rem; }
+  .tagline { font-size: .8125rem; }
+  .brand-bus { font-size: 2rem; }
+
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .app-shell {
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+    height: calc(100vh - 124px);
+    padding: 14px;
+    gap: 14px;
+    overflow: hidden;
+  }
+
+  .map-panel {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .toolbar button,
+  .toolbar select {
+    flex: 0 0 auto;
+    min-width: auto;
+    white-space: nowrap;
+    font-size: .875rem;
+    padding: 9px 14px;
+  }
+
+  .city-controls input[type="text"] {
+    flex: 0 0 190px;
+  }
+
+  .city-name {
+    flex: 0 0 auto;
+    margin-left: auto;
+    text-align: left;
+  }
+
+  .canvas-wrap {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .mini-map {
+    width: 180px;
+    height: 120px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .heatmap-legend {
+    left: 12px;
+    bottom: 12px;
+    min-width: 150px;
+    font-size: .75rem;
+    padding: 10px 12px;
+  }
+
+  .dashboard {
+    flex: 0 0 clamp(300px, 26vw, 420px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .dashboard-tab { flex: 0 0 auto; }
+  .dashboard-tab[open] { flex: 1 1 0; }
+
+  .tab-content {
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--orange) transparent;
+  }
+
+  .line-actions { grid-template-columns: 1fr; }
+}
