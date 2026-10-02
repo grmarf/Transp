@@ -142,45 +142,39 @@
 
 <footer>🚌 Vie t'Lignes — Vie la vie plus vite, en lignes !</footer>
 <script>
-(function () {
-  var files = [
-    "src/constants.js", "src/html.js", "src/persistence.js",
-    "src/city.js", "src/state.js", "src/scenarios.js",
-    "src/network.js", "src/routing.js", "src/vehicles.js",
-    "src/passengers.js", "src/growth.js", "src/disruptions.js",
-    "src/events.js", "src/progression.js", "src/contracts.js",
-    "src/reports.js", "src/seasons.js",
-    "src/engine.js", "src/renderer.js", "src/main.js"
+(async function () {
+  var modules = [
+    "./src/constants.js", "./src/html.js", "./src/persistence.js",
+    "./src/city.js", "./src/state.js", "./src/scenarios.js",
+    "./src/network.js", "./src/routing.js", "./src/vehicles.js",
+    "./src/passengers.js", "./src/growth.js", "./src/disruptions.js",
+    "./src/events.js", "./src/progression.js", "./src/contracts.js",
+    "./src/reports.js", "./src/seasons.js",
+    "./src/engine.js", "./src/renderer.js", "./src/main.js"
   ];
 
   var results = [];
-  var done = 0;
-
-  function finish(name, status) {
-    results.push(status.padEnd(10) + name);
-    done++;
-    if (done === files.length) show();
+  for (var i = 0; i < modules.length; i++) {
+    try {
+      var mod = await import(modules[i]);
+      results.push("OK    " + modules[i] + " (" + Object.keys(mod).length + " exports)");
+    } catch (e) {
+      results.push("KO    " + modules[i] + "\n      → " + e.message);
+    }
   }
 
-  function show() {
-    var b = document.createElement("div");
-    b.style.cssText = "position:fixed;top:0;left:0;right:0;padding:10px;background:#0066cc;color:#fff;font:14px monospace;z-index:99999;text-align:center;cursor:pointer";
-    b.textContent = "DIAG — touche pour voir (" + results.filter(r => r.startsWith("HTTP 200")).length + "/" + files.length + " OK)";
-    b.addEventListener("click", function () {
-      var pre = document.createElement("pre");
-      pre.style.cssText = "position:fixed;inset:0;background:#000;color:#0f0;font:12px monospace;padding:12px;z-index:99999;overflow:auto;margin:0;white-space:pre-wrap";
-      pre.textContent = "=== Diagnostic (chemins src/) ===\n\n" + results.join("\n") + "\n\n(touche pour fermer)";
-      pre.addEventListener("click", function () { pre.remove(); });
-      document.body.appendChild(pre);
-    });
-    document.body.appendChild(b);
-  }
-
-  files.forEach(function (f) {
-    fetch(f, { cache: "no-store" })
-      .then(function (r) { finish(f, r.ok ? "HTTP 200" : "HTTP " + r.status); })
-      .catch(function (e) { finish(f, "ERR"); });
+  // Bandeau cliquable
+  var b = document.createElement("div");
+  b.style.cssText = "position:fixed;top:0;left:0;right:0;padding:10px;background:#0066cc;color:#fff;font:13px monospace;z-index:99999;text-align:center;cursor:pointer";
+  b.textContent = "DIAG IMPORT — touche pour voir";
+  b.addEventListener("click", function () {
+    var pre = document.createElement("pre");
+    pre.style.cssText = "position:fixed;inset:0;background:#000;color:#0f0;font:11px monospace;padding:12px;z-index:99999;overflow:auto;margin:0;white-space:pre-wrap";
+    pre.textContent = results.join("\n\n");
+    pre.addEventListener("click", function () { pre.remove(); });
+    document.body.appendChild(pre);
   });
+  document.body.appendChild(b);
 })();
 </script>
 <script type="module" src="src/main.js"></script><script type="module" src="src/main.js"></script>
