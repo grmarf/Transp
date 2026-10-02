@@ -1,7 +1,7 @@
 import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
-import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal, intermodalStats } from "./engine.js";
+import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal } from "./engine.js";
 import { createNetwork, routeLine, createUndergroundNetwork } from "./network.js";
 import { createRenderer } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
@@ -78,9 +78,15 @@ function screenPoint(e) {
   const rect = canvas.getBoundingClientRect();
   const source = e?.changedTouches?.[0] || e?.touches?.[0] || e;
   if (!source || !rect.width || !rect.height) return null;
+  // Fix for V20.2: use CSS-scaled dimensions, not intrinsic canvas.width/height
+  // CSS aspect-ratio scales the displayed canvas, so we need to map screen coords
+  // through the actual visual dimensions, not the 1000x650 logical size.
+  const dpr = window.devicePixelRatio || 1;
+  const logicalWidth = rect.width / dpr;
+  const logicalHeight = rect.height / dpr;
   return {
-    x: (source.clientX - rect.left) * (canvas.width / rect.width),
-    y: (source.clientY - rect.top) * (canvas.height / rect.height)
+    x: (source.clientX - rect.left) * (canvas.width / logicalWidth),
+    y: (source.clientY - rect.top) * (canvas.height / logicalHeight)
   };
 }
 
