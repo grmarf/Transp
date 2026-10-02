@@ -14,6 +14,7 @@ function serviceLevelColor(level) {
   return "#e05a5a";
 }
 import { passengerStats, waitStats, PASSENGER_STATES } from "./passengers.js";
+import { escapeHtml as h } from "./html.js";
 
 // V11.0 — last few days' net result, so the player can read a trend
 // ("improving" / "declining") instead of only ever seeing the cumulative
@@ -24,7 +25,7 @@ function renderCashFlowTrend(state) {
   const recent = days.slice(-7);
   const bars = recent.map(d => {
     const color = d.net >= 0 ? "#4caf6a" : "#e05a5a";
-    return `<span title="Jour ${d.day} : ${d.net >= 0 ? "+" : ""}${Math.round(d.net).toLocaleString("fr-FR")} €" style="display:inline-block;width:10px;height:${Math.min(24, 4 + Math.abs(d.net) / 20)}px;background:${color};margin-right:2px;vertical-align:bottom;"></span>`;
+    return `<span title="${h(`Jour ${d.day} : ${d.net >= 0 ? "+" : ""}${Math.round(d.net).toLocaleString("fr-FR")} €`)}" style="display:inline-block;width:10px;height:${Math.min(24, 4 + Math.abs(d.net) / 20)}px;background:${h(color)};margin-right:2px;vertical-align:bottom;"></span>`;
   }).join("");
   const last = days[days.length - 1];
   return `<div class="stat" style="margin-top:8px;"><small>Tendance (7 derniers jours)</small><br>${bars}<br><small>Dernier jour : <span style="color:${last.net >= 0 ? "#4caf6a" : "#e05a5a"}">${last.net >= 0 ? "+" : ""}${Math.round(last.net).toLocaleString("fr-FR")} €</span></small></div>`;
@@ -40,13 +41,13 @@ function renderOpportunities(state) {
   }
   const items = [];
   if (unprofitableLine) {
-    items.push(`<div class="opportunity">📉 <strong style="color:${unprofitableLine.line.color}">${unprofitableLine.line.name}</strong> est déficitaire (${Math.round(unprofitableLine.net).toLocaleString("fr-FR")} € net) — envisagez de la revoir ou de la supprimer.</div>`);
+    items.push(`<div class="opportunity">📉 <strong style="color:${h(unprofitableLine.line.color)}">${h(unprofitableLine.line.name)}</strong> est déficitaire (${Math.round(unprofitableLine.net).toLocaleString("fr-FR")} € net) — envisagez de la revoir ou de la supprimer.</div>`);
   }
   if (saturatedLine) {
-    items.push(`<div class="opportunity">🚦 <strong style="color:${saturatedLine.line.color}">${saturatedLine.line.name}</strong> est saturée (${Math.round(saturatedLine.occupancy * 100)}% d'occupation) — un véhicule supplémentaire aiderait.</div>`);
+    items.push(`<div class="opportunity">🚦 <strong style="color:${h(saturatedLine.line.color)}">${h(saturatedLine.line.name)}</strong> est saturée (${Math.round(saturatedLine.occupancy * 100)}% d'occupation) — un véhicule supplémentaire aiderait.</div>`);
   }
   if (underservedStop) {
-    items.push(`<div class="opportunity">📍 <strong>${underservedStop.stop.name}</strong> a une forte demande non couverte (niveau de service ${Math.round(underservedStop.level * 100)}%) — envisagez une nouvelle ligne ou une extension.</div>`);
+    items.push(`<div class="opportunity">📍 <strong>${h(underservedStop.stop.name)}</strong> a une forte demande non couverte (niveau de service ${Math.round(underservedStop.level * 100)}%) — envisagez une nouvelle ligne ou une extension.</div>`);
   }
   return items.join("");
 }
@@ -59,7 +60,7 @@ function renderCityOverview(state) {
     .sort((a, b) => b.population - a.population)
     .map(s => {
       const level = serviceLevel(state, s);
-      return `<div class="overview-row"><span>${s.name}</span><span>${s.population.toLocaleString("fr-FR")} hab.</span><span style="color:${serviceLevelColor(level)}">${Math.round(level * 100)}%</span></div>`;
+      return `<div class="overview-row"><span>${h(s.name)}</span><span>${s.population.toLocaleString("fr-FR")} hab.</span><span style="color:${h(serviceLevelColor(level))}">${Math.round(level * 100)}%</span></div>`;
     }).join("");
   return `<div class="overview-header"><span>Arrêt</span><span>Population</span><span>Service</span></div>${rows}`;
 }
@@ -198,7 +199,7 @@ export function createRenderer(canvas, state) {
         <div class="stat"><small>Demande générée</small><strong>${Math.round(state.totalGenerated).toLocaleString("fr-FR")}</strong></div>
         <div class="stat"><small>Recettes cumulées</small><strong>${Math.round(fin.income).toLocaleString("fr-FR")} €</strong></div>
         <div class="stat"><small>Dépenses cumulées</small><strong>${Math.round(fin.expenses).toLocaleString("fr-FR")} €</strong></div>
-        <div class="stat"><small>Bilan net</small><strong style="color:${fin.net >= 0 ? "#4caf6a" : "#e05a5a"}">${fin.net >= 0 ? "+" : ""}${Math.round(fin.net).toLocaleString("fr-FR")} €</strong></div>
+        <div class="stat"><small>Bilan net</small><strong style="color:${h(fin.net >= 0 ? "#4caf6a" : "#e05a5a")}">${fin.net >= 0 ? "+" : ""}${Math.round(fin.net).toLocaleString("fr-FR")} €</strong></div>
       </div>
       ${renderCashFlowTrend(state)}`;
 
@@ -214,16 +215,16 @@ export function createRenderer(canvas, state) {
       const lastVehicleId = l.vehicles[l.vehicles.length - 1];
       return `
       <div class="line-row">
-        <div class="line-head"><strong style="color:${l.color}">${l.name}</strong><span class="pill">${l.riders} passagers</span></div>
-        <div>${l.stopIds.map(id => state.city.stops.find(s=>s.id===id).name).join(" → ")}</div>
-        <div class="muted">${l.vehicles.length} véhicule${l.vehicles.length > 1 ? "s" : ""}${headway ? ` · ~${Math.round(headway)} min d'intervalle` : ""}${occupancy != null ? ` · <span style="color:${occColor}">${Math.round(occupancy * 100)}% occupation</span>` : ""}</div>
-        <div class="muted">+${Math.round(l.income).toLocaleString("fr-FR")} € recettes · -${Math.round(l.expenses || 0).toLocaleString("fr-FR")} € dépenses · <span style="color:${net >= 0 ? "#4caf6a" : "#e05a5a"}">${net >= 0 ? "+" : ""}${Math.round(net).toLocaleString("fr-FR")} € net</span></div>
-        <div class="muted">Mode : ${vehicleMode(l.mode).name}</div>
+        <div class="line-head"><strong style="color:${h(l.color)}">${h(l.name)}</strong><span class="pill">${l.riders} passagers</span></div>
+        <div>${l.stopIds.map(id => h(state.city.stops.find(s=>s.id===id).name)).join(" → ")}</div>
+        <div class="muted">${l.vehicles.length} véhicule${l.vehicles.length > 1 ? "s" : ""}${headway ? ` · ~${Math.round(headway)} min d'intervalle` : ""}${occupancy != null ? ` · <span style="color:${h(occColor)}">${Math.round(occupancy * 100)}% occupation</span>` : ""}</div>
+        <div class="muted">+${Math.round(l.income).toLocaleString("fr-FR")} € recettes · -${Math.round(l.expenses || 0).toLocaleString("fr-FR")} € dépenses · <span style="color:${h(net >= 0 ? "#4caf6a" : "#e05a5a")}">${net >= 0 ? "+" : ""}${Math.round(net).toLocaleString("fr-FR")} € net</span></div>
+        <div class="muted">Mode : ${h(vehicleMode(l.mode).name)}</div>
         <div class="line-actions">
-          <button type="button" class="small" data-buy-vehicle="${l.id}">+ véhicule (${vehicleMode(l.mode).purchaseCost.toLocaleString("fr-FR")} €)</button>
-          <button type="button" class="small" data-extend-line="${l.id}">↔ Étendre la ligne</button>
-          ${l.vehicles.length > 1 ? `<button type="button" class="small" data-sell-vehicle="${l.id}" data-vehicle-id="${lastVehicleId}">- véhicule (+${Math.round(vehicleMode(l.mode).purchaseCost * 0.5).toLocaleString("fr-FR")} €)</button>` : ""}
-          <button type="button" class="small danger" data-delete-line="${l.id}">✕ Supprimer la ligne</button>
+          <button type="button" class="small" data-buy-vehicle="${h(l.id)}">+ véhicule (${vehicleMode(l.mode).purchaseCost.toLocaleString("fr-FR")} €)</button>
+          <button type="button" class="small" data-extend-line="${h(l.id)}">↔ Étendre la ligne</button>
+          ${l.vehicles.length > 1 ? `<button type="button" class="small" data-sell-vehicle="${h(l.id)}" data-vehicle-id="${h(lastVehicleId)}">- véhicule (+${Math.round(vehicleMode(l.mode).purchaseCost * 0.5).toLocaleString("fr-FR")} €)</button>` : ""}
+          <button type="button" class="small danger" data-delete-line="${h(l.id)}">✕ Supprimer la ligne</button>
         </div>
       </div>`;
     }).join("") :
@@ -250,49 +251,49 @@ export function createRenderer(canvas, state) {
       // serviceLevel), surfaced here so the player can see *why* a stop is
       // growing fast or stagnating, instead of it only acting invisibly.
       const level = serviceLevel(state, s);
-      stopEl.innerHTML = `<b>${s.name}</b><br>Population : ${s.population.toLocaleString("fr-FR")} · Emplois : ${s.jobs.toLocaleString("fr-FR")} · Commerces : ${s.commerce.toLocaleString("fr-FR")}<br>Densité : ${s.density.toLocaleString("fr-FR")} hab/km²<br>Niveau de service : <b style="color:${serviceLevelColor(level)}">${Math.round(level * 100)}%</b> (moteur de la croissance)<br>Passagers en attente ici : <b>${waitingHere}</b><br>Pression de demande (avant prochain passager) : ${od.length ? od.map(x=>`${x.stop.name} (${Math.round(x.n*100)}%)`).join(", ") : "aucune"}<br>Lignes : ${lines.length ? lines.map(l=>l.name).join(", ") : "aucune"}`;
+      stopEl.innerHTML = `<b>${h(s.name)}</b><br>Population : ${s.population.toLocaleString("fr-FR")} · Emplois : ${s.jobs.toLocaleString("fr-FR")} · Commerces : ${s.commerce.toLocaleString("fr-FR")}<br>Densité : ${s.density.toLocaleString("fr-FR")} hab/km²<br>Niveau de service : <b style="color:${h(serviceLevelColor(level))}">${Math.round(level * 100)}%</b> (moteur de la croissance)<br>Passagers en attente ici : <b>${waitingHere}</b><br>Pression de demande (avant prochain passager) : ${od.length ? od.map(x=>`${h(x.stop.name)} (${Math.round(x.n*100)}%)`).join(", ") : "aucune"}<br>Lignes : ${lines.length ? lines.map(l=>h(l.name)).join(", ") : "aucune"}`;
     }
 
-    document.getElementById("log").innerHTML = state.logs.map(x => `<div class="log-entry">${x}</div>`).join("");
+    document.getElementById("log").innerHTML = state.logs.map(x => `<div class="log-entry">${h(x)}</div>`).join("");
     document.getElementById("opportunities").innerHTML = renderOpportunities(state);
     document.getElementById("cityOverview").innerHTML = renderCityOverview(state);
 
     const journalEl = document.getElementById("journal");
     if (journalEl) {
       const entries = state.journal || [];
-      journalEl.innerHTML = entries.map(e => `<div class="journal-entry journal-${e.type}">${e.text}</div>`).join("");
+      journalEl.innerHTML = entries.map(e => `<div class="journal-entry journal-${h(e.type)}">${h(e.text)}</div>`).join("");
     }
     const seasonEl = document.getElementById("seasonPanel");
     if (seasonEl) {
       const season = seasonSummary(state);
-      seasonEl.innerHTML = `<div class="season-header"><b>${season.icon} ${season.label}</b><span>Jour ${season.dayInSeason}/7</span></div><div class="season-effects">Demande ×${season.demandMultiplier.toFixed(2)} · Tarif ×${season.fareMultiplier.toFixed(2)} · ${season.daysRemaining} jour(s) restant(s)</div>`;
+      seasonEl.innerHTML = `<div class="season-header"><b>${h(season.icon)} ${h(season.label)}</b><span>Jour ${season.dayInSeason}/7</span></div><div class="season-effects">Demande ×${season.demandMultiplier.toFixed(2)} · Tarif ×${season.fareMultiplier.toFixed(2)} · ${season.daysRemaining} jour(s) restant(s)</div>`;
     }
 
     const reportEl = document.getElementById("reportPanel");
     if (reportEl) {
       const report = latestReport(state);
-      reportEl.innerHTML = report ? `<div class="report-header"><b>Jour ${report.day}</b><span class="${report.net >= 0 ? "positive" : "negative"}">${report.net >= 0 ? "+" : ""}${Math.round(report.net).toLocaleString("fr-FR")} €</span></div><div class="report-metrics">${report.season ? `Saison ${report.season} · ` : ""}Satisfaction ${report.satisfaction}% · Attente ${Math.round(report.avgWaitMinutes)} min · Abandons ${report.abandonedCount}</div><div class="report-recommendations">${report.recommendations.map(item => `<div>• ${item}</div>`).join("")}</div>` : '<div class="muted">Le premier rapport sera disponible à la fin du jour 1.</div>';
+      reportEl.innerHTML = report ? `<div class="report-header"><b>Jour ${report.day}</b><span class="${h(report.net >= 0 ? "positive" : "negative")}">${report.net >= 0 ? "+" : ""}${Math.round(report.net).toLocaleString("fr-FR")} €</span></div><div class="report-metrics">${report.season ? `Saison ${h(report.season)} · ` : ""}Satisfaction ${report.satisfaction}% · Attente ${Math.round(report.avgWaitMinutes)} min · Abandons ${report.abandonedCount}</div><div class="report-recommendations">${report.recommendations.map(item => `<div>• ${h(item)}</div>`).join("")}</div>` : '<div class="muted">Le premier rapport sera disponible à la fin du jour 1.</div>';
     }
 
     const contractsEl = document.getElementById("contractsPanel");
     if (contractsEl) {
       const coverage = state.city.stops.length ? state.lines.reduce((sum, line) => sum + new Set(line.stopIds || []).size, 0) / state.city.stops.length : 0;
       const contracts = contractSummary(state, { satisfaction: satisfaction(state), transferShare: intermodalStats(state).shareWithTransfer, coverage });
-      contractsEl.innerHTML = contracts.length ? `<div class="muted">Renouvellement dans ${contracts[0].remainingDays} jour(s)</div>` + contracts.map(contract => `<div class="contract-row ${contract.completed ? "completed" : ""}"><b>${contract.completed ? "✓" : "○"} ${contract.label}</b><span>${Math.round(contract.progress * 100)}% · +${contract.reward.toLocaleString("fr-FR")} €</span></div>`).join("") : '<div class="muted">Les contrats seront proposés au prochain jour.</div>';
+      contractsEl.innerHTML = contracts.length ? `<div class="muted">Renouvellement dans ${contracts[0].remainingDays} jour(s)</div>` + contracts.map(contract => `<div class="contract-row ${contract.completed ? "completed" : ""}"><b>${contract.completed ? "✓" : "○"} ${h(contract.label)}</b><span>${Math.round(contract.progress * 100)}% · +${contract.reward.toLocaleString("fr-FR")} €</span></div>`).join("") : '<div class="muted">Les contrats seront proposés au prochain jour.</div>';
     }
 
     const progressionEl = document.getElementById("progressionPanel");
     if (progressionEl) {
       const transferShare = intermodalStats(state).shareWithTransfer;
       const progression = progressionSummary(state, { satisfaction: satisfaction(state), transferShare });
-      progressionEl.innerHTML = `<div class="progression-header"><b>${progression.rank}</b><span>${progression.reputation} réputation · ${progression.completed}/${progression.total} objectifs</span></div>` + progression.goals.map(goal => `<div class="goal-row ${goal.completed ? "completed" : ""}"><span>${goal.completed ? "✓" : "○"} <b>${goal.label}</b></span><span>${goal.completed ? `+${goal.reward.toLocaleString("fr-FR")} €` : `${Math.round(goal.progress * 100)}%`}</span></div>`).join("");
+      progressionEl.innerHTML = `<div class="progression-header"><b>${h(progression.rank)}</b><span>${progression.reputation} réputation · ${progression.completed}/${progression.total} objectifs</span></div>` + progression.goals.map(goal => `<div class="goal-row ${goal.completed ? "completed" : ""}"><span>${goal.completed ? "✓" : "○"} <b>${h(goal.label)}</b></span><span>${goal.completed ? `+${goal.reward.toLocaleString("fr-FR")} €` : `${Math.round(goal.progress * 100)}%`}</span></div>`).join("");
     }
 
     const eventsEl = document.getElementById("eventPanel");
     if (eventsEl) {
       const events = eventSummary(state);
       eventsEl.innerHTML = events.length
-        ? events.map(event => `<div class="event-row"><b>${event.icon} ${event.label}</b><span>${event.remainingDays} j · demande ×${event.demandMultiplier.toFixed(2)} · satisfaction ${event.satisfactionDelta >= 0 ? "+" : ""}${event.satisfactionDelta}</span></div>`).join("")
+        ? events.map(event => `<div class="event-row"><b>${h(event.icon)} ${h(event.label)}</b><span>${event.remainingDays} j · demande ×${event.demandMultiplier.toFixed(2)} · satisfaction ${event.satisfactionDelta >= 0 ? "+" : ""}${event.satisfactionDelta}</span></div>`).join("")
         : '<div class="muted">Aucun événement en cours.</div>';
     }
 

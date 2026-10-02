@@ -5,6 +5,7 @@ import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLi
 import { createNetwork, routeLine, createUndergroundNetwork } from "./network.js";
 import { createRenderer } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
+import { escapeHtml as h } from "./html.js";
 
 const canvas = document.getElementById("map");
 const rendererState = { current: null };
@@ -36,8 +37,8 @@ function updateInstructions() {
     if (extending) {
       const line = state.lines.find(l => l.id === state.extendingLineId);
       el.innerHTML = ready
-        ? `Extension de ${line?.name ?? "la ligne"} : touchez ✓ pour valider les nouveaux arrêts.`
-        : `Extension de ${line?.name ?? "la ligne"} : touchez <b>1 ou plusieurs arrêts</b> à ajouter en fin de ligne.`;
+        ? `Extension de ${h(line?.name ?? "la ligne")} : touchez ✓ pour valider les nouveaux arrêts.`
+        : `Extension de ${h(line?.name ?? "la ligne")} : touchez <b>1 ou plusieurs arrêts</b> à ajouter en fin de ligne.`;
     } else {
       el.innerHTML = ready
         ? "Mode création : plusieurs arrêts sélectionnés. Vous pouvez terminer la ligne."
@@ -158,7 +159,7 @@ function bindDelegatedTap(container, selector, handler) {
 
 function populateScenarioSelect() {
   const select = document.getElementById("scenarioSelect");
-  select.innerHTML = SCENARIOS.map(s => `<option value="${s.id}">${s.name} (${s.difficulty})</option>`).join("");
+  select.innerHTML = SCENARIOS.map(s => `<option value="${h(s.id)}">${h(s.name)} (${h(s.difficulty)})</option>`).join("");
 }
 
 function refreshUI() {
@@ -179,7 +180,7 @@ function updateScenarioBanner() {
   const statusText = scenario.status === "won" ? "✅ Réussi"
     : scenario.status === "lost" ? "❌ Échoué"
     : `Jour ${(state.elapsedDays || 0) + 1}${scenario.durationDays ? `/${scenario.durationDays}` : ""}`;
-  banner.innerHTML = `<div><b>${scenario.name}</b> (${scenario.difficulty}) — ${scenario.objective.label} · ${statusText}</div><div class="bar"><div style="width:${Math.round(progress * 100)}%"></div></div>`;
+  banner.innerHTML = `<div><b>${h(scenario.name)}</b> (${h(scenario.difficulty)}) — ${h(scenario.objective.label)} · ${h(statusText)}</div><div class="bar"><div style="width:${Math.round(progress * 100)}%"></div></div>`;
 }
 
 function boot(seed, scenarioId, restoredPayload = null) {
