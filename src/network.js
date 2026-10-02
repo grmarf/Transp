@@ -93,28 +93,67 @@ export function shortestPath(network, fromId, toId) {
   return [...path];
 }
 
+/**
+ * V21.0 — Route d'une ligne : ALLER-RETOUR.
+ * Avant : [a, b, c] donnait une boucle fermée a→b→c→a (retour à vide).
+ * Maintenant : [a, b, c] donne a→b→c→b→a (aller chargé, retour chargé).
+ *
+ * Concrètement, `nodeIds` contient l'aller complet (a→…→c) suivi du retour
+ * miroir (c→…→a) moins le dernier nœud, puisque la boucle `% ids.length`
+ * du moteur ramène naturellement au point de départ.
+ *
+ * Exemple : [a, x, b, y, c] → [a, x, b, y, c, y, b, x]
+ *   Parcours du véhicule : a → x → b → y → c → y → b → x → (retour à a)
+ *   Arrêts visités : a, b, c, b, a — chaque arrêt 2× par cycle sauf les
+ *   terminus, ce qui multiplie mécaniquement les occasions de montée.
+ *
+ * Deux longueurs sont exposées :
+ *   - `totalLength` : longueur du trajet simple (a→c), utilisée pour le
+ *     calcul du coût de création de la ligne (inchangé pour le joueur).
+ *   - `cycleLength` : longueur du cycle complet (aller + retour), utilisée
+ *     par lineHeadwayMinutes() dans vehicles.js pour calculer l'intervalle.
+ */
 export function routeLine(network, stopIds) {
   if (!Array.isArray(stopIds) || stopIds.length < 2) return null;
-  const route = [];
-  let totalLength = 0;
 
-  for (let i = 0; i < stopIds.length; i++) {
+  // --- 1. Aller simple : a → b → c ---
+  const forward = [];
+  let oneWayLength = 0;
+
+  for (let i = 0; i < stopIds.length - 1; i++) {
     const from = stopIds[i];
-    const to = stopIds[(i + 1) % stopIds.length];
+    const to = stopIds[i + 1];
     const path = shortestPath(network, from, to);
     if (!path) return null;
 
-    if (i === 0) route.push(...path);
-    else route.push(...path.slice(1));
+    if (i === 0) forward.push(...path);
+    else forward.push(...path.slice(1));
 
     for (let j = 1; j < path.length; j++) {
-      totalLength += distance(network.nodes.get(path[j - 1]), network.nodes.get(path[j]));
+      const na = network.nodes.get(path[j - 1]);
+      const nb = network.nodes.get(path[j]);
+      if (na && nb) oneWayLength += distance(na, nb);
     }
   }
 
+  // --- 2. Retour miroir : c → b → a (sans dupliquer le point de départ) ---
+  // forward = [a, …, b, …, c]
+  // backward = [c, …, b, …, a]
+  // backward.slice(1, -1) = […, b, …] : on enlève c (déjà à la fin de
+  // forward) et a (atteint par la boucle du moteur, pas besoin de le
+  // répéter dans nodeIds).
+  const backward = forward.slice().reverse().slice(1, -1);
+  const nodeIds = forward.concat(backward);
+
+  // --- 3. Longueurs ---
+  // oneWayLength = a→c (aller simple, sert au coût de création de ligne)
+  // cycleLength = oneWayLength × 2 (aller + retour, sert à l'intervalle)
+  const cycleLength = oneWayLength * 2;
+
   return {
-    nodeIds: route,
-    totalLength,
+    nodeIds,
+    totalLength: oneWayLength,
+    cycleLength,
     legs: stopIds.map((from, i) => ({
       from,
       to: stopIds[(i + 1) % stopIds.length],
@@ -171,7 +210,8 @@ export function createUndergroundNetwork(city) {
   return { version: "13.0-underground", nodes, edges, adjacency, pathCache: new Map() };
 }
 
-export function networkStats(network) {  const connected = [...network.nodes.keys()].filter(id => (network.adjacency.get(id) || []).length > 0).length;
+export function networkStats(network) {
+  const connected = [...network.nodes.keys()].filter(id => (network.adjacency.get(id) || []).length > 0).length;
   return {
     nodes: network.nodes.size,
     edges: network.edges.length,
@@ -200,3 +240,5 @@ export function countComponents(network) {
   }
   return count;
 }
+
+// === FIN DU FICHIER network.js ===
