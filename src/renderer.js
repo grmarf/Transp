@@ -194,7 +194,7 @@ export function createRenderer(canvas, state) {
         <div class="stat"><small>Passagers actifs</small><strong>${pStats.WAITING + pStats.BOARDING + pStats.ON_VEHICLE + pStats.TRANSFERRING}</strong></div>
         <div class="stat"><small>Réseau</small><strong>${state.network.edges.length} routes</strong></div>
         <div class="stat"><small>Jour</small><strong>${(state.elapsedDays || 0) + 1}</strong></div>
-        <div class="stat"><small>Abandons</small><strong>${wStats.abandonedCount}</strong></div>
+        <div class="stat"><small>Abandons</small><strong>${state.totalAbandoned || 0}</strong></div>
         <div class="stat"><small>Service demande</small><strong>${state.totalDemand > 0 ? Math.round((state.totalArrived / state.totalDemand) * 100) : 0}%</strong></div>
         <div class="stat"><small>Demande générée</small><strong>${Math.round(state.totalGenerated).toLocaleString("fr-FR")}</strong></div>
         <div class="stat"><small>Recettes cumulées</small><strong>${Math.round(fin.income).toLocaleString("fr-FR")} €</strong></div>

@@ -1,4 +1,4 @@
-# Transport Tycoon — Transp V20.0
+# Transport Tycoon — Transp V20.1
 
 Jeu de gestion et de simulation de réseau de transport en JavaScript natif, Canvas et modules ES.
 
@@ -44,10 +44,12 @@ Le script `launch-termux.sh` permet également un lancement sur Android/Termux.
 ## Tester
 
 ```bash
-npm test
+npm test             # tests métier + smoke test Chromium
+npm run check:syntax # vérification syntaxique de src/ et tests/
+npm run check        # les deux contrôles
 ```
 
-La suite couvre les versions historiques V2.3 à V13 ainsi que le routage intermodal, les métriques de correspondance et la heatmap V14.
+La suite couvre les versions historiques V2.3 à V13 ainsi que le routage intermodal, les métriques de correspondance, la heatmap V14, les régressions V20.1 et un parcours réel dans Chromium. Le smoke test navigateur nécessite `chromium` installé localement.
 
 ## Structure
 
@@ -81,3 +83,9 @@ La V19 introduit un calendrier saisonnier de 28 jours : les saisons modifient la
 La V20 utilise un format de sauvegarde strict courant. Les fichiers doivent
 être explicitement au format V20 ; aucune migration des formats historiques
 V13–V19 n’est incluse, car aucune sauvegarde de ces versions n’est à importer.
+
+La V20.1 corrige le nettoyage des passagers abandonnés, fiabilise le compteur
+cumulatif d’abandons et éloigne le redéclenchement des événements expirés. Les
+interpolations HTML issues de l’état sauvegardé sont échappées avant rendu.
+L’archive historique V13 n’est plus distribuée dans le dépôt. La CI GitHub
+exécute automatiquement les contrôles sur `main` et les pull requests.

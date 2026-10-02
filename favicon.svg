@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Transport Tycoon">
+  <rect width="64" height="64" rx="12" fill="#182029"/>
+  <path d="M10 43h44M16 36h32M18 25h28v18H18zM22 25v-6h20v6" fill="none" stroke="#4caf6a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="25" cy="48" r="4" fill="#e0a83b"/><circle cx="45" cy="48" r="4" fill="#e0a83b"/>
+</svg>

@@ -30,6 +30,7 @@ export function createState(city, scenario = null) {
     totalGenerated: 0,
     totalBoarded: 0,
     totalArrived: 0,
+    totalAbandoned: 0,
     logs: [],
     // V11.0 — per-day financial history (last 14 days), for cash-flow
     // trend display; dailyBaseline is the cumulative income/expenses total
