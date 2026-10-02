@@ -171,9 +171,14 @@ export function createRenderer(canvas, state) {
   function render(options = {}) {
     drawCity(options.heatmap || null);
     const served = state.city.stops.filter(s => state.lines.some(l => l.stopIds.includes(s.id))).length;
-    document.getElementById("money").textContent = Math.round(state.money).toLocaleString("fr-FR") + " €";
+    const moneyEl = document.getElementById("money");
+    moneyEl.textContent = Math.round(state.money).toLocaleString("fr-FR") + " €";
+    moneyEl.parentElement?.classList.toggle("is-critical", state.money <= 0);
     document.getElementById("passengers").textContent = state.transported.toLocaleString("fr-FR");
-    document.getElementById("satisfaction").textContent = Math.round(satisfaction(state)) + "%";
+    const satisfactionValue = satisfaction(state);
+    const satisfactionEl = document.getElementById("satisfaction");
+    satisfactionEl.textContent = Math.round(satisfactionValue) + "%";
+    satisfactionEl.parentElement?.classList.toggle("is-critical", satisfactionValue < 40);
     document.getElementById("clock").textContent = formatTime(state.time);
     document.getElementById("cityName").textContent = state.city.name;
     document.getElementById("seedValue").textContent = state.city.seed;
@@ -184,6 +189,9 @@ export function createRenderer(canvas, state) {
     const wStats = waitStats(state);
     // V4.0: cumulative revenue/expenses/net across all lines.
     const fin = networkFinancials(state);
+    const dayIncome = fin.income - (state.dailyBaseline?.income || 0);
+    const dayExpenses = fin.expenses - (state.dailyBaseline?.expenses || 0);
+    const dayNet = dayIncome - dayExpenses;
     document.getElementById("networkStats").innerHTML = `
       <div class="stat-grid">
         <div class="stat"><small>Lignes</small><strong>${state.lines.length}</strong></div>
@@ -200,6 +208,7 @@ export function createRenderer(canvas, state) {
         <div class="stat"><small>Recettes cumulées</small><strong>${Math.round(fin.income).toLocaleString("fr-FR")} €</strong></div>
         <div class="stat"><small>Dépenses cumulées</small><strong>${Math.round(fin.expenses).toLocaleString("fr-FR")} €</strong></div>
         <div class="stat"><small>Bilan net</small><strong style="color:${h(fin.net >= 0 ? "#4caf6a" : "#e05a5a")}">${fin.net >= 0 ? "+" : ""}${Math.round(fin.net).toLocaleString("fr-FR")} €</strong></div>
+        <div class="stat financial-highlight ${dayNet >= 0 ? "positive" : "negative"}"><small>Aujourd’hui · revenus / coûts / marge</small><strong>${dayIncome >= 0 ? "+" : ""}${Math.round(dayIncome).toLocaleString("fr-FR")} € / -${Math.round(dayExpenses).toLocaleString("fr-FR")} € / ${dayNet >= 0 ? "+" : ""}${Math.round(dayNet).toLocaleString("fr-FR")} €</strong></div>
       </div>
       ${renderCashFlowTrend(state)}`;
 

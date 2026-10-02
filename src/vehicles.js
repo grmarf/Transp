@@ -41,8 +41,11 @@ export const VEHICLE_RESALE_RATIO = 0.5;
 
 // V4.0 — economy.
 export const VEHICLE_OPEX_PER_HOUR = 12;
-export const FARE_BASE_LEG = 0.8;
-export const FARE_PER_100PX = 0.4;
+// V20.2 — the previous 0.80€ base fare left a single low-demand bus line
+// below break-even for too long. Operating cost remains hourly; fares gain a
+// measured 50% base uplift so a delivered passenger contributes a real margin.
+export const FARE_BASE_LEG = 1.2;
+export const FARE_PER_100PX = 0.5;
 
 // V3.0 — congestion: how much each additional vehicle sharing a road
 // segment slows down every vehicle currently on that segment.
@@ -257,6 +260,7 @@ const TRANSFER_FARE_DISCOUNT = 0.5;
 
 function alightPassengers(state, line, vehicle, stop) {
   let alight = 0;
+  let revenue = 0;
   const remaining = [];
   for (const passengerId of vehicle.onboard) {
     const passenger = state.passengers.find(p => p.id === passengerId);
@@ -270,6 +274,7 @@ function alightPassengers(state, line, vehicle, stop) {
     line.riders++;
     line.income += fare;
     state.money += fare;
+    revenue += fare;
     alight++;
     if ((passenger.legIndex || 0) >= legs.length - 1) {
       passenger.currentStopId = stop.id;
@@ -289,7 +294,7 @@ function alightPassengers(state, line, vehicle, stop) {
     }
   }
   vehicle.onboard = remaining;
-  return alight;
+  return { alight, revenue };
 }
 
 // V3.0 — congestion: identify a road segment independently of travel
@@ -431,7 +436,8 @@ export function updateVehicles(state, rng = () => 1, log = () => {}) {
 
       const stop = stopById(state, b.id);
       if (!stop) continue;
-      alightPassengers(state, line, vehicle, stop);
+      const result = alightPassengers(state, line, vehicle, stop);
+      if (result.revenue > 0) log(`+${result.revenue.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € passagers · ${line.name}.`);
       boardPassengers(state, line, vehicle, stop);
     }
   }

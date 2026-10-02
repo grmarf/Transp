@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>Transport Tycoon — V20.1</title>
+  <title>Transport Tycoon — V20.2</title>
   <meta name="theme-color" content="#182029">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,7 +16,7 @@
 <header class="topbar" aria-label="En-tête du jeu">
   <div>
     <h1>Transport Tycoon</h1>
-    <span class="version">V20.1 — sauvegardes strictes et validation</span>
+    <span class="version">V20.2 — interface et économie lisibles</span>
   </div>
   <div class="stats" aria-label="Statistiques principales">
     <span aria-label="Budget">💰 <b id="money">0 €</b></span>
@@ -61,45 +61,33 @@
   </section>
 
   <aside class="dashboard" aria-label="Tableau de bord">
-    <section class="card">
-      <h2>Ville</h2>
-      <div class="save-status" id="saveStatus" role="status" aria-live="polite">
-        <span id="saveActivity" class="save-activity" hidden aria-hidden="true">Sauvegarde…</span>
-        <span id="saveStatusText">Aucune sauvegarde locale.</span>
-      </div>
-      <div class="city-meta">
-        <div><small>Seed</small><strong id="seedValue">—</strong></div>
-        <div><small>Infrastructure</small><strong>V9.1+V7</strong></div>
-      </div>
-    </section>
-    <section class="card"><h2>Réseau</h2><div id="networkStats"></div></section>
-    <section class="card"><h2>Opportunités</h2><div id="opportunities"></div></section>
-    <section class="card"><h2>Lignes</h2><div id="lines"></div></section>
-    <section class="card"><h2>Arrêt sélectionné</h2><div id="stopInfo">Aucun arrêt sélectionné.</div></section>
-    <section class="card"><h2>Vue d'ensemble de la ville</h2><div id="cityOverview"></div></section>
-    <section class="card"><h2>Calendrier V19</h2><div id="seasonPanel" aria-live="polite"><div class="muted">Le calendrier saisonnier sera initialisé au démarrage.</div></div></section>
-    <section class="card"><h2>Rapport quotidien V18</h2><div id="reportPanel" aria-live="polite"><div class="muted">Le premier rapport sera disponible à la fin du jour 1.</div></div></section>
-    <section class="card"><h2>Contrats réseau V17</h2><div id="contractsPanel" aria-live="polite"><div class="muted">Les contrats seront proposés au prochain jour.</div></div></section>
-    <section class="card"><h2>Progression V16</h2><div id="progressionPanel" aria-live="polite"><div class="muted">Les objectifs apparaîtront après le premier jour.</div></div></section>
-    <section class="card"><h2>Événements urbains V15</h2><div id="eventPanel" aria-live="polite"><div class="muted">Aucun événement en cours.</div></div></section>
-    <section class="card">
-      <h2>Outils V14</h2>
-      <button id="toggleHeatmapBtn" type="button" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false">Carte de congestion</button>
-      <div id="intermodalStats"></div>
-      <h3>Finances (14 jours)</h3>
-      <canvas id="financialChart" width="200" height="100" aria-label="Graphique des finances sur quatorze jours"></canvas>
-    </section>
-    <section class="card"><h2>Journal de ville</h2><div id="journal" aria-live="polite"></div></section>
-    <section class="card">
-      <h2>Sauvegarde fichier</h2>
-      <button id="exportBtn" type="button" aria-label="Exporter la sauvegarde au format JSON">Exporter JSON</button>
-      <label class="import-label" for="importFile">Importer JSON <input type="file" id="importFile" accept=".json" aria-label="Importer une sauvegarde JSON"></label>
-    </section>
-    <section class="card log-card"><h2>Journal</h2><div id="log" aria-live="polite"></div></section>
+    <details class="dashboard-tab" open><summary>Vue d’ensemble</summary><div class="tab-content">
+      <section class="card"><h2>Ville</h2><div class="save-status" id="saveStatus" role="status" aria-live="polite"><span id="saveActivity" class="save-activity" hidden aria-hidden="true">Sauvegarde…</span><span id="saveStatusText">Aucune sauvegarde locale.</span></div><div class="city-meta"><div><small>Seed</small><strong id="seedValue">—</strong></div><div><small>Infrastructure</small><strong>V9.1+V7</strong></div></div></section>
+      <section class="card"><h2>Réseau</h2><div id="networkStats"></div></section>
+      <section class="card"><h2>Opportunités</h2><div id="opportunities"></div></section>
+      <section class="card"><h2>Arrêt sélectionné</h2><div id="stopInfo">Aucun arrêt sélectionné.</div></section>
+      <section class="card"><h2>Vue d'ensemble de la ville</h2><div id="cityOverview"></div></section>
+      <section class="card"><h2>Calendrier V19</h2><div id="seasonPanel" aria-live="polite"><div class="muted">Le calendrier saisonnier sera initialisé au démarrage.</div></div></section>
+      <section class="card"><h2>Rapport quotidien V18</h2><div id="reportPanel" aria-live="polite"><div class="muted">Le premier rapport sera disponible à la fin du jour 1.</div></div></section>
+    </div></details>
+    <details class="dashboard-tab"><summary>Lignes & flotte</summary><div class="tab-content">
+      <section class="card"><h2>Lignes</h2><div id="lines"></div></section>
+      <section class="card"><h2>Outils réseau</h2><button id="toggleHeatmapBtn" type="button" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false">Carte de congestion</button><div id="intermodalStats"></div><h3>Finances (14 jours)</h3><canvas id="financialChart" width="200" height="100" aria-label="Graphique des finances sur quatorze jours"></canvas></section>
+    </div></details>
+    <details class="dashboard-tab"><summary>Contrats & progression</summary><div class="tab-content">
+      <section class="card"><h2>Contrats réseau V17</h2><div id="contractsPanel" aria-live="polite"><div class="muted">Les contrats seront proposés au prochain jour.</div></div></section>
+      <section class="card"><h2>Progression V16</h2><div id="progressionPanel" aria-live="polite"><div class="muted">Les objectifs apparaîtront après le premier jour.</div></div></section>
+    </div></details>
+    <details class="dashboard-tab"><summary>Événements</summary><div class="tab-content"><section class="card"><h2>Événements urbains V15</h2><div id="eventPanel" aria-live="polite"><div class="muted">Aucun événement en cours.</div></div></section></div></details>
+    <details class="dashboard-tab"><summary>Journal & sauvegarde</summary><div class="tab-content">
+      <section class="card"><h2>Journal de ville</h2><div id="journal" aria-live="polite"></div></section>
+      <section class="card"><h2>Sauvegarde fichier</h2><button id="exportBtn" type="button" aria-label="Exporter la sauvegarde au format JSON">Exporter JSON</button><label class="import-label" for="importFile">Importer JSON <input type="file" id="importFile" accept=".json" aria-label="Importer une sauvegarde JSON"></label></section>
+      <section class="card log-card"><h2>Journal</h2><div id="log" aria-live="polite"></div></section>
+    </div></details>
   </aside>
 </main>
 
-<footer>V20.1 : sauvegardes strictes, abandon des passagers corrigé et import sécurisé.</footer>
+<footer>V20.2 : interface à onglets, économie instrumentée et import sécurisé.</footer>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

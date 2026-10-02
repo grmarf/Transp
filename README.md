@@ -1,4 +1,4 @@
-# Transport Tycoon — Transp V20.1
+# Transport Tycoon — Transp V20.2
 
 Jeu de gestion et de simulation de réseau de transport en JavaScript natif, Canvas et modules ES.
 
@@ -89,3 +89,9 @@ cumulatif d’abandons et éloigne le redéclenchement des événements expirés
 interpolations HTML issues de l’état sauvegardé sont échappées avant rendu.
 L’archive historique V13 n’est plus distribuée dans le dépôt. La CI GitHub
 exécute automatiquement les contrôles sur `main` et les pull requests.
+
+La V20.2 ajoute un tableau de bord à onglets repliables, un panneau de marge
+du jour, des logs de recettes et d’entretien, ainsi qu’un tarif de base relevé
+de 0,80 € à 1,20 € après mesure. L’audit n’a pas trouvé de perte de revenus :
+la livraison crédite bien `state.money`; le coût reste calculé par heure
+simulée, pas par tick brut. Voir `docs/economy-report-v20.2.md`.
