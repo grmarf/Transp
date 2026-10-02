@@ -10,12 +10,14 @@ import { PASSENGER_STATES } from "./passengers.js";
 import { TICK_MINUTES } from "./constants.js";
 
 export const DEFAULT_VEHICLE_CAPACITY = 35;
-export const DEFAULT_VEHICLE_SPEED = 0.004;
+// V21.0 — vitesse de référence alignée sur le bus. L'ancienne valeur 0.004
+// imposait ~4 jours simulés par trajet, rendant toute ligne déficitaire
+// (opex horaire vs recettes quasi nulles). 0.5 px/tick ≈ 50 min entre deux
+// arrêts distants de 300 px, ce qui est jouable.
+export const DEFAULT_VEHICLE_SPEED = 0.5;
 
-// V7.0 — transport modes. `bus` reproduces the exact pre-V7.0 constants
-// (capacity/speed/purchaseCost/opexPerHour/congestionResistance below), so
-// any line/vehicle created without specifying a mode behaves identically to
-// V9.1 — full backward compatibility with every existing test.
+// V7.0 — transport modes. `bus` reproduit les constantes pré-V7.0 à
+// l'exception de `speed`, relevée pour rendre le jeu jouable (V21.0).
 // congestionResistance: 0 = fully slowed by road congestion (shared road),
 // 1 = fully immune (grade-separated, e.g. underground). 0.5 = partial
 // (shared lanes with priority, e.g. a tram).
@@ -23,9 +25,9 @@ export const DEFAULT_VEHICLE_SPEED = 0.004;
 // creation cost, on top of the usual road-based line cost — 0 for buses,
 // which use existing roads.
 export const VEHICLE_MODES = {
-  bus:   { id: "bus",   name: "Bus",     capacity: 35,  speed: 0.004, purchaseCost: 3000,  opexPerHour: 12, congestionResistance: 0,   trackCostPerPixel: 0 },
-  tram:  { id: "tram",  name: "Tramway", capacity: 70,  speed: 0.005, purchaseCost: 9000,  opexPerHour: 22, congestionResistance: 0.5, trackCostPerPixel: 2.5 },
-  metro: { id: "metro", name: "Métro",   capacity: 160, speed: 0.007, purchaseCost: 25000, opexPerHour: 45, congestionResistance: 1,   trackCostPerPixel: 6 }
+  bus:   { id: "bus",   name: "Bus",     capacity: 35,  speed: 0.5, purchaseCost: 3000,  opexPerHour: 12, congestionResistance: 0,   trackCostPerPixel: 0 },
+  tram:  { id: "tram",  name: "Tramway", capacity: 70,  speed: 2,   purchaseCost: 9000,  opexPerHour: 22, congestionResistance: 0.5, trackCostPerPixel: 2.5 },
+  metro: { id: "metro", name: "Métro",   capacity: 160, speed: 5,   purchaseCost: 25000, opexPerHour: 45, congestionResistance: 1,   trackCostPerPixel: 6 }
 };
 
 export function vehicleMode(modeId) {
@@ -191,6 +193,12 @@ export function lineHeadwayMinutes(state, line) {
 /** V4.0 — operating cost for one line over `hours` of simulated time.
  * A vehicle stuck in congestion still burns fuel/time, so it costs more to
  * run, not less — ties V3's congestion model to the economy.
+ *
+ * V21.0 — note importante : ce coût reste HORAIRE. Augmenter la vitesse
+ * d'un véhicule ne change pas son opex, seulement sa capacité à capter la
+ * demande. C'est volontaire : sinon, multiplier la vitesse par 125
+ * multiplierait aussi l'opex par 125, et la moindre ligne ruinerait le
+ * joueur en quelques minutes simulées.
  */
 export function lineOperatingCost(state, line, hours) {
   let cost = 0;
@@ -453,4 +461,4 @@ export function vehiclePosition(state, vehicle) {
   const b = state.network.nodes.get(ids[j]);
   if (!a || !b) return null;
   return { x: a.x + (b.x - a.x) * vehicle.progress, y: a.y + (b.y - a.y) * vehicle.progress };
-}
+    }
