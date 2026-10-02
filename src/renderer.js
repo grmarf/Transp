@@ -250,7 +250,8 @@ export function createRenderer(canvas, state) {
     satisfactionEl.parentElement?.classList.toggle("is-critical", satisfactionValue < 40);
     document.getElementById("clock").textContent = formatTime(state.time);
     document.getElementById("cityName").textContent = state.city.name;
-    document.getElementById("seedValue").textContent = state.city.seed;
+    const seedEl = document.getElementById("seedInput");
+    if (seedEl) seedEl.value = state.city.seed;
 
     const pStats = passengerStats(state);
     const wStats = waitStats(state);
@@ -332,7 +333,7 @@ export function createRenderer(canvas, state) {
     const seasonEl = document.getElementById("seasonPanel");
     if (seasonEl) {
       const season = seasonSummary(state);
-      seasonEl.innerHTML = `<div class="season-header"><b>${h(season.icon)} ${h(season.label)}</b><span>Jour ${season.dayInSeason}/7</span></div><div class="season-effects">Demande ×${season.demandMultiplier.toFixed(2)} · Tarif ×${season.priceMultiplier.toFixed(2)} · Croissance ×${season.growthMultiplier.toFixed(2)}</div>`;
+      seasonEl.innerHTML = `<div class="season-header"><b>${h(season.icon)} ${h(season.label)}</b><span>Jour ${season.dayInSeason}/7</span></div><div class="season-effects">Demande ×${season.demandMultiplier.toFixed(2)} · Tarif ×${season.fareMultiplier.toFixed(2)} · Croissance ×${season.growthMultiplier.toFixed(2)}</div>`;
     }
 
     const reportEl = document.getElementById("reportPanel");
