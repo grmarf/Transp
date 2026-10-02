@@ -93,7 +93,8 @@ function clickMap(e) {
   // Use the logical Canvas coordinate system, so CSS scaling/Android DPR does not matter.
   for (const stop of state.city.stops) {
     const d = Math.hypot(stop.x - p.x, stop.y - p.y);
-    if (d <= STOP_RADIUS * 2.8 && d < best) {
+    const HIT_RADIUS = Math.max(STOP_RADIUS * 2.8, 36);
+    if (d <= HIT_RADIUS && d < best) {
       nearest = stop;
       best = d;
     }
