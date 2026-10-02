@@ -1,46 +1,79 @@
 import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
-import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal } from "./engine.js";
+import {
+  createLine,
+  cancelLineMode,
+  finishLine,
+  startExtendLine,
+  finishExtendLine,
+  step,
+  STOP_RADIUS,
+  buyVehicleForLine,
+  sellVehicleFromLine,
+  deleteLine,
+  networkFinancials,
+  congestionHeatmap,
+  cityJournal,
+} from "./engine.js";
 import { createNetwork, routeLine, createUndergroundNetwork } from "./network.js";
 import { createRenderer } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
 
 const canvas = document.getElementById("map");
+const miniMapCanvas = document.getElementById("miniMapCanvas");
 const rendererState = { current: null };
 let state = null;
 let rng = null;
 let timer = null;
 let bootCount = 0;
 
-// V20.3: Camera state for zoom/pan
 const cameraState = {
   x: 0,
   y: 0,
   zoom: 1,
+  minZoom: 0.5,
+  maxZoom: 3,
   isDragging: false,
   lastDragX: 0,
   lastDragY: 0,
-  lastPanX: 0,
-  lastPanY: 0
 };
 
 function log(msg) {
+  if (!state) return;
   state.logs.unshift(`[${formatTime()}] ${msg}`);
   state.logs = state.logs.slice(0, 30);
 }
 
 function formatTime() {
+  if (!state) return "00:00";
   const h = Math.floor(state.time / 60) % 24;
   const m = Math.floor(state.time % 60);
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-// UI only: never initializes/restarts the game.
+function syncCameraToRenderer() {
+  const renderer = rendererState.current;
+  if (!renderer || !renderer.camera) return;
+  renderer.camera.x = cameraState.x;
+  renderer.camera.y = cameraState.y;
+  renderer.camera.zoom = cameraState.zoom;
+}
+
+function resetCameraView() {
+  cameraState.x = 0;
+  cameraState.y = 0;
+  cameraState.zoom = 1;
+  syncCameraToRenderer();
+  refreshUI();
+}
+
 function updateInstructions() {
   const el = document.getElementById("instructions");
   const finish = document.getElementById("finishLineBtn");
+  if (!el || !state) return;
+
   const extending = !!state.extendingLineId;
   const minStops = extending ? 1 : 2;
   const ready = state.lineMode && state.pendingStops.length >= minStops;
@@ -86,28 +119,22 @@ function bindTap(el, handler) {
   }
 }
 
-// V20.3: Screen to world coordinate transformation
 function screenPoint(e) {
   const rect = canvas.getBoundingClientRect();
   const source = e?.changedTouches?.[0] || e?.touches?.[0] || e;
   if (!source || !rect.width || !rect.height) return null;
-  
-  // Screen to canvas coordinates
+
   const screenX = source.clientX - rect.left;
   const screenY = source.clientY - rect.top;
-  
-  // Canvas to logical canvas coordinates
+
   const logicalX = screenX * (canvas.width / rect.width);
   const logicalY = screenY * (canvas.height / rect.height);
-  
-  // Apply inverse camera transform
+
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
-  
-  // World coordinates = (logical - center) / zoom + camera offset
   const worldX = (logicalX - centerX) / cameraState.zoom + centerX / cameraState.zoom + cameraState.x;
   const worldY = (logicalY - centerY) / cameraState.zoom + centerY / cameraState.zoom + cameraState.y;
-  
+
   return { x: worldX, y: worldY };
 }
 
@@ -117,7 +144,6 @@ function clickMap(e) {
 
   let nearest = null;
   let best = Infinity;
-  // Use the logical Canvas coordinate system
   for (const stop of state.city.stops) {
     const d = Math.hypot(stop.x - p.x, stop.y - p.y);
     const HIT_RADIUS = Math.max(STOP_RADIUS * 2.8, 36);
@@ -126,6 +152,7 @@ function clickMap(e) {
       best = d;
     }
   }
+
   if (!nearest) return;
 
   state.selectedStop = nearest.id;
@@ -137,105 +164,162 @@ function clickMap(e) {
   refreshUI();
 }
 
-// V20.3: Pan/drag handling
-function bindMapInteraction() {
+function bindMap() {
   let lastTap = 0;
-  
-  const handlePointerDown = (e) => {
+
+  const pointerDown = e => {
     cameraState.isDragging = true;
     cameraState.lastDragX = e.clientX;
     cameraState.lastDragY = e.clientY;
   };
-  
-  const handlePointerMove = (e) => {
+
+  const pointerMove = e => {
     if (!cameraState.isDragging) return;
-    
     const deltaX = e.clientX - cameraState.lastDragX;
     const deltaY = e.clientY - cameraState.lastDragY;
-    
-    // Pan the camera (inverse direction)
+
     cameraState.x -= deltaX / cameraState.zoom;
     cameraState.y -= deltaY / cameraState.zoom;
-    
+
     cameraState.lastDragX = e.clientX;
     cameraState.lastDragY = e.clientY;
-    
+    syncCameraToRenderer();
     refreshUI();
   };
-  
-  const handlePointerUp = (e) => {
+
+  const pointerUp = () => {
     cameraState.isDragging = false;
   };
-  
-  const handle = e => {
+
+  const handleClick = e => {
     const now = Date.now();
     if (now - lastTap < 500) return;
     lastTap = now;
     e.preventDefault?.();
-    // Only click if we didn't drag much
-    if (Math.abs(cameraState.lastDragX - e.clientX) < 10 && 
-        Math.abs(cameraState.lastDragY - e.clientY) < 10) {
+    if (
+      Math.abs(cameraState.lastDragX - e.clientX) < 10 &&
+      Math.abs(cameraState.lastDragY - e.clientY) < 10
+    ) {
       clickMap(e);
     }
   };
 
   if (window.PointerEvent) {
-    canvas.addEventListener("pointerdown", handlePointerDown, { passive: true });
-    canvas.addEventListener("pointermove", handlePointerMove, { passive: true });
-    canvas.addEventListener("pointerup", handlePointerUp, { passive: true });
-    canvas.addEventListener("pointerup", handle, { passive: false });
-    canvas.addEventListener("click", handle);
+    canvas.addEventListener("pointerdown", pointerDown, { passive: true });
+    canvas.addEventListener("pointermove", pointerMove, { passive: true });
+    canvas.addEventListener("pointerup", pointerUp, { passive: true });
+    canvas.addEventListener("pointerup", handleClick, { passive: false });
+    canvas.addEventListener("click", handleClick);
   } else {
-    canvas.addEventListener("touchstart", handlePointerDown, { passive: true });
-    canvas.addEventListener("touchmove", handlePointerMove, { passive: true });
-    canvas.addEventListener("touchend", handlePointerUp, { passive: true });
-    canvas.addEventListener("touchend", handle, { passive: false });
-    canvas.addEventListener("click", handle);
+    canvas.addEventListener("touchstart", pointerDown, { passive: true });
+    canvas.addEventListener("touchmove", pointerMove, { passive: true });
+    canvas.addEventListener("touchend", pointerUp, { passive: true });
+    canvas.addEventListener("touchend", handleClick, { passive: false });
+    canvas.addEventListener("click", handleClick);
   }
-  
-  // Zoom with mouse wheel (Ctrl + scroll)
-  canvas.addEventListener("wheel", (e) => {
+
+  canvas.addEventListener("wheel", e => {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
-    
+
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const oldZoom = cameraState.zoom;
-    cameraState.zoom = Math.max(0.5, Math.min(3, cameraState.zoom * delta));
-    
-    // Zoom towards mouse position
+    cameraState.zoom = Math.max(cameraState.minZoom, Math.min(cameraState.maxZoom, cameraState.zoom * delta));
+
     const rect = canvas.getBoundingClientRect();
     const mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
     const mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
-    
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    
-    // Adjust camera to zoom towards cursor
     const zoomRatio = cameraState.zoom / oldZoom;
+
     cameraState.x = cameraState.x + (mouseX - centerX) * (1 - zoomRatio) / (cameraState.zoom * centerX);
     cameraState.y = cameraState.y + (mouseY - centerY) * (1 - zoomRatio) / (cameraState.zoom * centerY);
-    
+
+    syncCameraToRenderer();
     refreshUI();
   }, { passive: false });
-  
+
   canvas.addEventListener("contextmenu", e => e.preventDefault());
   canvas.addEventListener("dragstart", e => e.preventDefault());
 }
 
-// V20.3: Bind zoom reset button
 function bindZoomReset() {
   const resetBtn = document.getElementById("resetZoomBtn");
-  if (resetBtn) {
-    bindTap(resetBtn, () => {
-      cameraState.x = 0;
-      cameraState.y = 0;
-      cameraState.zoom = 1;
-      refreshUI();
-    });
-  }
+  if (!resetBtn) return;
+  bindTap(resetBtn, resetCameraView);
 }
 
-// V3.0 — line rows re-rendered on every tick
+function renderMiniMap() {
+  if (!miniMapCanvas || !state) return;
+
+  const miniCtx = miniMapCanvas.getContext("2d");
+  const stops = state.city.stops;
+  if (!stops.length) return;
+
+  const minX = Math.min(...stops.map(s => s.x));
+  const maxX = Math.max(...stops.map(s => s.x));
+  const minY = Math.min(...stops.map(s => s.y));
+  const maxY = Math.max(...stops.map(s => s.y));
+  const pad = 10;
+  const scale = Math.min(
+    (miniMapCanvas.width - pad * 2) / Math.max(1, maxX - minX),
+    (miniMapCanvas.height - pad * 2) / Math.max(1, maxY - minY)
+  );
+
+  miniCtx.clearRect(0, 0, miniMapCanvas.width, miniMapCanvas.height);
+  miniCtx.fillStyle = "#101a22";
+  miniCtx.fillRect(0, 0, miniMapCanvas.width, miniMapCanvas.height);
+
+  const worldToMini = (x, y) => ({
+    x: pad + (x - minX) * scale,
+    y: pad + (y - minY) * scale,
+  });
+
+  for (const line of state.lines) {
+    if (!Array.isArray(line.route?.nodeIds) || line.route.nodeIds.length < 2) continue;
+    miniCtx.beginPath();
+    let first = true;
+    for (const id of line.route.nodeIds) {
+      const node = state.network.nodes.get(id);
+      if (!node) continue;
+      const point = worldToMini(node.x, node.y);
+      if (first) {
+        miniCtx.moveTo(point.x, point.y);
+        first = false;
+      } else {
+        miniCtx.lineTo(point.x, point.y);
+      }
+    }
+    miniCtx.strokeStyle = line.color || "#ffffff";
+    miniCtx.lineWidth = 1.5;
+    miniCtx.stroke();
+  }
+
+  for (const stop of stops) {
+    const point = worldToMini(stop.x, stop.y);
+    miniCtx.beginPath();
+    miniCtx.fillStyle = stop.id === state.selectedStop ? "#ffffff" : "#7da7c9";
+    miniCtx.arc(point.x, point.y, stop.id === state.selectedStop ? 2.5 : 2, 0, Math.PI * 2);
+    miniCtx.fill();
+  }
+
+  const left = cameraState.x;
+  const top = cameraState.y;
+  const viewWidth = canvas.width / cameraState.zoom;
+  const viewHeight = canvas.height / cameraState.zoom;
+  const rect = {
+    x: pad + (left - minX) * scale,
+    y: pad + (top - minY) * scale,
+    w: viewWidth * scale,
+    h: viewHeight * scale,
+  };
+
+  miniCtx.strokeStyle = "#f6d365";
+  miniCtx.lineWidth = 1.2;
+  miniCtx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+}
+
 function bindDelegatedTap(container, selector, handler) {
   if (!container) return;
   let lastTouch = 0;
@@ -261,34 +345,46 @@ function bindDelegatedTap(container, selector, handler) {
 
 function populateScenarioSelect() {
   const select = document.getElementById("scenarioSelect");
+  if (!select) return;
   select.innerHTML = SCENARIOS.map(s => `<option value="${h(s.id)}">${h(s.name)} (${h(s.difficulty)})</option>`).join("");
+}
+
+function updateScenarioBanner() {
+  const banner = document.getElementById("scenarioBanner");
+  if (!banner || !state) return;
+
+  const scenario = state.scenario;
+  if (!scenario || !scenario.objective) {
+    banner.hidden = true;
+    return;
+  }
+
+  banner.hidden = false;
+  banner.className = "scenario-banner" + (scenario.status !== "active" ? ` ${scenario.status}` : "");
+  const progress = scenarioProgress(state, { net: networkFinancials(state).net }) ?? 0;
+  const statusText = scenario.status === "won"
+    ? "✅ Réussi"
+    : scenario.status === "lost"
+      ? "❌ Échoué"
+      : `Jour ${(state.elapsedDays || 0) + 1}${scenario.durationDays ? `/${scenario.durationDays}` : ""}`;
+
+  banner.innerHTML = `<div><b>${h(scenario.name)}</b> (${h(scenario.difficulty)}) — ${h(scenario.objective.label)} · ${h(statusText)}</div><div class="bar"><div style="width:${Math.round(progress * 100)}%"></div></div>`;
 }
 
 function refreshUI() {
   if (!state || !rendererState.current) return;
   state.journal = cityJournal(state);
+  syncCameraToRenderer();
   rendererState.current.render({ heatmap: state.showHeatmap ? congestionHeatmap(state) : null, camera: cameraState });
+  renderMiniMap();
   updateScenarioBanner();
-}
-
-function updateScenarioBanner() {
-  const banner = document.getElementById("scenarioBanner");
-  const scenario = state.scenario;
-  if (!scenario || !scenario.objective) { banner.hidden = true; return; }
-
-  banner.hidden = false;
-  banner.className = "scenario-banner" + (scenario.status !== "active" ? ` ${scenario.status}` : "");
-  const progress = scenarioProgress(state, { net: networkFinancials(state).net }) ?? 0;
-  const statusText = scenario.status === "won" ? "✅ Réussi"
-    : scenario.status === "lost" ? "❌ Échoué"
-    : `Jour ${(state.elapsedDays || 0) + 1}${scenario.durationDays ? `/${scenario.durationDays}` : ""}`;
-  banner.innerHTML = `<div><b>${h(scenario.name)}</b> (${h(scenario.difficulty)}) — ${h(scenario.objective.label)} · ${h(statusText)}</div><div class="bar"><div style="width:${Math.round(progress * 100)}%"></div></div>`;
 }
 
 function boot(seed, scenarioId, restoredPayload = null) {
   bootCount += 1;
   let nextState;
   let nextRng;
+
   if (restoredPayload) {
     nextState = restoredPayload.state;
     nextState.network = createNetwork(nextState.city);
@@ -306,6 +402,7 @@ function boot(seed, scenarioId, restoredPayload = null) {
     nextState.network = createNetwork(city);
     nextState.undergroundNetwork = createUndergroundNetwork(city);
     nextRng = mulberry32(city.numericSeed ^ 0xA57E2);
+
     state = nextState;
     rng = nextRng;
     log(`Bienvenue. Votre budget initial est de ${state.money.toLocaleString("fr-FR")} €.`);
@@ -348,13 +445,24 @@ function boot(seed, scenarioId, restoredPayload = null) {
   timer = null;
   state = nextState;
   rng = nextRng;
-  document.getElementById("seedInput").value = state.city.seed;
-  document.getElementById("scenarioSelect").value = state.scenario?.id || "sandbox";
-  document.getElementById("pauseBtn").textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
-  document.getElementById("speedBtn").textContent = `▶ ${state.speed}×`;
+
+  const seedInput = document.getElementById("seedInput");
+  if (seedInput) seedInput.value = state.city.seed;
+
+  const scenarioSelect = document.getElementById("scenarioSelect");
+  if (scenarioSelect) scenarioSelect.value = state.scenario?.id || "sandbox";
+
+  const pauseBtn = document.getElementById("pauseBtn");
+  if (pauseBtn) pauseBtn.textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
+
+  const speedBtn = document.getElementById("speedBtn");
+  if (speedBtn) speedBtn.textContent = `▶ ${state.speed}×`;
+
   rendererState.current = nextRenderer;
+  syncCameraToRenderer();
   updateInstructions();
-  document.getElementById("toggleHeatmapBtn")?.setAttribute("aria-pressed", String(!!state.showHeatmap));
+  const toggle = document.getElementById("toggleHeatmapBtn");
+  if (toggle) toggle.setAttribute("aria-pressed", String(!!state.showHeatmap));
   refreshUI();
   updateSaveStatus();
 
@@ -367,15 +475,25 @@ function boot(seed, scenarioId, restoredPayload = null) {
 function updateSaveStatus(message = null) {
   const el = document.getElementById("saveStatus");
   const text = document.getElementById("saveStatusText");
-  if (!el) return;
-  if (message) { (text || el).textContent = message; return; }
+  if (!el || !text) return;
+
+  if (message) {
+    text.textContent = message;
+    return;
+  }
+
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) { (text || el).textContent = "Aucune sauvegarde locale."; return; }
+    if (!raw) {
+      text.textContent = "Aucune sauvegarde locale.";
+      return;
+    }
     const payload = JSON.parse(raw);
     const date = payload.savedAt ? new Date(payload.savedAt).toLocaleString("fr-FR") : "date inconnue";
-    (text || el).textContent = `Sauvegarde locale : ${date}`;
-  } catch { (text || el).textContent = "Sauvegarde locale indisponible."; }
+    text.textContent = `Sauvegarde locale : ${date}`;
+  } catch {
+    text.textContent = "Sauvegarde locale indisponible.";
+  }
 }
 
 function setSaveActivity(active, label = "Sauvegarde…") {
@@ -401,7 +519,10 @@ function saveCurrentGame() {
 function loadCurrentGame() {
   try {
     const payload = readSavedGame();
-    if (!payload) { updateSaveStatus("Aucune sauvegarde locale."); return; }
+    if (!payload) {
+      updateSaveStatus("Aucune sauvegarde locale.");
+      return;
+    }
     boot(payload.state.city.seed, payload.state.scenario?.id || "sandbox", payload);
     updateSaveStatus("Partie chargée.");
   } catch (error) {
@@ -411,6 +532,7 @@ function loadCurrentGame() {
 }
 
 bindTap(document.getElementById("newLineBtn"), () => {
+  if (!state) return;
   if (state.lineMode) cancelLineMode(state);
   else createLine(state);
   updateInstructions();
@@ -418,6 +540,7 @@ bindTap(document.getElementById("newLineBtn"), () => {
 });
 
 bindTap(document.getElementById("finishLineBtn"), () => {
+  if (!state) return;
   const minStops = state.extendingLineId ? 1 : 2;
   if (state.pendingStops.length < minStops) return;
   if (state.extendingLineId) finishExtendLine(state, log, routeLine);
@@ -427,16 +550,20 @@ bindTap(document.getElementById("finishLineBtn"), () => {
 });
 
 bindTap(document.getElementById("pauseBtn"), () => {
+  if (!state) return;
   state.paused = !state.paused;
   document.getElementById("pauseBtn").textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
   refreshUI();
 });
 
 bindTap(document.getElementById("speedBtn"), () => {
+  if (!state) return;
   state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : state.speed === 4 ? 1000 : 1;
   document.getElementById("speedBtn").textContent = `▶ ${state.speed}×`;
   refreshUI();
 });
+
+bindTap(document.getElementById("resetZoomBtn"), resetCameraView);
 
 bindTap(document.getElementById("saveBtn"), saveCurrentGame);
 bindTap(document.getElementById("loadBtn"), loadCurrentGame);
@@ -447,7 +574,7 @@ bindTap(document.getElementById("newCityBtn"), () => {
   boot(seed, document.getElementById("scenarioSelect").value);
 });
 
-bindMapInteraction();
+bindMap();
 bindZoomReset();
 
 bindDelegatedTap(document.getElementById("lines"), "[data-buy-vehicle]", target => {
@@ -456,7 +583,6 @@ bindDelegatedTap(document.getElementById("lines"), "[data-buy-vehicle]", target 
   refreshUI();
 });
 
-// V11.0 — line management: sell one vehicle off a line, or scrap the whole line.
 bindDelegatedTap(document.getElementById("lines"), "[data-sell-vehicle]", target => {
   const lineId = Number(target.dataset.sellVehicle);
   const vehicleId = Number(target.dataset.vehicleId);
@@ -472,8 +598,6 @@ bindDelegatedTap(document.getElementById("lines"), "[data-delete-line]", target 
   refreshUI();
 });
 
-// V12.0 — line editing: start extend-mode, then reuse the normal map-tap /
-// finishLineBtn flow (branched above) to pick and confirm the new stops.
 bindDelegatedTap(document.getElementById("lines"), "[data-extend-line]", target => {
   const lineId = Number(target.dataset.extendLine);
   startExtendLine(state, lineId);
@@ -482,6 +606,7 @@ bindDelegatedTap(document.getElementById("lines"), "[data-extend-line]", target 
 });
 
 bindTap(document.getElementById("toggleHeatmapBtn"), () => {
+  if (!state) return;
   state.showHeatmap = !state.showHeatmap;
   const button = document.getElementById("toggleHeatmapBtn");
   button?.setAttribute("aria-pressed", String(state.showHeatmap));
@@ -490,8 +615,11 @@ bindTap(document.getElementById("toggleHeatmapBtn"), () => {
 
 bindTap(document.getElementById("exportBtn"), () => {
   setSaveActivity(true, "Export…");
-  try { exportGameToFile(state, rng?.getState?.() ?? null); }
-  finally { setSaveActivity(false); }
+  try {
+    exportGameToFile(state, rng?.getState?.() ?? null);
+  } finally {
+    setSaveActivity(false);
+  }
 });
 
 document.getElementById("importFile")?.addEventListener("change", async event => {
@@ -511,15 +639,42 @@ document.getElementById("importFile")?.addEventListener("change", async event =>
   }
 });
 
+if (miniMapCanvas) {
+  miniMapCanvas.addEventListener("click", e => {
+    if (!state) return;
+    const rect = miniMapCanvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * miniMapCanvas.width;
+    const y = ((e.clientY - rect.top) / rect.height) * miniMapCanvas.height;
+    const minX = Math.min(...state.city.stops.map(s => s.x));
+    const maxX = Math.max(...state.city.stops.map(s => s.x));
+    const minY = Math.min(...state.city.stops.map(s => s.y));
+    const maxY = Math.max(...state.city.stops.map(s => s.y));
+    const pad = 10;
+    const scale = Math.min(
+      (miniMapCanvas.width - pad * 2) / Math.max(1, maxX - minX),
+      (miniMapCanvas.height - pad * 2) / Math.max(1, maxY - minY)
+    );
+    const worldX = minX + (x - pad) / scale;
+    const worldY = minY + (y - pad) / scale;
+    const dx = worldX - canvas.width / 2 / cameraState.zoom;
+    const dy = worldY - canvas.height / 2 / cameraState.zoom;
+    cameraState.x = dx;
+    cameraState.y = dy;
+    syncCameraToRenderer();
+    refreshUI();
+  });
+}
+
 const initialSeed = createSeedFromQuery();
-document.getElementById("seedInput").value = initialSeed;
+const seedInput = document.getElementById("seedInput");
+if (seedInput) seedInput.value = initialSeed;
+
 populateScenarioSelect();
 boot(initialSeed, "sandbox");
 
-// Debug-only readout useful in automated/browser diagnostics.
 window.__transportTycoon = {
   getState: () => state,
   getBootCount: () => bootCount,
   clickMap,
-  cameraState
+  cameraState,
 };
