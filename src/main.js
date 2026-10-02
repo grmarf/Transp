@@ -1,36 +1,12 @@
-/* =====================================================================
-   Vie t'Lignes — main.js
-   Convention caméra (partagée avec renderer.js) :
-     cameraState.x / y  = coordonnées MONDE du CENTRE de l'écran
-     Tout l'input se fait en pixels CSS (canvas.clientWidth/Height)
-   ===================================================================== */
-
 import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
-import {
-  createLine,
-  cancelLineMode,
-  finishLine,
-  startExtendLine,
-  finishExtendLine,
-  step,
-  STOP_RADIUS,
-  buyVehicleForLine,
-  sellVehicleFromLine,
-  deleteLine,
-  networkFinancials,
-  congestionHeatmap,
-  cityJournal,
-} from "./engine.js";
+import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal } from "./engine.js";
 import { createNetwork, routeLine, createUndergroundNetwork } from "./network.js";
 import { createRenderer } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
 
-// ---------------------------------------------------------------------------
-// DOM & état global
-// ---------------------------------------------------------------------------
 const canvas = document.getElementById("map");
 const miniMapCanvas = document.getElementById("miniMapCanvas");
 const rendererState = { current: null };
@@ -39,26 +15,18 @@ let rng = null;
 let rafId = null;
 let bootCount = 0;
 
-// ---------------------------------------------------------------------------
-// Caméra
-// ---------------------------------------------------------------------------
 const cameraState = {
-  x: 0,
-  y: 0,
-  zoom: 1,
-  minZoom: 0.5,
-  maxZoom: 3,
+  x: 0, y: 0, zoom: 1,
+  minZoom: 0.5, maxZoom: 3,
   isDragging: false,
-  lastDragX: 0,
-  lastDragY: 0,
-  downX: 0,
-  downY: 0,
+  lastDragX: 0, lastDragY: 0,
+  downX: 0, downY: 0,
   moved: false,
 };
 
 function log(msg) {
   if (!state) return;
-  state.logs.unshift(`[${formatTime()}] ${msg}`);
+  state.logs.unshift("[" + formatTime() + "] " + msg);
   state.logs = state.logs.slice(0, 30);
 }
 
@@ -66,54 +34,46 @@ function formatTime() {
   if (!state) return "00:00";
   const hh = Math.floor(state.time / 60) % 24;
   const mm = Math.floor(state.time % 60);
-  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+  return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
 }
 
 function syncCameraToRenderer() {
-  const renderer = rendererState.current;
-  if (!renderer || !renderer.camera) return;
-  renderer.camera.x = cameraState.x;
-  renderer.camera.y = cameraState.y;
-  renderer.camera.zoom = cameraState.zoom;
+  const r = rendererState.current;
+  if (!r || !r.camera) return;
+  r.camera.x = cameraState.x;
+  r.camera.y = cameraState.y;
+  r.camera.zoom = cameraState.zoom;
 }
 
 function getCanvasCssSize() {
   const rect = canvas.getBoundingClientRect();
-  return { W: rect.width, H: rect.height, rect };
+  return { W: rect.width, H: rect.height, rect: rect };
 }
 
-/**
- * Recentre la caméra sur le barycentre de la ville et ajuste le zoom pour
- * que l'ensemble des arrêts tienne à l'écran.
- * INDISPENSABLE au boot, sinon la caméra reste sur (0,0) = coin du monde.
- */
 function recenterCameraOnCity() {
-  if (!state?.city?.stops?.length) return;
-
-  // Force un resize du canvas d'abord pour avoir les bonnes dimensions CSS
-  if (rendererState.current?.resizeCanvas) {
+  if (!state || !state.city || !state.city.stops || !state.city.stops.length) return;
+  if (rendererState.current && rendererState.current.resizeCanvas) {
     rendererState.current.resizeCanvas();
   }
-
+  const size = getCanvasCssSize();
+  if (!size.W || !size.H) {
+    requestAnimationFrame(recenterCameraOnCity);
+    return;
+  }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const s of state.city.stops) {
+  state.city.stops.forEach(function (s) {
     if (s.x < minX) minX = s.x;
     if (s.x > maxX) maxX = s.x;
     if (s.y < minY) minY = s.y;
     if (s.y > maxY) maxY = s.y;
-  }
+  });
   cameraState.x = (minX + maxX) / 2;
   cameraState.y = (minY + maxY) / 2;
-
-  const { W, H } = getCanvasCssSize();
   const spanX = Math.max(1, maxX - minX);
   const spanY = Math.max(1, maxY - minY);
-  const fit = Math.min(W / spanX, H / spanY) * 0.85;
-  cameraState.zoom = Math.max(
-    cameraState.minZoom,
-    Math.min(cameraState.maxZoom, fit || 1)
-  );
-
+  let zoom = Math.min(size.W / spanX, size.H / spanY) * 0.85;
+  if (!isFinite(zoom) || zoom <= 0) zoom = 1;
+  cameraState.zoom = Math.max(cameraState.minZoom, Math.min(cameraState.maxZoom, zoom));
   syncCameraToRenderer();
 }
 
@@ -122,24 +82,20 @@ function resetCameraView() {
   refreshUI();
 }
 
-// ---------------------------------------------------------------------------
-// Instructions contextuelles (mode création / extension de ligne)
-// ---------------------------------------------------------------------------
 function updateInstructions() {
   const el = document.getElementById("instructions");
   const finish = document.getElementById("finishLineBtn");
   if (!el || !state) return;
-
   const extending = !!state.extendingLineId;
   const minStops = extending ? 1 : 2;
   const ready = state.lineMode && state.pendingStops.length >= minStops;
-
   if (state.lineMode) {
     if (extending) {
-      const line = state.lines.find(l => l.id === state.extendingLineId);
+      const line = state.lines.find(function (l) { return l.id === state.extendingLineId; });
+      const name = h((line && line.name) || "la ligne");
       el.innerHTML = ready
-        ? `Extension de <b>${h(line?.name ?? "la ligne")}</b> : touche <b>✓ Terminer</b> pour valider.`
-        : `Extension de <b>${h(line?.name ?? "la ligne")}</b> : touche <b>1 ou plusieurs arrêts</b> à ajouter.`;
+        ? "Extension de <b>" + name + "</b> : touche <b>✓ Terminer</b> pour valider."
+        : "Extension de <b>" + name + "</b> : touche <b>1 ou plusieurs arrêts</b> à ajouter.";
     } else {
       el.innerHTML = ready
         ? "Mode création : tu peux terminer la ligne !"
@@ -148,33 +104,27 @@ function updateInstructions() {
   } else {
     el.textContent = "Crée des lignes, ajoute des véhicules, fais grandir ta ville !";
   }
-
   if (finish) {
     finish.hidden = !ready;
     finish.disabled = !ready;
   }
-
   const newLineBtn = document.getElementById("newLineBtn");
   if (newLineBtn) {
     newLineBtn.textContent = state.lineMode ? "✕ Annuler la ligne" : "✏️ Nouvelle ligne";
   }
 }
 
-// ---------------------------------------------------------------------------
-// Bindings génériques (clic + toucher sans double-déclenchement)
-// ---------------------------------------------------------------------------
 function bindTap(el, handler) {
   if (!el) return;
   let lastTouch = 0;
-  const invoke = e => {
-    if (e?.type === "click" && Date.now() - lastTouch < 700) return;
-    if (e?.type === "touchend" || e?.type === "pointerup") {
+  const invoke = function (e) {
+    if (e && e.type === "click" && Date.now() - lastTouch < 700) return;
+    if (e && (e.type === "touchend" || e.type === "pointerup")) {
       lastTouch = Date.now();
-      e.preventDefault?.();
+      if (e.preventDefault) e.preventDefault();
     }
     handler(e);
   };
-
   if (window.PointerEvent) {
     el.addEventListener("pointerup", invoke, { passive: false });
     el.addEventListener("click", invoke);
@@ -187,17 +137,16 @@ function bindTap(el, handler) {
 function bindDelegatedTap(container, selector, handler) {
   if (!container) return;
   let lastTouch = 0;
-  const invoke = e => {
-    const target = e.target.closest?.(selector);
+  const invoke = function (e) {
+    const target = e.target && e.target.closest ? e.target.closest(selector) : null;
     if (!target || !container.contains(target)) return;
     if (e.type === "click" && Date.now() - lastTouch < 700) return;
     if (e.type === "touchend" || e.type === "pointerup") {
       lastTouch = Date.now();
-      e.preventDefault?.();
+      if (e.preventDefault) e.preventDefault();
     }
     handler(target, e);
   };
-
   if (window.PointerEvent) {
     container.addEventListener("pointerup", invoke, { passive: false });
     container.addEventListener("click", invoke);
@@ -207,56 +156,43 @@ function bindDelegatedTap(container, selector, handler) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Conversion écran → monde (DOIT être l'inverse exact du renderer)
-// ---------------------------------------------------------------------------
 function screenPoint(e) {
   const rect = canvas.getBoundingClientRect();
-  const source = e?.changedTouches?.[0] || e?.touches?.[0] || e;
+  const source = (e && e.changedTouches && e.changedTouches[0]) || (e && e.touches && e.touches[0]) || e;
   if (!source || !rect.width || !rect.height) return null;
-
   const sx = source.clientX - rect.left;
   const sy = source.clientY - rect.top;
   const W = rect.width;
   const H = rect.height;
-
   const worldX = (sx - W / 2) / cameraState.zoom + cameraState.x;
   const worldY = (sy - H / 2) / cameraState.zoom + cameraState.y;
-
   return { x: worldX, y: worldY };
 }
 
 function clickMap(e) {
   const p = screenPoint(e);
   if (!p || !state) return;
-
   let nearest = null;
   let best = Infinity;
-  for (const stop of state.city.stops) {
+  state.city.stops.forEach(function (stop) {
     const d = Math.hypot(stop.x - p.x, stop.y - p.y);
-    const HIT_RADIUS = Math.max(STOP_RADIUS * 2.8, 36);
-    if (d <= HIT_RADIUS && d < best) {
+    const HIT = Math.max(STOP_RADIUS * 2.8, 36);
+    if (d <= HIT && d < best) {
       nearest = stop;
       best = d;
     }
-  }
-
+  });
   if (!nearest) return;
-
   state.selectedStop = nearest.id;
-  if (state.lineMode && !state.pendingStops.includes(nearest.id)) {
+  if (state.lineMode && state.pendingStops.indexOf(nearest.id) < 0) {
     state.pendingStops.push(nearest.id);
   }
-
   updateInstructions();
   refreshUI();
 }
 
-// ---------------------------------------------------------------------------
-// Interaction carte (drag / clic / zoom)
-// ---------------------------------------------------------------------------
 function bindMap() {
-  const pointerDown = e => {
+  const pointerDown = function (e) {
     cameraState.isDragging = true;
     cameraState.lastDragX = e.clientX;
     cameraState.lastDragY = e.clientY;
@@ -264,11 +200,8 @@ function bindMap() {
     cameraState.downY = e.clientY;
     cameraState.moved = false;
   };
-
-  const pointerMove = e => {
+  const pointerMove = function (e) {
     if (!cameraState.isDragging) return;
-
-    // Seuil de 4px pour distinguer un clic d'un drag
     if (!cameraState.moved) {
       if (Math.hypot(e.clientX - cameraState.downX, e.clientY - cameraState.downY) > 4) {
         cameraState.moved = true;
@@ -276,34 +209,27 @@ function bindMap() {
         return;
       }
     }
-
     const dx = e.clientX - cameraState.lastDragX;
     const dy = e.clientY - cameraState.lastDragY;
-
     cameraState.x -= dx / cameraState.zoom;
     cameraState.y -= dy / cameraState.zoom;
-
     cameraState.lastDragX = e.clientX;
     cameraState.lastDragY = e.clientY;
-
     syncCameraToRenderer();
     refreshUI();
   };
-
-  const pointerUp = e => {
+  const pointerUp = function (e) {
     const wasDragging = cameraState.isDragging;
     cameraState.isDragging = false;
     if (!wasDragging) return;
-    if (cameraState.moved) return; // c'était un pan, pas un clic
-    e.preventDefault?.();
+    if (cameraState.moved) return;
+    if (e.preventDefault) e.preventDefault();
     clickMap(e);
   };
-
-  const pointerCancel = () => {
+  const pointerCancel = function () {
     cameraState.isDragging = false;
     cameraState.moved = false;
   };
-
   if (window.PointerEvent) {
     canvas.addEventListener("pointerdown", pointerDown, { passive: true });
     canvas.addEventListener("pointermove", pointerMove, { passive: true });
@@ -315,228 +241,187 @@ function bindMap() {
     canvas.addEventListener("touchend", pointerUp, { passive: false });
     canvas.addEventListener("touchcancel", pointerCancel, { passive: true });
   }
-
-  canvas.addEventListener("wheel", e => {
+  canvas.addEventListener("wheel", function (e) {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
-
-    const { rect, W, H } = getCanvasCssSize();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-
+    const size = getCanvasCssSize();
+    if (!size.W || !size.H) return;
+    const sx = e.clientX - size.rect.left;
+    const sy = e.clientY - size.rect.top;
     const oldZoom = cameraState.zoom;
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(
-      cameraState.minZoom,
-      Math.min(cameraState.maxZoom, oldZoom * delta)
-    );
+    const newZoom = Math.max(cameraState.minZoom, Math.min(cameraState.maxZoom, oldZoom * delta));
     if (newZoom === oldZoom) return;
-
-    // Point monde sous la souris AVANT le zoom
-    const wx = (sx - W / 2) / oldZoom + cameraState.x;
-    const wy = (sy - H / 2) / oldZoom + cameraState.y;
-
+    const wx = (sx - size.W / 2) / oldZoom + cameraState.x;
+    const wy = (sy - size.H / 2) / oldZoom + cameraState.y;
     cameraState.zoom = newZoom;
-
-    // Après le zoom, on veut que (sx, sy) pointe toujours sur (wx, wy)
-    cameraState.x = wx - (sx - W / 2) / newZoom;
-    cameraState.y = wy - (sy - H / 2) / newZoom;
-
+    cameraState.x = wx - (sx - size.W / 2) / newZoom;
+    cameraState.y = wy - (sy - size.H / 2) / newZoom;
     syncCameraToRenderer();
     refreshUI();
   }, { passive: false });
-
-  canvas.addEventListener("contextmenu", e => e.preventDefault());
-  canvas.addEventListener("dragstart", e => e.preventDefault());
+  canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  canvas.addEventListener("dragstart", function (e) { e.preventDefault(); });
 }
 
 function bindZoomReset() {
-  const resetBtn = document.getElementById("resetZoomBtn");
-  if (!resetBtn) return;
-  bindTap(resetBtn, resetCameraView);
+  const btn = document.getElementById("resetZoomBtn");
+  if (btn) bindTap(btn, resetCameraView);
 }
 
-// ---------------------------------------------------------------------------
-// Minimap
-// ---------------------------------------------------------------------------
 function computeMiniMapTransform() {
   const stops = state.city.stops;
-  const minX = Math.min(...stops.map(s => s.x));
-  const maxX = Math.max(...stops.map(s => s.x));
-  const minY = Math.min(...stops.map(s => s.y));
-  const maxY = Math.max(...stops.map(s => s.y));
+  const minX = Math.min.apply(null, stops.map(function (s) { return s.x; }));
+  const maxX = Math.max.apply(null, stops.map(function (s) { return s.x; }));
+  const minY = Math.min.apply(null, stops.map(function (s) { return s.y; }));
+  const maxY = Math.max.apply(null, stops.map(function (s) { return s.y; }));
   const pad = 10;
   const scale = Math.min(
     (miniMapCanvas.width - pad * 2) / Math.max(1, maxX - minX),
     (miniMapCanvas.height - pad * 2) / Math.max(1, maxY - minY)
   );
-  return { minX, maxX, minY, maxY, pad, scale };
+  return { minX: minX, maxX: maxX, minY: minY, maxY: maxY, pad: pad, scale: scale };
 }
 
 function renderMiniMap() {
   if (!miniMapCanvas || !state) return;
   const stops = state.city.stops;
   if (!stops.length) return;
-
   const miniCtx = miniMapCanvas.getContext("2d");
-  const { minX, minY, pad, scale } = computeMiniMapTransform();
-
+  const t = computeMiniMapTransform();
   miniCtx.clearRect(0, 0, miniMapCanvas.width, miniMapCanvas.height);
   miniCtx.fillStyle = "#101a22";
   miniCtx.fillRect(0, 0, miniMapCanvas.width, miniMapCanvas.height);
-
-  const worldToMini = (x, y) => ({
-    x: pad + (x - minX) * scale,
-    y: pad + (y - minY) * scale,
-  });
-
-  // Routes des lignes
-  for (const line of state.lines) {
-    if (!Array.isArray(line.route?.nodeIds) || line.route.nodeIds.length < 2) continue;
+  const worldToMini = function (x, y) {
+    return { x: t.pad + (x - t.minX) * t.scale, y: t.pad + (y - t.minY) * t.scale };
+  };
+  state.lines.forEach(function (line) {
+    if (!line.route || !Array.isArray(line.route.nodeIds) || line.route.nodeIds.length < 2) return;
     miniCtx.beginPath();
     let first = true;
-    for (const id of line.route.nodeIds) {
+    line.route.nodeIds.forEach(function (id) {
       const node = state.network.nodes.get(id);
-      if (!node) continue;
-      const point = worldToMini(node.x, node.y);
-      if (first) {
-        miniCtx.moveTo(point.x, point.y);
-        first = false;
-      } else {
-        miniCtx.lineTo(point.x, point.y);
-      }
-    }
+      if (!node) return;
+      const p = worldToMini(node.x, node.y);
+      if (first) { miniCtx.moveTo(p.x, p.y); first = false; }
+      else miniCtx.lineTo(p.x, p.y);
+    });
     miniCtx.strokeStyle = line.color || "#ffffff";
     miniCtx.lineWidth = 1.5;
     miniCtx.stroke();
-  }
-
-  // Arrêts
-  for (const stop of stops) {
-    const point = worldToMini(stop.x, stop.y);
+  });
+  stops.forEach(function (stop) {
+    const p = worldToMini(stop.x, stop.y);
     miniCtx.beginPath();
     miniCtx.fillStyle = stop.id === state.selectedStop ? "#ffffff" : "#7da7c9";
-    miniCtx.arc(point.x, point.y, stop.id === state.selectedStop ? 2.5 : 2, 0, Math.PI * 2);
+    miniCtx.arc(p.x, p.y, stop.id === state.selectedStop ? 2.5 : 2, 0, Math.PI * 2);
     miniCtx.fill();
-  }
-
-  // Rectangle de vue (camera.x/y = CENTRE monde de l'écran)
+  });
   const rectCss = canvas.getBoundingClientRect();
+  if (!rectCss.width || !rectCss.height) return;
   const viewW = rectCss.width / cameraState.zoom;
   const viewH = rectCss.height / cameraState.zoom;
   const left = cameraState.x - viewW / 2;
   const top = cameraState.y - viewH / 2;
-
   miniCtx.strokeStyle = "#f6d365";
   miniCtx.lineWidth = 1.2;
   miniCtx.strokeRect(
-    pad + (left - minX) * scale,
-    pad + (top - minY) * scale,
-    viewW * scale,
-    viewH * scale
+    t.pad + (left - t.minX) * t.scale,
+    t.pad + (top - t.minY) * t.scale,
+    viewW * t.scale,
+    viewH * t.scale
   );
 }
 
 function bindMiniMapClick() {
   if (!miniMapCanvas) return;
-  miniMapCanvas.addEventListener("click", e => {
+  miniMapCanvas.addEventListener("click", function (e) {
     if (!state || !state.city.stops.length) return;
     const rect = miniMapCanvas.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * miniMapCanvas.width;
     const y = ((e.clientY - rect.top) / rect.height) * miniMapCanvas.height;
-
-    const { minX, minY, pad, scale } = computeMiniMapTransform();
-    if (!scale || !isFinite(scale)) return;
-
-    const worldX = minX + (x - pad) / scale;
-    const worldY = minY + (y - pad) / scale;
-
-    // camera.x/y = CENTRE monde de l'écran → on y place directement le point
-    cameraState.x = worldX;
-    cameraState.y = worldY;
-
+    const t = computeMiniMapTransform();
+    if (!t.scale || !isFinite(t.scale)) return;
+    cameraState.x = t.minX + (x - t.pad) / t.scale;
+    cameraState.y = t.minY + (y - t.pad) / t.scale;
     syncCameraToRenderer();
     refreshUI();
   });
 }
 
-// ---------------------------------------------------------------------------
-// Scénario
-// ---------------------------------------------------------------------------
 function populateScenarioSelect() {
   const select = document.getElementById("scenarioSelect");
   if (!select) return;
-  select.innerHTML = SCENARIOS.map(
-    s => `<option value="${h(s.id)}">${h(s.name)} (${h(s.difficulty)})</option>`
-  ).join("");
+  select.innerHTML = SCENARIOS.map(function (s) {
+    return '<option value="' + h(s.id) + '">' + h(s.name) + " (" + h(s.difficulty) + ")</option>";
+  }).join("");
 }
 
 function updateScenarioBanner() {
   const banner = document.getElementById("scenarioBanner");
   if (!banner || !state) return;
-
   const scenario = state.scenario;
   if (!scenario || !scenario.objective) {
     banner.hidden = true;
     return;
   }
-
   banner.hidden = false;
-  banner.className = "scenario-banner" + (scenario.status !== "active" ? ` ${scenario.status}` : "");
-  const progress = scenarioProgress(state, { net: networkFinancials(state).net }) ?? 0;
+  banner.className = "scenario-banner" + (scenario.status !== "active" ? " " + scenario.status : "");
+  const progress = scenarioProgress(state, { net: networkFinancials(state).net }) || 0;
   const statusText = scenario.status === "won"
     ? "✅ Réussi"
     : scenario.status === "lost"
       ? "❌ Échoué"
-      : `Jour ${(state.elapsedDays || 0) + 1}${scenario.durationDays ? `/${scenario.durationDays}` : ""}`;
-
-  banner.innerHTML = `<div><b>${h(scenario.name)}</b> (${h(scenario.difficulty)}) — ${h(scenario.objective.label)} · ${h(statusText)}</div><div class="bar"><div style="width:${Math.round(progress * 100)}%"></div></div>`;
+      : "Jour " + ((state.elapsedDays || 0) + 1) + (scenario.durationDays ? "/" + scenario.durationDays : "");
+  banner.innerHTML = '<div><b>' + h(scenario.name) + '</b> (' + h(scenario.difficulty) + ') — ' + h(scenario.objective.label) + ' · ' + h(statusText) + '</div>' +
+    '<div class="bar"><div style="width:' + Math.round(progress * 100) + '%"></div></div>';
 }
 
-// ---------------------------------------------------------------------------
-// Rafraîchissement UI
-// ---------------------------------------------------------------------------
 function refreshUI() {
   if (!state || !rendererState.current) return;
-  state.journal = cityJournal(state);
-  syncCameraToRenderer();
-  rendererState.current.render({
-    heatmap: state.showHeatmap ? congestionHeatmap(state) : null,
-    camera: cameraState,
-  });
-  renderMiniMap();
-  updateScenarioBanner();
+  try {
+    state.journal = cityJournal(state);
+    syncCameraToRenderer();
+    rendererState.current.render({
+      heatmap: state.showHeatmap ? congestionHeatmap(state) : null,
+      camera: cameraState,
+    });
+    renderMiniMap();
+    updateScenarioBanner();
+  } catch (err) {
+    console.error("[Vie t'Lignes] refreshUI :", err);
+  }
 }
 
-// ---------------------------------------------------------------------------
-// Boucle principale — requestAnimationFrame, step à 1 Hz
-// ---------------------------------------------------------------------------
 const STEP_INTERVAL_MS = 1000;
 let accumulator = 0;
 let lastTs = 0;
+let firstFrameDone = false;
 
 function loop(ts) {
   if (!state) {
     rafId = requestAnimationFrame(loop);
     return;
   }
-
   if (!lastTs) lastTs = ts;
   accumulator += ts - lastTs;
   lastTs = ts;
-
-  // Max 5 steps par frame pour éviter la spirale
   let steps = 0;
   while (accumulator >= STEP_INTERVAL_MS && steps < 5) {
     accumulator -= STEP_INTERVAL_MS;
     steps++;
-    if (!state.paused) {
-      step(state, rng, log);
-    }
+    if (!state.paused) step(state, rng, log);
   }
   if (accumulator > STEP_INTERVAL_MS * 5) accumulator = 0;
-
   refreshUI();
+  if (!firstFrameDone) {
+    firstFrameDone = true;
+    requestAnimationFrame(function () {
+      if (rendererState.current && rendererState.current.resizeCanvas) rendererState.current.resizeCanvas();
+      recenterCameraOnCity();
+      refreshUI();
+    });
+  }
   rafId = requestAnimationFrame(loop);
 }
 
@@ -544,13 +429,11 @@ function startLoop() {
   if (rafId) cancelAnimationFrame(rafId);
   accumulator = 0;
   lastTs = 0;
+  firstFrameDone = false;
   rafId = requestAnimationFrame(loop);
 }
 
-// ---------------------------------------------------------------------------
-// Boot
-// ---------------------------------------------------------------------------
-function boot(seed, scenarioId, restoredPayload = null) {
+function boot(seed, scenarioId, restoredPayload) {
   bootCount += 1;
   let nextState;
   let nextRng;
@@ -559,10 +442,10 @@ function boot(seed, scenarioId, restoredPayload = null) {
     nextState = restoredPayload.state;
     nextState.network = createNetwork(nextState.city);
     const savedNetwork = restoredPayload.state.network;
-    if (savedNetwork?.closedEdgeIds?.length) {
+    if (savedNetwork && savedNetwork.closedEdgeIds && savedNetwork.closedEdgeIds.length) {
       nextState.network.closedEdgeIds = new Set(savedNetwork.closedEdgeIds);
     }
-    if (savedNetwork?.roadworksReopenDay?.length) {
+    if (savedNetwork && savedNetwork.roadworksReopenDay && savedNetwork.roadworksReopenDay.length) {
       nextState.network.roadworksReopenDay = new Map(savedNetwork.roadworksReopenDay);
     }
     nextState.network.pathCache.clear();
@@ -572,43 +455,260 @@ function boot(seed, scenarioId, restoredPayload = null) {
       nextRng.setState(restoredPayload.rngState);
     }
   } else {
-    const scenario = findScenario(
-      scenarioId || document.getElementById("scenarioSelect")?.value || "sandbox"
-    );
+    const scenario = findScenario(scenarioId || "sandbox");
     const city = createCity(seed);
-    nextState = createState(city, scenario.id === "sandbox" ? null : scenario);
+    nextState = createState(city, scenario);
     nextState.network = createNetwork(city);
     nextState.undergroundNetwork = createUndergroundNetwork(city);
     nextRng = mulberry32(city.numericSeed ^ 0xA57E2);
   }
 
-  // Valeurs par défaut pour les champs optionnels
   nextState.eventsEnabled = true;
-  nextState.activeEvents ||= [];
-  nextState.eventHistory ||= [];
-  nextState.nextEventId ||= 1;
-  nextState.completedGoals ||= [];
-  nextState.progressionHistory ||= [];
-  nextState.reputation ||= 0;
+  nextState.activeEvents = nextState.activeEvents || [];
+  nextState.eventHistory = nextState.eventHistory || [];
+  nextState.nextEventId = nextState.nextEventId || 1;
+  nextState.completedGoals = nextState.completedGoals || [];
+  nextState.progressionHistory = nextState.progressionHistory || [];
+  nextState.reputation = nextState.reputation || 0;
   nextState.progressionEnabled = true;
   nextState.contractsEnabled = true;
-  nextState.activeContracts ||= [];
-  nextState.contractHistory ||= [];
-  nextState.dailyReports ||= [];
-  nextState.latestReport ||= null;
+  nextState.activeContracts = nextState.activeContracts || [];
+  nextState.contractHistory = nextState.contractHistory || [];
+  nextState.dailyReports = nextState.dailyReports || [];
+  nextState.latestReport = nextState.latestReport || null;
   nextState.seasonsEnabled = true;
-  nextState.pendingStops ||= [];
-  nextState.logs ||= [];
+  nextState.pendingStops = nextState.pendingStops || [];
+  nextState.logs = nextState.logs || [];
 
-  // Bascule l'état global AVANT toute fonction qui en a besoin
   state = nextState;
   rng = nextRng;
 
-  // Création du renderer
   const nextRenderer = createRenderer(canvas, nextState);
   rendererState.current = nextRenderer;
 
-  // Logs de bienvenue (uniquement pour une nouvelle partie)
   if (!restoredPayload) {
-    log(`Bienvenue ! Ton budget de départ : ${state.money.toLocaleString("fr-FR")} €.`);
-    log(`Ville générée : « ${state.ci
+    log("Bienvenue ! Ton budget de départ : " + state.money.toLocaleString("fr-FR") + " €.");
+    log("Ville générée : « " + state.city.name + " ».");
+    if (state.scenario && state.scenario.objective) {
+      log("Scénario : " + state.scenario.name + " — " + state.scenario.objective.label + ".");
+    }
+    log("Touche la carte pour sélectionner un arrêt !");
+  }
+
+  recenterCameraOnCity();
+  nextRenderer.render({
+    heatmap: nextState.showHeatmap ? congestionHeatmap(nextState) : null,
+    camera: cameraState,
+  });
+
+  const seedInput = document.getElementById("seedInput");
+  if (seedInput) seedInput.value = state.city.seed;
+  const scenarioSelect = document.getElementById("scenarioSelect");
+  if (scenarioSelect) scenarioSelect.value = (state.scenario && state.scenario.id) || "sandbox";
+  const pauseBtn = document.getElementById("pauseBtn");
+  if (pauseBtn) pauseBtn.textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
+  const speedBtn = document.getElementById("speedBtn");
+  if (speedBtn) speedBtn.textContent = "▶ " + state.speed + "×";
+  const toggle = document.getElementById("toggleHeatmapBtn");
+  if (toggle) toggle.setAttribute("aria-pressed", String(!!state.showHeatmap));
+
+  updateInstructions();
+  refreshUI();
+  updateSaveStatus();
+
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      if (rendererState.current && rendererState.current.resizeCanvas) rendererState.current.resizeCanvas();
+      recenterCameraOnCity();
+      refreshUI();
+    });
+  });
+
+  startLoop();
+}
+
+function updateSaveStatus(message) {
+  const el = document.getElementById("saveStatus");
+  const text = document.getElementById("saveStatusText");
+  if (!el || !text) return;
+  if (message) { text.textContent = message; return; }
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) { text.textContent = "Aucune sauvegarde locale."; return; }
+    const payload = JSON.parse(raw);
+    const date = payload.savedAt ? new Date(payload.savedAt).toLocaleString("fr-FR") : "date inconnue";
+    text.textContent = "Sauvegarde locale : " + date;
+  } catch (e) {
+    text.textContent = "Sauvegarde locale indisponible.";
+  }
+}
+
+function setSaveActivity(active, label) {
+  const activity = document.getElementById("saveActivity");
+  if (!activity) return;
+  activity.hidden = !active;
+  activity.setAttribute("aria-hidden", String(!active));
+  activity.textContent = label || "Sauvegarde…";
+}
+
+function saveCurrentGame() {
+  try {
+    saveGame(state, rng && rng.getState ? rng.getState() : null);
+    updateSaveStatus("Partie sauvegardée localement.");
+    log("Partie sauvegardée.");
+    refreshUI();
+  } catch (error) {
+    updateSaveStatus("Échec de la sauvegarde.");
+    log("Sauvegarde impossible : " + error.message);
+  }
+}
+
+function loadCurrentGame() {
+  try {
+    const payload = readSavedGame();
+    if (!payload) { updateSaveStatus("Aucune sauvegarde locale."); return; }
+    boot(payload.state.city.seed, (payload.state.scenario && payload.state.scenario.id) || "sandbox", payload);
+    updateSaveStatus("Partie chargée.");
+  } catch (error) {
+    updateSaveStatus("Sauvegarde invalide.");
+    log("Chargement impossible : " + error.message);
+  }
+}
+
+bindTap(document.getElementById("newLineBtn"), function () {
+  if (!state) return;
+  if (state.lineMode) cancelLineMode(state);
+  else createLine(state);
+  updateInstructions();
+  refreshUI();
+});
+
+bindTap(document.getElementById("finishLineBtn"), function () {
+  if (!state) return;
+  const minStops = state.extendingLineId ? 1 : 2;
+  if (state.pendingStops.length < minStops) return;
+  const modeSelect = document.getElementById("modeSelect");
+  if (state.extendingLineId) finishExtendLine(state, log, routeLine);
+  else finishLine(state, log, routeLine, (modeSelect && modeSelect.value) || "bus");
+  updateInstructions();
+  refreshUI();
+});
+
+bindTap(document.getElementById("pauseBtn"), function () {
+  if (!state) return;
+  state.paused = !state.paused;
+  const btn = document.getElementById("pauseBtn");
+  if (btn) btn.textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
+  refreshUI();
+});
+
+bindTap(document.getElementById("speedBtn"), function () {
+  if (!state) return;
+  state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : state.speed === 4 ? 1000 : 1;
+  const btn = document.getElementById("speedBtn");
+  if (btn) btn.textContent = "▶ " + state.speed + "×";
+  refreshUI();
+});
+
+bindTap(document.getElementById("resetZoomBtn"), resetCameraView);
+bindTap(document.getElementById("saveBtn"), saveCurrentGame);
+bindTap(document.getElementById("loadBtn"), loadCurrentGame);
+
+bindTap(document.getElementById("newCityBtn"), function () {
+  const input = document.getElementById("seedInput");
+  const seed = (input && input.value.trim()) || ("CITY-" + Date.now());
+  const scenarioSelect = document.getElementById("scenarioSelect");
+  boot(seed, (scenarioSelect && scenarioSelect.value) || "sandbox");
+});
+
+bindMap();
+bindZoomReset();
+bindMiniMapClick();
+
+bindDelegatedTap(document.getElementById("lines"), "[data-buy-vehicle]", function (target) {
+  if (!state) return;
+  buyVehicleForLine(state, Number(target.dataset.buyVehicle), log);
+  refreshUI();
+});
+
+bindDelegatedTap(document.getElementById("lines"), "[data-sell-vehicle]", function (target) {
+  if (!state) return;
+  sellVehicleFromLine(state, Number(target.dataset.sellVehicle), Number(target.dataset.vehicleId), log);
+  refreshUI();
+});
+
+bindDelegatedTap(document.getElementById("lines"), "[data-delete-line]", function (target) {
+  if (!state) return;
+  const lineId = Number(target.dataset.deleteLine);
+  const line = state.lines.find(function (l) { return l.id === lineId; });
+  if (line && window.confirm && !window.confirm("Supprimer " + line.name + " ?")) return;
+  deleteLine(state, lineId, log);
+  refreshUI();
+});
+
+bindDelegatedTap(document.getElementById("lines"), "[data-extend-line]", function (target) {
+  if (!state) return;
+  startExtendLine(state, Number(target.dataset.extendLine));
+  updateInstructions();
+  refreshUI();
+});
+
+bindTap(document.getElementById("toggleHeatmapBtn"), function () {
+  if (!state) return;
+  state.showHeatmap = !state.showHeatmap;
+  const button = document.getElementById("toggleHeatmapBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showHeatmap));
+  refreshUI();
+});
+
+bindTap(document.getElementById("exportBtn"), function () {
+  setSaveActivity(true, "Export…");
+  try { exportGameToFile(state, rng && rng.getState ? rng.getState() : null); }
+  finally { setSaveActivity(false); }
+});
+
+const importFileEl = document.getElementById("importFile");
+if (importFileEl) {
+  importFileEl.addEventListener("change", async function (event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    setSaveActivity(true, "Import…");
+    try {
+      const payload = await importGameFromFile(file);
+      boot(payload.state.city.seed, (payload.state.scenario && payload.state.scenario.id) || "sandbox", payload);
+      log("Partie importée avec succès.");
+      refreshUI();
+    } catch (error) {
+      log("Échec de l'import : " + error.message);
+    } finally {
+      setSaveActivity(false);
+      event.target.value = "";
+    }
+  });
+}
+
+let resizeTimer = null;
+window.addEventListener("resize", function () {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function () {
+    if (rendererState.current && rendererState.current.resizeCanvas) rendererState.current.resizeCanvas();
+    recenterCameraOnCity();
+    refreshUI();
+  }, 200);
+});
+
+const initialSeed = createSeedFromQuery();
+const seedInputEl = document.getElementById("seedInput");
+if (seedInputEl) seedInputEl.value = initialSeed;
+
+populateScenarioSelect();
+boot(initialSeed, "sandbox");
+
+window.__vieTLignes = {
+  getState: function () { return state; },
+  cameraState: cameraState,
+  recenterCameraOnCity: recenterCameraOnCity,
+  clickMap: clickMap,
+};
+
+// === FIN DU FICHIER main.js ===
