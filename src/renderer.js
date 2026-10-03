@@ -108,6 +108,101 @@ export function createRenderer(canvas, state) {
     return n - Math.floor(n);
   }
 
+  let urbanObstaclesCache = null;
+  const roadPathCache = new Map();
+
+  function urbanObstacles() {
+    if (urbanObstaclesCache) return urbanObstaclesCache;
+    const obstacles = [];
+    const cell = 74;
+    for (let x = -cell; x < 1000 + cell; x += cell) {
+      for (let y = -cell; y < 650 + cell; y += cell) {
+        const n = urbanNoise(x, y);
+        if (n > .86) continue;
+        const inset = 7 + n * 7;
+        const w = cell - inset * 2;
+        const h = cell - inset * 2;
+        const buildingCount = 2 + Math.floor(n * 4);
+        for (let building = 0; building < buildingCount; building++) {
+          const bw = 9 + urbanNoise(x + building * 17, y) * 13;
+          const bh = 8 + urbanNoise(x, y + building * 19) * 15;
+          const bx = x + inset + 7 + urbanNoise(x + building, y + 4) * Math.max(8, w - bw - 14);
+          const by = y + inset + 7 + urbanNoise(x + 4, y + building) * Math.max(8, h - bh - 14);
+          obstacles.push({ x: bx, y: by, w: bw, h: bh });
+        }
+      }
+    }
+    urbanObstaclesCache = obstacles;
+    return obstacles;
+  }
+
+  function routeAroundBuildings(a, b) {
+    const key = [a.id, b.id].sort().join("|");
+    if (roadPathCache.has(key)) {
+      const cached = roadPathCache.get(key);
+      return a.id < b.id ? cached : cached.slice().reverse();
+    }
+    const step = 20;
+    const cols = 51;
+    const rows = 34;
+    const obstacles = urbanObstacles();
+    const blocked = function (x, y, endpoint) {
+      if (endpoint) return false;
+      return obstacles.some(function (o) {
+        return x >= o.x - 12 && x <= o.x + o.w + 12 && y >= o.y - 12 && y <= o.y + o.h + 12;
+      });
+    };
+    const toNode = function (point) {
+      return { x: Math.max(0, Math.min(cols - 1, Math.round(point.x / step))), y: Math.max(0, Math.min(rows - 1, Math.round(point.y / step))) };
+    };
+    const start = toNode(a);
+    const goal = toNode(b);
+    const id = function (x, y) { return y * cols + x; };
+    const startId = id(start.x, start.y);
+    const goalId = id(goal.x, goal.y);
+    const open = [{ x: start.x, y: start.y, f: 0 }];
+    const cameFrom = new Map();
+    const cost = new Map([[startId, 0]]);
+    const heuristic = function (x, y) { return Math.abs(x - goal.x) + Math.abs(y - goal.y); };
+    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
+    let found = false;
+    while (open.length && open.length < 5000) {
+      open.sort(function (left, right) { return left.f - right.f; });
+      const current = open.shift();
+      if (id(current.x, current.y) === goalId) { found = true; break; }
+      directions.forEach(function (direction) {
+        const nx = current.x + direction[0];
+        const ny = current.y + direction[1];
+        if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) return;
+        const nextId = id(nx, ny);
+        if (blocked(nx * step, ny * step, nextId === startId || nextId === goalId)) return;
+        const moveCost = direction[0] && direction[1] ? 1.4 : 1;
+        const nextCost = (cost.get(id(current.x, current.y)) || 0) + moveCost;
+        if (nextCost >= (cost.get(nextId) ?? Infinity)) return;
+        cost.set(nextId, nextCost);
+        cameFrom.set(nextId, id(current.x, current.y));
+        open.push({ x: nx, y: ny, f: nextCost + heuristic(nx, ny) });
+      });
+    }
+    if (!found) return [a, b];
+    const nodes = [];
+    let currentId = goalId;
+    while (currentId !== undefined) {
+      nodes.unshift({ x: (currentId % cols) * step, y: Math.floor(currentId / cols) * step });
+      currentId = cameFrom.get(currentId);
+    }
+    nodes[0] = { x: a.x, y: a.y };
+    nodes[nodes.length - 1] = { x: b.x, y: b.y };
+    const simplified = nodes.filter(function (point, index) {
+      if (index === 0 || index === nodes.length - 1) return true;
+      const previous = nodes[index - 1];
+      const next = nodes[index + 1];
+      return Math.sign(point.x - previous.x) !== Math.sign(next.x - point.x) || Math.sign(point.y - previous.y) !== Math.sign(next.y - point.y);
+    });
+    roadPathCache.set(key, a.id < b.id ? simplified : simplified.slice().reverse());
+    return a.id < b.id ? simplified : simplified.slice().reverse();
+  }
+
   function drawUrbanBase(left, top, viewW, viewH) {
     ctx.fillStyle = "#d7e2df";
     ctx.fillRect(left, top, viewW, viewH);
@@ -212,21 +307,22 @@ export function createRenderer(canvas, state) {
           : null;
         const closed = edge && state.network.closedEdgeIds && state.network.closedEdgeIds.has(edge.id);
         const width = road.type === "arterial" ? 14 : 9;
+        const path = routeAroundBuildings(a, b);
 
         ctx.strokeStyle = "rgba(31, 35, 64, .38)";
         ctx.lineWidth = width + 5;
         ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(path[0].x, path[0].y);
+        path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
         ctx.stroke();
 
         ctx.strokeStyle = closed ? ROAD_CLOSED : "#66747b";
         ctx.lineWidth = width;
         if (closed) ctx.setLineDash([8, 8]);
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(path[0].x, path[0].y);
+        path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
         ctx.stroke();
         ctx.setLineDash([]);
         if (!closed) {
@@ -234,8 +330,8 @@ export function createRenderer(canvas, state) {
           ctx.lineWidth = road.type === "arterial" ? 2 : 1.5;
           ctx.setLineDash(road.type === "arterial" ? [12, 10] : [6, 10]);
           ctx.beginPath();
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(b.x, b.y);
+          ctx.moveTo(path[0].x, path[0].y);
+          path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
           ctx.stroke();
           ctx.setLineDash([]);
         }
