@@ -75,8 +75,10 @@ function validateCity(city) {
   const roads = array(city.roads, "ville.roads");
   for (const road of roads) {
     object(road, "ville.roads[]");
-    if (!stopIds.has(road.a) || !stopIds.has(road.b) || road.a === road.b) invalid("route invalide");
     string(road.type, "route.type");
+    const linked = typeof road.a === "string" && typeof road.b === "string" && stopIds.has(road.a) && stopIds.has(road.b) && road.a !== road.b;
+    const free = road.start && road.end && Number.isFinite(road.start.x) && Number.isFinite(road.start.y) && Number.isFinite(road.end.x) && Number.isFinite(road.end.y);
+    if (!linked && !free) invalid("route invalide");
   }
   const districts = array(city.districts, "ville.districts");
   uniqueIds(districts, "ville.districts");

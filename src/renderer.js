@@ -296,8 +296,10 @@ export function createRenderer(canvas, state) {
 
     if (state.city && state.city.roads) {
       state.city.roads.forEach(function (road) {
-        const a = state.city.stops.find(function (s) { return s.id === road.a; });
-        const b = state.city.stops.find(function (s) { return s.id === road.b; });
+        const aStop = state.city.stops.find(function (s) { return s.id === road.a; });
+        const bStop = state.city.stops.find(function (s) { return s.id === road.b; });
+        const a = aStop || (road.start ? { id: road.id + "-a", x: road.start.x, y: road.start.y } : null);
+        const b = bStop || (road.end ? { id: road.id + "-b", x: road.end.x, y: road.end.y } : null);
         if (!a || !b) return;
 
         const edge = state.network && state.network.edges
@@ -336,6 +338,16 @@ export function createRenderer(canvas, state) {
           ctx.setLineDash([]);
         }
       });
+    }
+
+    if (state.roadEditMode === "build" && state.pendingRoadPoint) {
+      ctx.fillStyle = "#ffcf33";
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(state.pendingRoadPoint.x, state.pendingRoadPoint.y, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
 
     if (Array.isArray(heatmap) && heatmap.length) {

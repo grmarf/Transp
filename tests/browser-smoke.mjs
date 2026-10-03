@@ -84,6 +84,14 @@ try {
       }
       document.querySelector('#finishLineBtn').click();
       const created = window.__transportTycoon.getState().lines.length;
+      const worldClick = (x, y) => window.__transportTycoon.clickMap({
+        clientX: rect.left + x * rect.width / canvas.width,
+        clientY: rect.top + y * rect.height / canvas.height
+      });
+      document.querySelector('#buildRoadBtn').click();
+      worldClick(120, 100);
+      worldClick(250, 180);
+      const builtRoads = window.__transportTycoon.getState().city.roads.filter(road => road.built).length;
       const cityNameInput = document.querySelector('#cityNameInput');
       cityNameInput.focus();
       cityNameInput.value = 'Lyon-sur-Test';
@@ -96,11 +104,15 @@ try {
       document.querySelector('#saveBtn').click();
       document.querySelector('#loadBtn').click();
       const loaded = window.__transportTycoon.getState().lines.length;
+      const loadedRoad = window.__transportTycoon.getState().city.roads.find(road => road.built);
+      const loadedBuiltRoads = window.__transportTycoon.getState().city.roads.filter(road => road.built).length;
+      document.querySelector('#removeRoadBtn').click();
+      const removeMode = document.querySelector('#removeRoadBtn').getAttribute('aria-pressed');
       const payload = '<img src=x onerror=alert(1)>';
       window.__transportTycoon.getState().logs.unshift(payload);
       document.querySelector('#toggleHeatmapBtn').click();
       return {
-        created, loaded, renamed, typedSeed,
+        created, loaded, builtRoads, loadedBuiltRoads, removeMode, renamed, typedSeed,
         escaped: document.querySelector('#log').innerHTML.includes('&lt;img'),
         executableImage: Boolean(document.querySelector('#log img')),
         money: document.querySelector('#money').textContent
@@ -111,6 +123,9 @@ try {
   assert.equal(consoleErrors.length, 0, `erreurs navigateur : ${consoleErrors.join('; ')}`);
   assert.equal(value.created, 1, 'la création d’une ligne doit fonctionner');
   assert.equal(value.loaded, 1, 'le chargement valide doit conserver la ligne');
+  assert.equal(value.builtRoads, 1, 'une route libre doit pouvoir être construite');
+  assert.equal(value.loadedBuiltRoads, 1, 'une route libre doit être sauvegardée');
+  assert.equal(value.removeMode, 'true', 'le mode suppression doit pouvoir être activé');
   assert.equal(value.renamed, 'Lyon-sur-Test', 'le nom de ville doit être modifiable sans écrasement');
   assert.equal(value.typedSeed, 'MA-SEED-TEST', 'le seed doit rester éditable');
   assert.equal(value.escaped, true, 'le journal doit échapper le HTML');

@@ -89,7 +89,11 @@ function updateInstructions() {
   const extending = !!state.extendingLineId;
   const minStops = extending ? 1 : 2;
   const ready = state.lineMode && state.pendingStops.length >= minStops;
-  if (state.lineMode) {
+  if (state.roadEditMode === "build") {
+    el.innerHTML = state.pendingRoadPoint ? "Construction : clique le <b>second point</b>." : "Construction : clique le <b>premier point</b>.";
+  } else if (state.roadEditMode === "remove") {
+    el.innerHTML = "Suppression : clique une <b>route construite</b>.";
+  } else if (state.lineMode) {
     if (extending) {
       const line = state.lines.find(function (l) { return l.id === state.extendingLineId; });
       const name = h((line && line.name) || "la ligne");
@@ -111,6 +115,16 @@ function updateInstructions() {
   const newLineBtn = document.getElementById("newLineBtn");
   if (newLineBtn) {
     newLineBtn.textContent = state.lineMode ? "✕ Annuler la ligne" : "✏️ Nouvelle ligne";
+  }
+  const buildRoadBtn = document.getElementById("buildRoadBtn");
+  const removeRoadBtn = document.getElementById("removeRoadBtn");
+  if (buildRoadBtn) {
+    buildRoadBtn.textContent = state.roadEditMode === "build" ? "✕ Annuler construction" : "🛣️ Construire une route";
+    buildRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "build"));
+  }
+  if (removeRoadBtn) {
+    removeRoadBtn.textContent = state.roadEditMode === "remove" ? "✕ Annuler suppression" : "🧹 Supprimer une route";
+    removeRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "remove"));
   }
 }
 
@@ -181,6 +195,60 @@ function clickMap(e) {
     p = { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }
   if (!p || !state) return;
+
+  if (state.roadEditMode === "build") {
+    if (!state.pendingRoadPoint) {
+      state.pendingRoadPoint = { x: Math.round(p.x), y: Math.round(p.y) };
+      log("Point de départ choisi. Clique un second point pour construire la route.");
+    } else {
+      const start = state.pendingRoadPoint;
+      const end = { x: Math.round(p.x), y: Math.round(p.y) };
+      const length = Math.hypot(end.x - start.x, end.y - start.y);
+      const cost = Math.max(25, Math.round(length * 0.45));
+      if (length < 24) log("Route trop courte : éloigne le second point.");
+      else if (state.money < cost) log(`Construction impossible : il faut ${cost.toLocaleString("fr-FR")} €.`);
+      else {
+        if (!Number.isInteger(state.nextRoadId)) state.nextRoadId = 1;
+        state.city.roads.push({ id: `built-road-${state.nextRoadId++}`, start, end, type: "secondary", built: true });
+        state.money -= cost;
+        state.pendingRoadPoint = null;
+        log(`Route construite (${cost.toLocaleString("fr-FR")} €).`);
+      }
+    }
+    updateInstructions();
+    refreshUI();
+    return;
+  }
+
+  if (state.roadEditMode === "remove") {
+    let nearestRoad = null;
+    let nearestDistance = 100 / cameraState.zoom;
+    state.city.roads.forEach(function (road) {
+      if (!road.built || !road.start || !road.end) return;
+      const dx = road.end.x - road.start.x;
+      const dy = road.end.y - road.start.y;
+      const lengthSquared = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((p.x - road.start.x) * dx + (p.y - road.start.y) * dy) / lengthSquared));
+      const distanceToRoad = Math.hypot(p.x - (road.start.x + t * dx), p.y - (road.start.y + t * dy));
+      const inDetourBounds = p.x >= Math.min(road.start.x, road.end.x) - 30 &&
+        p.x <= Math.max(road.start.x, road.end.x) + 30 &&
+        p.y >= Math.min(road.start.y, road.end.y) - 30 &&
+        p.y <= Math.max(road.start.y, road.end.y) + 30;
+      const hitDistance = inDetourBounds ? Math.min(distanceToRoad, 30) : distanceToRoad;
+      if (hitDistance < nearestDistance) {
+        nearestDistance = hitDistance;
+        nearestRoad = road;
+      }
+    });
+    if (nearestRoad) {
+      state.city.roads = state.city.roads.filter(function (road) { return road !== nearestRoad; });
+      log("Route construite supprimée.");
+    } else log("Aucune route construite sous le curseur.");
+    updateInstructions();
+    refreshUI();
+    return;
+  }
+
   let nearest = null;
   let best = Infinity;
   state.city.stops.forEach(function (stop) {
@@ -588,6 +656,24 @@ bindTap(document.getElementById("newLineBtn"), function () {
   if (!state) return;
   if (state.lineMode) cancelLineMode(state);
   else createLine(state);
+  updateInstructions();
+  refreshUI();
+});
+
+bindTap(document.getElementById("buildRoadBtn"), function () {
+  if (!state) return;
+  if (state.lineMode) cancelLineMode(state);
+  state.roadEditMode = state.roadEditMode === "build" ? null : "build";
+  state.pendingRoadPoint = null;
+  updateInstructions();
+  refreshUI();
+});
+
+bindTap(document.getElementById("removeRoadBtn"), function () {
+  if (!state) return;
+  if (state.lineMode) cancelLineMode(state);
+  state.roadEditMode = state.roadEditMode === "remove" ? null : "remove";
+  state.pendingRoadPoint = null;
   updateInstructions();
   refreshUI();
 });
