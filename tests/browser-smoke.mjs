@@ -89,6 +89,10 @@ try {
       cityNameInput.value = 'Lyon-sur-Test';
       cityNameInput.dispatchEvent(new Event('input', { bubbles: true }));
       const renamed = window.__transportTycoon.getState().city.name;
+      const seedInput = document.querySelector('#seedInput');
+      seedInput.focus();
+      seedInput.value = 'MA-SEED-TEST';
+      const typedSeed = seedInput.value;
       document.querySelector('#saveBtn').click();
       document.querySelector('#loadBtn').click();
       const loaded = window.__transportTycoon.getState().lines.length;
@@ -96,7 +100,7 @@ try {
       window.__transportTycoon.getState().logs.unshift(payload);
       document.querySelector('#toggleHeatmapBtn').click();
       return {
-        created, loaded, renamed,
+        created, loaded, renamed, typedSeed,
         escaped: document.querySelector('#log').innerHTML.includes('&lt;img'),
         executableImage: Boolean(document.querySelector('#log img')),
         money: document.querySelector('#money').textContent
@@ -108,6 +112,7 @@ try {
   assert.equal(value.created, 1, 'la création d’une ligne doit fonctionner');
   assert.equal(value.loaded, 1, 'le chargement valide doit conserver la ligne');
   assert.equal(value.renamed, 'Lyon-sur-Test', 'le nom de ville doit être modifiable sans écrasement');
+  assert.equal(value.typedSeed, 'MA-SEED-TEST', 'le seed doit rester éditable');
   assert.equal(value.escaped, true, 'le journal doit échapper le HTML');
   assert.equal(value.executableImage, false, 'aucune balise img ne doit être créée');
   assert.match(value.money, /€/);

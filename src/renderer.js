@@ -473,7 +473,9 @@ export function createRenderer(canvas, state) {
     }
 
     const seedEl = document.getElementById("seedInput");
-    if (seedEl) seedEl.value = state.city.seed;
+    if (seedEl && document.activeElement !== seedEl && seedEl.value !== state.city.seed) {
+      seedEl.value = state.city.seed;
+    }
 
     const pStats = passengerStats(state);
     const wStats = waitStats(state);
