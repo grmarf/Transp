@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "20.0",
+    version: "22.0",
     city,
     network: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,
@@ -58,9 +58,24 @@ export function createState(city, scenario = null) {
     contractCycle: 0,
     contractsEndDay: 0,
     // V18: rolling daily operating reports.
-    dailyReports: [],
+    dailyRepo
+rts: [],
     latestReport: null,
     // V19: browser games apply seasonal demand, fares and growth.
     seasonsEnabled: false,
+    // V22.0 — Cities in Motion inspired levers. All opt-in so legacy
+    // engine tests keep their exact money and demand trajectories; the
+    // browser game enables them at boot.
+    demographicsEnabled: false,
+    fareLevel: 1,
+    wageLevel: 1,
+    staffCostsEnabled: false,
+    dailyStaffCost: 0,
+    advertisingEnabled: false,
+    activeCampaigns: [],
+    campaignHistory: [],
+    nextCampaignId: 1,
+    campaignCooldownUntil: 0,
+    showCoverage: false,
   };
 }

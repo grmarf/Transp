@@ -5,10 +5,11 @@ export const SAVE_FORMAT_VERSION = 2;
 export const SAVE_VERSION = SAVE_FORMAT_VERSION;
 export const SAVE_KEY = "transport-tycoon-v20-save";
 const SAVE_FORMAT = "transport-tycoon-save";
-const STATE_VERSION = "20.0";
+const STATE_VERSION = "22.0";
 const UINT32_MAX = 0xFFFFFFFF;
 const PASSENGER_STATES = new Set(["WAITING", "BOARDING", "ON_VEHICLE", "TRANSFERRING", "ARRIVED", "ABANDONED"]);
 const VEHICLE_MODES = new Set(["bus", "tram", "metro"]);
+const DEMOGRAPHIC_IDS = new Set(["commuter", "student", "retiree", "worker"]);
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function invalid(message) { throw new Error(`Sauvegarde V20 invalide : ${message}`); }
@@ -49,7 +50,8 @@ function uniqueNumericIds(items, label) {
   }
   return ids;
 }
-function coordinate(value, label) { finite(value, label); }
+functio
+n coordinate(value, label) { finite(value, label); }
 
 function validateCity(city) {
   object(city, "ville");
@@ -85,7 +87,8 @@ function validateCity(city) {
   for (const district of districts) {
     string(district.name, "district.name");
     object(district.center, "district.center");
-    coordinate(district.center.x, "district.center.x"); coordinate(district.center.y, "district.center.y");
+    coordinate(district.center.x, "district.center.x");
+ coordinate(district.center.y, "district.center.y");
     finite(district.populationFactor, "district.populationFactor");
   }
   return stopIds;
@@ -108,16 +111,17 @@ function validateSerializedNetwork(network, label) {
 
 function validateState(state) {
   object(state, "état");
-  if (state.version !== STATE_VERSION) invalid("version du jeu différente de V20.0");
+  if (state.version !== STATE_VERSION) invalid("version du jeu différente de V22.0");
   const stopIds = validateCity(state.city);
-  for (const field of ["lines", "vehicles", "passengers", "dailyStats", "dailyReports", "activeEvents", "activeContracts", "completedGoals"]) array(state[field], `état.${field}`);
+  for (const field of ["lines", "vehicles", "passengers", "dailyStats", "dailyReports", "activeEvents", "activeContracts", "activeCampaigns", "completedGoals"]) array(state[field], `état.${field}`);
   for (const field of ["money", "time", "elapsedDays", "nextLineId", "nextVehicleId", "nextPassengerId", "transported", "totalDemand", "totalGenerated", "totalBoarded", "totalArrived"]) finite(state[field], `état.${field}`);
   if (state.money < 0 || state.time < 0 || state.time >= 1440 || state.elapsedDays < 0) invalid("compteur temporel ou financier hors limites");
   for (const field of ["elapsedDays", "nextLineId", "nextVehicleId", "nextPassengerId", "transported", "totalBoarded", "totalArrived"]) integer(state[field], `état.${field}`, { min: 0 });
   if (state.totalAbandoned !== undefined) integer(state.totalAbandoned, "état.totalAbandoned", { min: 0 });
   if (state.logs !== undefined) {
     array(state.logs, "état.logs");
-    for (const entry of state.logs) string(entry, "état.logs[]");
+    for (const entry of state.log
+s) string(entry, "état.logs[]");
   }
   if (state.journal !== undefined) {
     array(state.journal, "état.journal");
@@ -150,12 +154,29 @@ function validateState(state) {
   }
   for (const contract of state.activeContracts) {
     object(contract, "état.activeContracts[]"); string(contract.id, "contrat.id"); integer(contract.cycle, "contrat.cycle", { min: 0 });
-    integer(contract.startedDay, "contrat.startedDay", { min: 0 });
+    integer(contract.startedDay, "con
+trat.startedDay", { min: 0 });
     if (typeof contract.completed !== "boolean") invalid("contrat.completed invalide");
   }
   if (state.contractHistory !== undefined) {
     array(state.contractHistory, "état.contractHistory");
     for (const contract of state.contractHistory) object(contract, "état.contractHistory[]");
+  }
+  for (const campaign of state.activeCampaigns) {
+    object(campaign, "état.activeCampaigns[]");
+    string(campaign.id, "campagne.id");
+    integer(campaign.campaignId, "campagne.campaignId", { min: 1 });
+    integer(campaign.startedDay, "campagne.startedDay", { min: 0 });
+    integer(campaign.endsDay, "campagne.endsDay", { min: 0 });
+  }
+  if (state.campaignHistory !== undefined) {
+    array(state.campaignHistory, "état.campaignHistory");
+    for (const campaign of state.campaignHistory) object(campaign, "état.campaignHistory[]");
+  }
+  for (const field of ["wageLevel", "fareLevel"]) {
+    if (state[field] === undefined) continue;
+    finite(state[field], `état.${field}`);
+    if (state[field] < 0.5 || state[field] > 2) invalid(`${field} hors limites`);
   }
   for (const goalId of state.completedGoals) string(goalId, "état.completedGoals[]");
   if (state.progressionHistory !== undefined) {
@@ -186,7 +207,8 @@ function validateState(state) {
   for (const vehicle of state.vehicles) {
     integer(vehicle.id, "véhicule.id", { min: 1 });
     if (vehicleIds.has(vehicle.id)) invalid("véhicules avec identifiants dupliqués");
-    vehicleIds.add(vehicle.id);
+    veh
+icleIds.add(vehicle.id);
     if (!lineIds.has(vehicle.lineId) || !VEHICLE_MODES.has(vehicle.mode)) invalid("véhicule rattaché à une ligne inconnue");
     integer(vehicle.routeIndex, "véhicule.routeIndex", { min: 0 });
     finite(vehicle.progress, "véhicule.progress");
@@ -210,12 +232,14 @@ function validateState(state) {
     passengerIds.add(passenger.id);
     for (const field of ["originId", "destinationId", "currentStopId"]) if (!stopIds.has(passenger[field])) invalid("passager référant un arrêt inconnu");
     if (!PASSENGER_STATES.has(passenger.state)) invalid("état de passager inconnu");
+    if (passenger.demographic !== null && passenger.demographic !== undefined && !DEMOGRAPHIC_IDS.has(passenger.demographic)) invalid("groupe de passager inconnu");
     finite(passenger.createdAt, "passager.createdAt"); finite(passenger.waitedMinutes, "passager.waitedMinutes");
     finite(passenger.transfersDone, "passager.transfersDone"); finite(passenger.travelMinutes, "passager.travelMinutes");
     if (passenger.waitedMinutes < 0 || passenger.transfersDone < 0 || passenger.travelMinutes < 0) invalid("métrique de passager négative");
     if (passenger.itinerary !== null) {
       array(passenger.itinerary, "passager.itinerary");
-      for (const leg of passenger.itinerary) {
+     
+ for (const leg of passenger.itinerary) {
         object(leg, "passager.itinerary[]");
         integer(leg.lineId, "étape de trajet.lineId", { min: 1 });
         if (!lineIds.has(leg.lineId) || !stopIds.has(leg.from) || !stopIds.has(leg.to)) invalid("étape de trajet incohérente");
@@ -253,7 +277,8 @@ export function serializeState(state, rngState = null) {
       roadworksReopenDay: [...(state.undergroundNetwork.roadworksReopenDay || [])]
     } : null
   });
-  const payload = { format: SAVE_FORMAT, version: SAVE_FORMAT_VERSION, savedAt: new Date().toISOString(), rngState, state: clean };
+  const payload = { format: SAVE_FO
+RMAT, version: SAVE_FORMAT_VERSION, savedAt: new Date().toISOString(), rngState, state: clean };
   return validateSavePayload(payload);
 }
 

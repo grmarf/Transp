@@ -53,7 +53,8 @@ function getCanvasCssSize() {
 function recenterCameraOnCity() {
   if (!state || !state.city || !state.city.stops || !state.city.stops.length) return;
   if (rendererState.current && rendererState.current.resizeCanvas) {
-    rendererState.current.resizeCanvas();
+    rendererState.curre
+nt.resizeCanvas();
   }
   const size = getCanvasCssSize();
   if (!size.W || !size.H) {
@@ -103,6 +104,7 @@ function updateInstructions() {
     } else {
       el.innerHTML = ready
         ? "Mode création : tu peux terminer la ligne !"
+
         : "Mode création : touche <b>2 arrêts minimum</b> dans l'ordre pour créer la ligne.";
     }
   } else {
@@ -154,7 +156,8 @@ function bindDelegatedTap(container, selector, handler) {
   const invoke = function (e) {
     const target = e.target && e.target.closest ? e.target.closest(selector) : null;
     if (!target || !container.contains(target)) return;
-    if (e.type === "click" && Date.now() - lastTouch < 700) return;
+    if (e.type === "click" && Date.now() - lastTouch < 700) 
+return;
     if (e.type === "touchend" || e.type === "pointerup") {
       lastTouch = Date.now();
       if (e.preventDefault) e.preventDefault();
@@ -203,7 +206,8 @@ function clickMap(e) {
     } else {
       const start = state.pendingRoadPoint;
       const end = { x: Math.round(p.x), y: Math.round(p.y) };
-      const length = Math.hypot(end.x - start.x, end.y - start.y);
+      const length = Math.hypot(end.x - start.x, end.y - 
+start.y);
       const cost = Math.max(25, Math.round(length * 0.45));
       if (length < 24) log("Route trop courte : éloigne le second point.");
       else if (state.money < cost) log(`Construction impossible : il faut ${cost.toLocaleString("fr-FR")} €.`);
@@ -246,7 +250,8 @@ function clickMap(e) {
     } else log("Aucune route construite sous le curseur.");
     updateInstructions();
     refreshUI();
-    return;
+    retur
+n;
   }
 
   let nearest = null;
@@ -311,7 +316,8 @@ function bindMap() {
     canvas.addEventListener("pointerdown", pointerDown, { passive: true });
     canvas.addEventListener("pointermove", pointerMove, { passive: true });
     canvas.addEventListener("pointerup", pointerUp, { passive: false });
-    canvas.addEventListener("pointercancel", pointerCancel, { passive: true });
+    canvas.addE
+ventListener("pointercancel", pointerCancel, { passive: true });
   } else {
     canvas.addEventListener("touchstart", pointerDown, { passive: true });
     canvas.addEventListener("touchmove", pointerMove, { passive: true });
@@ -355,7 +361,8 @@ function computeMiniMapTransform() {
   const pad = 10;
   const scale = Math.min(
     (miniMapCanvas.width - pad * 2) / Math.max(1, maxX - minX),
-    (miniMapCanvas.height - pad * 2) / Math.max(1, maxY - minY)
+    (miniMapCanvas.
+height - pad * 2) / Math.max(1, maxY - minY)
   );
   return { minX: minX, maxX: maxX, minY: minY, maxY: maxY, pad: pad, scale: scale };
 }
@@ -406,7 +413,8 @@ function renderMiniMap() {
     t.pad + (left - t.minX) * t.scale,
     t.pad + (top - t.minY) * t.scale,
     viewW * t.scale,
-    viewH * t.scale
+    viewH * t.sc
+ale
   );
 }
 
@@ -458,7 +466,8 @@ function refreshUI() {
   if (!state || !rendererState.current) return;
   try {
     state.journal = cityJournal(state);
-    syncCameraToRenderer();
+    syncCame
+raToRenderer();
     rendererState.current.render({
       heatmap: state.showHeatmap ? congestionHeatmap(state) : null,
       camera: cameraState,
@@ -526,7 +535,8 @@ function boot(seed, scenarioId, restoredPayload) {
       nextState.network.roadworksReopenDay = new Map(savedNetwork.roadworksReopenDay);
     }
     nextState.network.pathCache.clear();
-    nextState.undergroundNetwork = createUndergroundNetwork(nextState.city);
+    nextState.undergroundNetwork = createUndergroun
+dNetwork(nextState.city);
     nextRng = mulberry32(nextState.city.numericSeed ^ 0xA57E2);
     if (restoredPayload.rngState != null && nextRng.setState) {
       nextRng.setState(restoredPayload.rngState);
@@ -574,10 +584,18 @@ function boot(seed, scenarioId, restoredPayload) {
 
   recenterCameraOnCity();
   nextRenderer.render({
-    heatmap: nextState.showHeatmap ? congestionHeatmap(nextState) : null,
+    heatmap: nextState.showHeatmap ? congestionHea
+tmap(nextState) : null,
     camera: cameraState,
   });
 
+  state.demographicsEnabled = true;
+  state.advertisingEnabled = true;
+  state.staffCostsEnabled = true;
+  const fareLevelSelect = document.getElementById("fareLevelSelect");
+  if (fareLevelSelect) fareLevelSelect.value = String(state.fareLevel ?? 1);
+  const wageLevelSelect = document.getElementById("wageLevelSelect");
+  if (wageLevelSelect) wageLevelSelect.value = String(state.wageLevel ?? 1);
   const seedInput = document.getElementById("seedInput");
   if (seedInput) seedInput.value = state.city.seed;
   const scenarioSelect = document.getElementById("scenarioSelect");
@@ -630,6 +648,7 @@ function setSaveActivity(active, label) {
 
 function saveCurrentGame() {
   try {
+
     saveGame(state, rng && rng.getState ? rng.getState() : null);
     updateSaveStatus("Partie sauvegardée localement.");
     log("Partie sauvegardée.");
@@ -690,7 +709,8 @@ bindTap(document.getElementById("finishLineBtn"), function () {
 });
 
 bindTap(document.getElementById("pauseBtn"), function () {
-  if (!state) return;
+  if
+ (!state) return;
   state.paused = !state.paused;
   const btn = document.getElementById("pauseBtn");
   if (btn) btn.textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
@@ -742,7 +762,8 @@ bindDelegatedTap(document.getElementById("lines"), "[data-delete-line]", functio
 });
 
 bindDelegatedTap(document.getElementById("lines"), "[data-extend-line]", function (target) {
-  if (!state) return;
+  if (!state) 
+return;
   startExtendLine(state, Number(target.dataset.extendLine));
   updateInstructions();
   refreshUI();
@@ -754,6 +775,28 @@ bindTap(document.getElementById("toggleHeatmapBtn"), function () {
   const button = document.getElementById("toggleHeatmapBtn");
   if (button) button.setAttribute("aria-pressed", String(state.showHeatmap));
   refreshUI();
+});
+
+bindTap(document.getElementById("toggleCoverageBtn"), function () {
+  if (!state) return;
+  state.showCoverage = !state.showCoverage;
+  const button = document.getElementById("toggleCoverageBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showCoverage));
+  refreshUI();
+});
+
+const fareLevelSelectEl = document.getElementById("fareLevelSelect");
+if (fareLevelSelectEl) fareLevelSelectEl.addEventListener("change", function () {
+  if (!state) return;
+  const value = Number(fareLevelSelectEl.value);
+  if (Number.isFinite(value) && value >= 0.8 && value <= 1.5) state.fareLevel = value;
+});
+
+const wageLevelSelectEl = document.getElementById("wageLevelSelect");
+if (wageLevelSelectEl) wageLevelSelectEl.addEventListener("change", function () {
+  if (!state) return;
+  const value = Number(wageLevelSelectEl.value);
+  if (Number.isFinite(value) && value >= 0.8 && value <= 1.2) state.wageLevel = value;
 });
 
 bindTap(document.getElementById("exportBtn"), function () {
@@ -800,7 +843,8 @@ if (cityNameInputEl) {
   cityNameInputEl.addEventListener("input", function () {
     if (!state) return;
     const value = cityNameInputEl.value.trim();
-    if (value) state.city.name = value;
+    i
+f (value) state.city.name = value;
   });
   cityNameInputEl.addEventListener("blur", function () {
     if (!state) return;

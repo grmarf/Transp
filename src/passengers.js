@@ -6,12 +6,12 @@ export const PASSENGER_STATES = Object.freeze({
 
 let nextPassengerId = 1;
 
-export function createPassenger({ originId, destinationId, createdAt = 0 }) {
+export function createPassenger({ originId, destinationId, createdAt = 0, demographic = null }) {
   return {
     id: nextPassengerId++, originId, destinationId, currentStopId: originId,
     state: PASSENGER_STATES.WAITING, itinerary: null, legIndex: 0,
     vehicleId: null, createdAt, waitedMinutes: 0, arrivedAt: null,
-    transfersDone: 0, travelMinutes: 0
+    transfersDone: 0, travelMinutes: 0, demographic
   };
 }
 
@@ -49,7 +49,8 @@ export function intermodalStats(state) {
   }
   return {
     arrivedCount: arrived,
-    avgTransfersPerTrip: arrived ? totalTransfers / arrived : 0,
+    avgTransfersPerTrip: arrived ?
+ totalTransfers / arrived : 0,
     avgTravelMinutes: arrived ? totalTravel / arrived : 0,
     shareWithTransfer: arrived ? withTransfer / arrived : 0
   };

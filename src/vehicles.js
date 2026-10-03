@@ -8,6 +8,7 @@ import { eventFareMultiplier } from "./events.js";
 import { seasonFareMultiplier } from "./seasons.js";
 import { PASSENGER_STATES } from "./passengers.js";
 import { TICK_MINUTES } from "./constants.js";
+import { fareAcceptance } from "./demographics.js";
 
 export const DEFAULT_VEHICLE_CAPACITY = 35;
 // V21.0 — vitesses accélérées pour rendre les trajets jouables. Les
@@ -51,7 +52,8 @@ export function createVehicle(state, lineId, options = {}) {
   };
 }
 
-export function addVehicleToLine(state, line) {
+export functi
+on addVehicleToLine(state, line) {
   const ids = line.route?.nodeIds;
   if (!ids?.length) return null;
 
@@ -110,7 +112,8 @@ export function sellVehicleFromLine(state, lineId, vehicleId, log) {
   line.vehicles = line.vehicles.filter(id => id !== vehicleId);
   state.vehicles = state.vehicles.filter(v => v.id !== vehicleId);
 
-  const refund = Math.round(vehicleMode(vehicle.mode).purchaseCost * VEHICLE_RESALE_RATIO);
+  const refund = M
+ath.round(vehicleMode(vehicle.mode).purchaseCost * VEHICLE_RESALE_RATIO);
   state.money += refund;
   log(`${line.name} : véhicule vendu (+${refund.toLocaleString("fr-FR")} €, ${line.vehicles.length} restant${line.vehicles.length > 1 ? "s" : ""}).`);
   return refund;
@@ -160,7 +163,8 @@ export function lineOperatingCost(state, line, hours) {
   for (const vehicleId of line.vehicles) {
     const vehicle = state.vehicles.find(v => v.id === vehicleId);
     if (!vehicle) continue;
-    const congestionPenalty = 1 + (1 - (vehicle.congestion ?? 1));
+    const congestionPenalty = 1 + (1 - (vehic
+le.congestion ?? 1));
     const opexPerHour = vehicleMode(vehicle.mode).opexPerHour;
     cost += opexPerHour * hours * congestionPenalty;
   }
@@ -182,7 +186,7 @@ function isScheduledStop(line, nodeId) {
 function legFare(state, leg, arrivalStop) {
   const boardedAt = stopById(state, leg.from);
   const d = boardedAt ? distance(boardedAt, arrivalStop) : 0;
-  return (FARE_BASE_LEG + (d / 100) * FARE_PER_100PX) * eventFareMultiplier(state) * seasonFareMultiplier(state);
+  return (FARE_BASE_LEG + (d / 100) * FARE_PER_100PX) * eventFareMultiplier(state) * seasonFareMultiplier(state) * (state.fareLevel ?? 1);
 }
 
 function boardPassengers(state, line, vehicle, stop) {
@@ -195,6 +199,7 @@ function boardPassengers(state, line, vehicle, stop) {
       const legs = routeLegs(p.itinerary);
       return legs.length && legs[p.legIndex || 0]?.lineId === line.id;
     })
+    .filter(p => !state.demographicsEnabled || fareAcceptance(p.demographic, state.fareLevel ?? 1) >= 0.3)
     .sort((a, b) => {
       const al = routeLegs(a.itinerary), bl = routeLegs(b.itinerary);
       return (al.length - (a.legIndex || 0)) - (bl.length - (b.legIndex || 0)) ||
@@ -219,6 +224,7 @@ function alightPassengers(state, line, vehicle, stop) {
   let alight = 0;
   let revenue = 0;
   const remaining = [];
+
   for (const passengerId of vehicle.onboard) {
     const passenger = state.passengers.find(p => p.id === passengerId);
     if (!passenger) continue;
@@ -230,6 +236,9 @@ function alightPassengers(state, line, vehicle, stop) {
     const fare = passenger.transfersDone > 0 ? fullFare * TRANSFER_FARE_DISCOUNT : fullFare;
     line.riders++;
     line.income += fare;
+    line.incomeByDemo = line.incomeByDemo || {};
+    const demoId = passenger.demographic || "commuter";
+    line.incomeByDemo[demoId] = (line.incomeByDemo[demoId] || 0) + fare;
     state.money += fare;
     revenue += fare;
     alight++;
@@ -277,7 +286,8 @@ export function computeEdgeLoad(state) {
   return load;
 }
 
-export function congestionHeatmap(state) {
+export function c
+ongestionHeatmap(state) {
   const load = computeEdgeLoad(state);
   const heat = [];
   for (const [key, count] of load) {
@@ -304,7 +314,9 @@ function maybeBreakDown(state, vehicle, rng, log) {
     ? 0
     : (vehicle.brokenMinutesLeft ?? ((vehicle.brokenTicksLeft || 0) * TICK_MINUTES));
   const simulatedTicks = Math.max(1, state.speed);
-  const chanceThisStep = 1 - Math.pow(1 - BREAKDOWN_CHANCE_PER_TICK, simulatedTicks);
+  const wage = state.wageLevel ?? 1;
+  const wageFactor = wage < 1 ? 1 + (1 - wage) * 2 : (wage >= 1.1 ? 0.7 : 1);
+  const chanceThisStep = 1 - Math.pow(1 - BREAKDOWN_CHANCE_PER_TICK * wageFactor, simulatedTicks);
   if (remaining > 0 || rng() >= chanceThisStep) return;
   vehicle.brokenMinutesLeft = BREAKDOWN_DURATION_MINUTES_MIN +
     Math.floor(rng() * (BREAKDOWN_DURATION_MINUTES_MAX - BREAKDOWN_DURATION_MINUTES_MIN));
@@ -322,7 +334,8 @@ export function updateVehicles(state, rng = () => 1, log = () => {}) {
 
     maybeBreakDown(state, vehicle, rng, log);
     const elapsedMinutes = TICK_MINUTES * state.speed;
-    const brokenMinutes = vehicle.brokenTicksLeft === 0
+    cons
+t brokenMinutes = vehicle.brokenTicksLeft === 0
       ? 0
       : (vehicle.brokenMinutesLeft ?? ((vehicle.brokenTicksLeft || 0) * TICK_MINUTES));
     if (brokenMinutes > 0) {
@@ -373,7 +386,8 @@ export function updateVehicles(state, rng = () => 1, log = () => {}) {
       const stop = stopById(state, b.id);
       if (!stop) continue;
       const result = alightPassengers(state, line, vehicle, stop);
-      if (result.revenue > 0) log(`+${result.revenue.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € passagers · ${line.name}.`);
+      if (result.revenue > 0) log(`+${re
+sult.revenue.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € passagers · ${line.name}.`);
       boardPassengers(state, line, vehicle, stop);
     }
   }

@@ -43,7 +43,8 @@ function renderCashFlowTrend(state) {
 function renderOpportunities(state) {
   const o = networkOpportunities(state);
   if (!o.unprofitableLine && !o.saturatedLine && !o.underservedStop) {
-    return '<div class="muted">Tout roule ! 🎉</div>';
+  
+  return '<div class="muted">Tout roule ! 🎉</div>';
   }
   const items = [];
   if (o.unprofitableLine) {
@@ -84,7 +85,8 @@ export function createRenderer(canvas, state) {
   if (typeof ResizeObserver !== "undefined") {
     new ResizeObserver(resizeCanvas).observe(canvas);
   }
-  if (typeof requestAnimationFrame !== "undefined") {
+  if (typeof re
+questAnimationFrame !== "undefined") {
     requestAnimationFrame(resizeCanvas);
   }
 
@@ -140,7 +142,8 @@ export function createRenderer(canvas, state) {
     const key = [a.id, b.id].sort().join("|");
     if (roadPathCache.has(key)) {
       const cached = roadPathCache.get(key);
-      return a.id < b.id ? cached : cached.slice().reverse();
+      return a.id < b.id ?
+ cached : cached.slice().reverse();
     }
     const step = 20;
     const cols = 51;
@@ -181,7 +184,8 @@ export function createRenderer(canvas, state) {
         if (nextCost >= (cost.get(nextId) ?? Infinity)) return;
         cost.set(nextId, nextCost);
         cameFrom.set(nextId, id(current.x, current.y));
-        open.push({ x: nx, y: ny, f: nextCost + heuristic(nx, ny) });
+        open.push({ x: nx, y: ny, f: n
+extCost + heuristic(nx, ny) });
       });
     }
     if (!found) return [a, b];
@@ -232,7 +236,8 @@ export function createRenderer(canvas, state) {
         const w = cell - inset * 2;
         const h = cell - inset * 2;
         const park = n > .86;
-        ctx.fillStyle = park ? "#a8c99a" : (n > .48 ? "#cbd8d0" : "#c4d2cd");
+        ctx.fillStyl
+e = park ? "#a8c99a" : (n > .48 ? "#cbd8d0" : "#c4d2cd");
         roundRect(x + inset, y + inset, w, h, 8);
         ctx.fill();
         ctx.strokeStyle = park ? "rgba(42, 92, 70, .32)" : "rgba(31, 35, 64, .12)";
@@ -284,6 +289,7 @@ export function createRenderer(canvas, state) {
     drawUrbanBase(left, top, viewW, viewH);
 
     if (state.city && state.city.stops) {
+
       state.city.stops.forEach(function (stop) {
         const radius = Math.max(6, Math.sqrt(stop.population / 90));
         const density = Math.min(0.9, stop.population / 3500);
@@ -328,7 +334,8 @@ export function createRenderer(canvas, state) {
         ctx.stroke();
         ctx.setLineDash([]);
         if (!closed) {
-          ctx.strokeStyle = road.type === "arterial" ? "rgba(255, 231, 150, .85)" : "rgba(238, 244, 234, .72)";
+          ctx.stro
+keStyle = road.type === "arterial" ? "rgba(255, 231, 150, .85)" : "rgba(238, 244, 234, .72)";
           ctx.lineWidth = road.type === "arterial" ? 2 : 1.5;
           ctx.setLineDash(road.type === "arterial" ? [12, 10] : [6, 10]);
           ctx.beginPath();
@@ -363,6 +370,25 @@ export function createRenderer(canvas, state) {
       });
     }
 
+    // V22.0 — network coverage overlay: walking-distance halos around
+    // stops served by an active line; uncovered stops get a soft red ring.
+    if (state.showCoverage && state.city && state.city.stops) {
+      const servedStops = new Set();
+      (state.lines || []).forEach(function (line) {
+        if (line.vehicles && line.vehicles.length) (line.stopIds || []).forEach(function (id) { servedStops.add(id); });
+      });
+      state.city.stops.forEach(function (stop) {
+        const served = servedStops.has(stop.id);
+        ctx.fillStyle = served ? "rgba(85, 184, 120, 0.16)" : "rgba(239, 71, 111, 0.10)";
+        ctx.strokeStyle = served ? "rgba(85, 184, 120, 0.45)" : "rgba(239, 71, 111, 0.40)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(stop.x, stop.y, 220, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+    }
+
     if (state.lines) {
       state.lines.forEach(function (line) {
         const ids = (line.route && line.route.nodeIds) || [];
@@ -383,7 +409,8 @@ export function createRenderer(canvas, state) {
 
         ctx.strokeStyle = line.color;
         ctx.lineWidth = 5;
-        if (line.mode === "metro") ctx.setLineDash([2, 8]);
+        if (l
+ine.mode === "metro") ctx.setLineDash([2, 8]);
         else ctx.setLineDash([]);
         ctx.beginPath();
         nodes.forEach(function (node, i) {
@@ -449,7 +476,8 @@ export function createRenderer(canvas, state) {
 
         if (broken) {
           ctx.font = "12px system-ui";
-          ctx.textAlign = "center";
+  
+        ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillStyle = "#fff";
           ctx.fillText("🔧", p.x, p.y + 1);
@@ -505,7 +533,8 @@ export function createRenderer(canvas, state) {
         const boxH = fontSize + 6;
 
         ctx.fillStyle = PAPER;
-        roundRect(s.x - textWidth / 2 - padX, labelY - fontSize + 2, textWidth + padX * 2, boxH, 6);
+        roundRect(s.x - textWidth / 2 - padX,
+ labelY - fontSize + 2, textWidth + padX * 2, boxH, 6);
         ctx.fill();
         ctx.strokeStyle = INK;
         ctx.lineWidth = 1.5;
@@ -561,7 +590,8 @@ export function createRenderer(canvas, state) {
     }
 
     const passengersEl = document.getElementById("passengers");
-    if (passengersEl) passengersEl.textContent = state.transported.toLocaleString("fr-FR");
+    if (passengersEl) passengersEl.textContent = state.transported.to
+LocaleString("fr-FR");
 
     const satisfactionValue = satisfaction(state);
     const satisfactionEl = document.getElementById("satisfaction");
@@ -606,6 +636,7 @@ export function createRenderer(canvas, state) {
           stat("Arrêts", served + "/" + state.city.stops.length) +
           stat("Attente", Math.round(wStats.avgWaitMinutes) + " min") +
           stat("Transportés", state.totalArrived) +
+
           stat("Actifs", pStats.WAITING + pStats.BOARDING + pStats.ON_VEHICLE + pStats.TRANSFERRING) +
           stat("Routes", state.network.edges.length) +
           stat("Jour", (state.elapsedDays || 0) + 1) +
@@ -631,7 +662,8 @@ export function createRenderer(canvas, state) {
           const occupancy = lineOccupancyRate(state, l);
           const occColor = occupancy == null ? "#999" : (occupancy >= 0.85 ? ORANGE : (occupancy <= 0.2 ? "#999" : GRASS));
           const lastVehicleId = l.vehicles[l.vehicles.length - 1];
-          const stopNames = l.stopIds.map(function (id) {
+          const stopNames = l.stopIds.map(function (i
+d) {
             const s = state.city.stops.find(function (x) { return x.id === id; });
             return s ? h(s.name) : "?";
           }).join(" → ");
@@ -652,7 +684,8 @@ export function createRenderer(canvas, state) {
               '<button type="button" class="small" data-buy-vehicle="' + h(l.id) + '">➕ Bus (' + vehicleMode(l.mode).purchaseCost.toLocaleString("fr-FR") + ' €)</button>' +
               '<button type="button" class="small" data-extend-line="' + h(l.id) + '">↔️ Prolonger</button>' +
               sellBtn +
-              '<button type="button" class="small danger" data-delete-line="' + h(l.id) + '">🗑️ Supprimer</button>' +
+              '<button type="button" class="small danger" data-delete-li
+ne="' + h(l.id) + '">🗑️ Supprimer</button>' +
             '</div>' +
           '</div>';
         }).join("");
@@ -696,7 +729,8 @@ export function createRenderer(canvas, state) {
 
     const journalEl = document.getElementById("journal");
     if (journalEl) {
-      const entries = state.journal || [];
+   
+   const entries = state.journal || [];
       journalEl.innerHTML = entries.map(function (e) {
         return '<div class="journal-entry journal-' + h(e.type) + '">' + h(e.text) + '</div>';
       }).join("");
@@ -725,7 +759,8 @@ export function createRenderer(canvas, state) {
       const coverage = state.city.stops.length
         ? state.lines.reduce(function (sum, line) { return sum + new Set(line.stopIds || []).size; }, 0) / state.city.stops.length
         : 0;
-      const contracts = contractSummary(state, {
+      const contracts = contractSummary(state,
+ {
         satisfaction: satisfaction(state),
         transferShare: intermodalStats(state).shareWithTransfer,
         coverage: coverage,
@@ -742,77 +777,6 @@ export function createRenderer(canvas, state) {
 
     const progressionEl = document.getElementById("progressionPanel");
     if (progressionEl) {
-      const transferShare = intermodalStats(state).shareWithTransfer;
-      const progression = progressionSummary(state, { satisfaction: satisfaction(state), transferShare: transferShare });
-      progressionEl.innerHTML = '<div class="progression-header"><b>🏅 ' + h(progression.rank) + '</b><span>⭐ ' + progression.reputation + ' · ' + progression.completed + '/' + progression.total + ' objectifs</span></div>';
-    }
+      const transferShare = in
 
-    const eventsEl = document.getElementById("eventPanel");
-    if (eventsEl) {
-      const events = eventSummary(state);
-      if (events.length) {
-        eventsEl.innerHTML = events.map(function (event) {
-          return '<div class="event-row"><b>' + h(event.icon) + ' ' + h(event.label) + '</b><span>' + event.remainingDays + ' j · demande ×' + event.demandMultiplier.toFixed(2) + '</span></div>';
-        }).join("");
-      } else {
-        eventsEl.innerHTML = '<div class="muted">Aucun événement en cours.</div>';
-      }
-    }
-
-    const intermodalEl = document.getElementById("intermodalStats");
-    if (intermodalEl) {
-      const stats = intermodalStats(state);
-      intermodalEl.innerHTML = '<div>🔁 Correspondances : ' + stats.avgTransfersPerTrip.toFixed(2) + '</div><div>🎫 Voyages avec correspondance : ' + (stats.shareWithTransfer * 100).toFixed(1) + '%</div>';
-    }
-
-    const heatmapLegend = document.getElementById("heatmapLegend");
-    if (heatmapLegend) {
-      const active = Array.isArray(options.heatmap) && options.heatmap.length > 0;
-      heatmapLegend.hidden = !active;
-      heatmapLegend.setAttribute("aria-hidden", String(!active));
-      if (active) {
-        const countEl = heatmapLegend.querySelector(".heatmap-count");
-        if (countEl) {
-          countEl.textContent = options.heatmap.length + " segment" + (options.heatmap.length > 1 ? "s" : "");
-        }
-      }
-    }
-
-    const chart = document.getElementById("financialChart");
-    if (chart && chart.getContext) {
-      const c = chart.getContext("2d");
-      c.clearRect(0, 0, chart.width, chart.height);
-      c.fillStyle = "#fff8ec";
-      c.fillRect(0, 0, chart.width, chart.height);
-      const days = (state.dailyStats || []).slice(-14);
-      const max = Math.max(1, Math.max.apply(null, days.map(function (d) { return Math.abs(d.net); }).concat([1])));
-      const mid = chart.height / 2;
-      c.strokeStyle = INK;
-      c.lineWidth = 2;
-      c.beginPath();
-      c.moveTo(0, mid);
-      c.lineTo(chart.width, mid);
-      c.stroke();
-      days.forEach(function (d, i) {
-        const x = (i + 0.5) * chart.width / Math.max(1, days.length);
-        const hh = Math.min(mid - 4, Math.abs(d.net) / max * (mid - 8));
-        const barW = chart.width / Math.max(1, days.length) - 2;
-        c.fillStyle = d.net >= 0 ? GRASS : CORAL;
-        c.fillRect(x - barW / 2, mid - (d.net >= 0 ? hh : -hh), barW, hh);
-        c.strokeStyle = INK;
-        c.lineWidth = 1.5;
-        c.strokeRect(x - barW / 2, mid - (d.net >= 0 ? hh : -hh), barW, hh);
-      });
-    }
-  }
-
-  function formatTime(minutes) {
-    const hh = Math.floor(minutes / 60) % 24;
-    const mm = Math.floor(minutes % 60);
-    return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
-  }
-
-  return { render: render, camera: camera, resizeCanvas: resizeCanvas };
-}
-
-// === FIN DU FICHIER renderer.js ===
+... [Content truncated]

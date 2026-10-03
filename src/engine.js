@@ -24,6 +24,9 @@ import { evaluateProgression } from "./progression.js";
 import { ensureContracts, evaluateContracts, refreshContracts } from "./contracts.js";
 import { createDailyReport, recordDailyReport } from "./reports.js";
 import { applySeasonalGrowth, seasonDemandMultiplier, seasonSummary } from "./seasons.js";
+import { pickDemographic, waitToleranceMinutes } from "./demographics.js";
+import { campaignDemandMultiplier, finishExpiredCampaigns } from "./advertising.js";
+import { coverageRatio } from "./coverage.js";
 
 export {
   TICK_MINUTES, STOP_RADIUS, distance, vehiclePosition, buyVehicleForLine,
@@ -43,7 +46,8 @@ export function evaluateLiveProgression(state, log = () => {}) {
   return evaluateProgression(state, progressionMetrics(state), log);
 }
 export function stopById(state, id) {
-  return state.city.stops.find(s => s.id === id);
+  return state.city.stops.find(s => s.id === id)
+;
 }
 
 
@@ -101,7 +105,8 @@ export function finishExtendLine(state, log, routeLine) {
   const network = mode.id === "metro" && state.undergroundNetwork ? state.undergroundNetwork : state.network;
   const route = routeLine(network, newStopIds);
   if (!route) {
-    log(mode.id === "metro"
+    l
+og(mode.id === "metro"
       ? "Extension impossible : aucun tunnel possible vers ces arrêts."
       : "Extension impossible : les nouveaux arrêts ne sont pas reliés par le réseau routier.");
     return false;
@@ -150,7 +155,8 @@ export function finishLine(state, log, routeLine, modeId = "bus") {
   if (!route) {
     log(mode.id === "metro"
       ? "Création impossible : aucun tunnel possible entre ces arrêts."
-      : "Création impossible : les arrêts sélectionnés ne sont pas reliés par le réseau routier.");
+      : "Création impossible : les arrêts sélectionnés ne sont pas reliés par le r
+éseau routier.");
     return false;
   }
 
@@ -199,7 +205,8 @@ export function finishLine(state, log, routeLine, modeId = "bus") {
 // around its removal instead of trying to board a line that no longer runs.
 export function deleteLine(state, lineId, log) {
   const line = state.lines.find(l => l.id === lineId);
-  if (!line) return false;
+  if (!line) return fa
+lse;
 
   let refund = 0;
   for (const vehicleId of [...line.vehicles]) {
@@ -243,13 +250,14 @@ export function generateDemand(state, rng) {
     const hour = ((state.time + slice * sliceMinutes) / 60) % 24;
     const isRush = (hour >= 7 && hour < 9) || (hour >= 17 && hour < 19.5);
     const rush = isRush ? 1.8 : 0.75;
-    const jobsWeight = isRush ? 1 : 0.3;
+    const jobsWeight = isRush ? 1 : 0.3
+;
     const commerceWeight = isRush ? 0.3 : 1;
     const intervalFactor = sliceMinutes / TICK_MINUTES;
 
     for (const origin of stops) {
       const base = rng() * TRIP_RATE * origin.population * rush * intervalFactor *
-        (state.scenario?.demandMultiplier ?? 1) * eventDemandMultiplier(state) * seasonDemandMultiplier(state);
+        (state.scenario?.demandMultiplier ?? 1) * Math.min(2, eventDemandMultiplier(state) * seasonDemandMultiplier(state) * campaignDemandMultiplier(state));
       if (base <= 0) continue;
 
       const candidates = stops.filter(s => s.id !== origin.id);
@@ -279,6 +287,7 @@ export function generateDemand(state, rng) {
             createdAt: (state.time + slice * sliceMinutes) % 1440
           });
           passenger.id = state.nextPassengerId++;
+          if (state.demographicsEnabled) passenger.demographic = pickDemographic(rng, hour);
           passenger.itinerary = findPassengerRoute(state, origin.id, destination.id);
           if (!passenger.itinerary) {
             passenger.state = PASSENGER_STATES.ABANDONED;
@@ -292,7 +301,8 @@ export function generateDemand(state, rng) {
   }
 }
 
-export function economy(state, log = () => {}) {
+export fun
+ction economy(state, log = () => {}) {
   // V4.0: cost is computed and attributed per line (so profitability is
   // comparable line by line), instead of one flat global deduction.
   const hours = (TICK_MINUTES / 60) * state.speed;
@@ -337,7 +347,8 @@ export function networkOpportunities(state) {
   for (const stop of state.city.stops) {
     const level = serviceLevel(state, stop);
     if (level >= 0.3) continue; // already decently served
-    const pressure = Object.values(stop.waitingByDestination || {}).reduce((a, v) => a + v, 0);
+    const pressure =
+ Object.values(stop.waitingByDestination || {}).reduce((a, v) => a + v, 0);
     if (pressure < 1) continue; // no meaningful unmet demand yet
     if (!underservedStop || pressure > underservedStop.pressure) underservedStop = { stop, level, pressure };
   }
@@ -357,7 +368,27 @@ export function satisfaction(state) {
     : 0;
   const intermodal = intermodalStats(state);
   const intermodalBonus = intermodal.shareWithTransfer > 0.15 ? 5 : 0;
-  return Math.max(0, Math.min(100, 100 - waitPenalty - abandonPenalty + intermodalBonus + eventSatisfactionDelta(state)));
+  return Math.max(0, Math.min(100, 100 - waitPenalty - abandonPenalty + intermodalBonus + eventSatisfactionDelta(state) + wageSatisfactionDelta(state)));
+}
+
+/**
+ * V22.0 — staff wages: daily personnel cost scaled by state.wageLevel,
+ * and its satisfaction counterpart. Charged only when the browser game
+ * opted in (staffCostsEnabled) so legacy engine tests keep exact money
+ * trajectories. Breakdown frequency reacts to wages in vehicles.js.
+ */
+const DAILY_STAFF_HOURS = 6;
+
+export function dailyStaffCost(state) {
+  let cost = 0;
+  for (const vehicle of state.vehicles || []) cost += vehicleMode(vehicle.mode).opexPerHour * DAILY_STAFF_HOURS;
+  return cost * (state.wageLevel ?? 1);
+}
+
+export function wageSatisfactionDelta(state) {
+  const wage = state.wageLevel ?? 1;
+  if (wage === 1) return 0;
+  return Math.round((wage - 1) * 25);
 }
 
 /** Derived narrative entries for the V14 city journal. */
@@ -370,7 +401,8 @@ export function cityJournal(state) {
   const { unprofitableLine, saturatedLine, underservedStop } = networkOpportunities(state);
   if (unprofitableLine) entries.push({ type: "warning", text: `${unprofitableLine.line.name} perd de l'argent (${Math.round(unprofitableLine.net).toLocaleString("fr-FR")} €).` });
   if (saturatedLine) entries.push({ type: "warning", text: `${saturatedLine.line.name} est saturée (${(saturatedLine.occupancy * 100).toFixed(0)}% de remplissage).` });
-  if (underservedStop) entries.push({ type: "info", text: `Le quartier ${underservedStop.stop.name} manque de transport (niveau de service ${(underservedStop.level * 100).toFixed(0)}%).` });
+  if (underservedStop) entries.push({ type: "info", text: `
+Le quartier ${underservedStop.stop.name} manque de transport (niveau de service ${(underservedStop.level * 100).toFixed(0)}%).` });
   entries.push(...eventJournal(state));
   if (!entries.length) entries.push({ type: "positive", text: "Le réseau fonctionne correctement." });
   return entries;
@@ -405,9 +437,10 @@ export function step(state, rng, log) {
       passenger.waitedMinutes += TICK_MINUTES * state.speed;
       if (passenger.waitedMinutes >= 120 && !findPassengerRoute(state, passenger.currentStopId, passenger.destinationId)) {
         passenger.state = PASSENGER_STATES.ABANDONED;
-        passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
+        passenger.completedAt = (stat
+e.elapsedDays || 0) * 1440 + state.time;
         state.totalAbandoned = (state.totalAbandoned || 0) + 1;
-      } else if (passenger.waitedMinutes >= 240) {
+      } else if (passenger.waitedMinutes >= (state.demographicsEnabled ? waitToleranceMinutes(passenger.demographic) : 240)) {
         passenger.state = PASSENGER_STATES.ABANDONED;
         passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
         state.totalAbandoned = (state.totalAbandoned || 0) + 1;
@@ -436,6 +469,14 @@ export function step(state, rng, log) {
     maybeEndRoadworks(state, log);
     maybeStartRoadworks(state, rng, log);
     finishExpiredEvents(state, log);
+    finishExpiredCampaigns(state, log);
+    if (state.staffCostsEnabled) {
+      const staff = dailyStaffCost(state);
+      if (staff > 0) {
+        state.money -= staff;
+        state.dailyStaffCost = (state.dailyStaffCost || 0) + staff;
+      }
+    }
     const wait = waitStats(state);
     const serviceRatio = state.totalDemand > 0 ? state.totalArrived / state.totalDemand : 0;
     const activePassengers = state.passengers.length + state.totalArrived;
@@ -445,14 +486,15 @@ export function step(state, rng, log) {
       serviceRatio
     });
     // V9.0: evaluated last, after this day's growth/economy/disruptions have
-    // landed, using metrics computed here so scenarios.js needs no import
+    // landed, u
+sing metrics computed here so scenarios.js needs no import
     // from engine.js (avoids an engine <-> scenarios cycle).
     const goalsCompleted = state.progressionEnabled ? evaluateProgression(state, progressionMetrics(state), log) : [];
     let contractsCompleted = [];
     if (state.contractsEnabled) {
       ensureContracts(state);
       refreshContracts(state);
-      contractsCompleted = evaluateContracts(state, { satisfaction: satisfaction(state), transferShare: intermodalStats(state).shareWithTransfer, coverage: state.city.stops.length ? state.lines.filter(line => line.stopIds?.length).reduce((sum, line) => sum + new Set(line.stopIds).size, 0) / state.city.stops.length : 0 }, log);
+      contractsCompleted = evaluateContracts(state, { satisfaction: satisfaction(state), transferShare: intermodalStats(state).shareWithTransfer, coverage: coverageRatio(state) }, log);
     }
     evaluateScenario(state, log, { net: networkFinancials(state).net, currentSatisfaction: satisfaction(state) });
 
@@ -477,7 +519,8 @@ export function step(state, rng, log) {
       avgWaitMinutes: waitReport.avgWaitMinutes,
       events: state.activeEvents || [],
       contractsCompleted: contractsCompleted.length,
-      goalsCompleted: goalsCompleted.length,
+      goalsCompleted: goalsComplete
+d.length,
       transferShare: intermodalReport.shareWithTransfer,
       season: seasonSummary(state)
     }));
