@@ -57,8 +57,7 @@ La suite couvre les versions historiques V2.3 à V13 ainsi que le routage interm
 - `src/network.js` : graphes routier et souterrain ;
 - `src/routing.js` : itinéraires passagers ;
 - `src/vehicles.js` : véhicules, tarifs, congestion ;
-- `src/engine.js` : simulation et économ
-ie ;
+- `src/engine.js` : simulation et économie ;
 - `src/renderer.js` : rendu Canvas et tableaux de bord ;
 - `src/persistence.js` : sauvegarde locale et fichiers JSON ;
 - `src/demographics.js` : groupes de passagers et sensibilité tarifaire (V22) ;
@@ -92,8 +91,7 @@ La V20.1 corrige le nettoyage des passagers abandonnés, fiabilise le compteur
 cumulatif d’abandons et éloigne le redéclenchement des événements expirés. Les
 interpolations HTML issues de l’état sauvegardé sont échappées avant rendu.
 L’archive historique V13 n’est plus distribuée dans le dépôt. La CI GitHub
-e
-xécute automatiquement les contrôles sur `main` et les pull requests.
+exécute automatiquement les contrôles sur `main` et les pull requests.
 
 La V20.2 ajoute un tableau de bord à onglets repliables, un panneau de marge
 du jour, des logs de recettes et d’entretien, ainsi qu’un tarif de base relevé

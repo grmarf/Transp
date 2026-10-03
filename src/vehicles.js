@@ -52,8 +52,7 @@ export function createVehicle(state, lineId, options = {}) {
   };
 }
 
-export functi
-on addVehicleToLine(state, line) {
+export function addVehicleToLine(state, line) {
   const ids = line.route?.nodeIds;
   if (!ids?.length) return null;
 
@@ -112,8 +111,7 @@ export function sellVehicleFromLine(state, lineId, vehicleId, log) {
   line.vehicles = line.vehicles.filter(id => id !== vehicleId);
   state.vehicles = state.vehicles.filter(v => v.id !== vehicleId);
 
-  const refund = M
-ath.round(vehicleMode(vehicle.mode).purchaseCost * VEHICLE_RESALE_RATIO);
+  const refund = Math.round(vehicleMode(vehicle.mode).purchaseCost * VEHICLE_RESALE_RATIO);
   state.money += refund;
   log(`${line.name} : véhicule vendu (+${refund.toLocaleString("fr-FR")} €, ${line.vehicles.length} restant${line.vehicles.length > 1 ? "s" : ""}).`);
   return refund;
@@ -163,8 +161,7 @@ export function lineOperatingCost(state, line, hours) {
   for (const vehicleId of line.vehicles) {
     const vehicle = state.vehicles.find(v => v.id === vehicleId);
     if (!vehicle) continue;
-    const congestionPenalty = 1 + (1 - (vehic
-le.congestion ?? 1));
+    const congestionPenalty = 1 + (1 - (vehicle.congestion ?? 1));
     const opexPerHour = vehicleMode(vehicle.mode).opexPerHour;
     cost += opexPerHour * hours * congestionPenalty;
   }
@@ -286,8 +283,7 @@ export function computeEdgeLoad(state) {
   return load;
 }
 
-export function c
-ongestionHeatmap(state) {
+export function congestionHeatmap(state) {
   const load = computeEdgeLoad(state);
   const heat = [];
   for (const [key, count] of load) {
@@ -334,8 +330,7 @@ export function updateVehicles(state, rng = () => 1, log = () => {}) {
 
     maybeBreakDown(state, vehicle, rng, log);
     const elapsedMinutes = TICK_MINUTES * state.speed;
-    cons
-t brokenMinutes = vehicle.brokenTicksLeft === 0
+    const brokenMinutes = vehicle.brokenTicksLeft === 0
       ? 0
       : (vehicle.brokenMinutesLeft ?? ((vehicle.brokenTicksLeft || 0) * TICK_MINUTES));
     if (brokenMinutes > 0) {
@@ -386,8 +381,7 @@ t brokenMinutes = vehicle.brokenTicksLeft === 0
       const stop = stopById(state, b.id);
       if (!stop) continue;
       const result = alightPassengers(state, line, vehicle, stop);
-      if (result.revenue > 0) log(`+${re
-sult.revenue.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € passagers · ${line.name}.`);
+      if (result.revenue > 0) log(`+${result.revenue.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € passagers · ${line.name}.`);
       boardPassengers(state, line, vehicle, stop);
     }
   }

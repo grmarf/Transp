@@ -49,8 +49,7 @@ export function intermodalStats(state) {
   }
   return {
     arrivedCount: arrived,
-    avgTransfersPerTrip: arrived ?
- totalTransfers / arrived : 0,
+    avgTransfersPerTrip: arrived ? totalTransfers / arrived : 0,
     avgTravelMinutes: arrived ? totalTravel / arrived : 0,
     shareWithTransfer: arrived ? withTransfer / arrived : 0
   };

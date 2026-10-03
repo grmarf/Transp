@@ -58,8 +58,7 @@ export function createState(city, scenario = null) {
     contractCycle: 0,
     contractsEndDay: 0,
     // V18: rolling daily operating reports.
-    dailyRepo
-rts: [],
+    dailyReports: [],
     latestReport: null,
     // V19: browser games apply seasonal demand, fares and growth.
     seasonsEnabled: false,

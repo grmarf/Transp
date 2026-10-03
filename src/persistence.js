@@ -50,8 +50,7 @@ function uniqueNumericIds(items, label) {
   }
   return ids;
 }
-functio
-n coordinate(value, label) { finite(value, label); }
+function coordinate(value, label) { finite(value, label); }
 
 function validateCity(city) {
   object(city, "ville");
@@ -87,8 +86,7 @@ function validateCity(city) {
   for (const district of districts) {
     string(district.name, "district.name");
     object(district.center, "district.center");
-    coordinate(district.center.x, "district.center.x");
- coordinate(district.center.y, "district.center.y");
+    coordinate(district.center.x, "district.center.x"); coordinate(district.center.y, "district.center.y");
     finite(district.populationFactor, "district.populationFactor");
   }
   return stopIds;
@@ -120,8 +118,7 @@ function validateState(state) {
   if (state.totalAbandoned !== undefined) integer(state.totalAbandoned, "état.totalAbandoned", { min: 0 });
   if (state.logs !== undefined) {
     array(state.logs, "état.logs");
-    for (const entry of state.log
-s) string(entry, "état.logs[]");
+    for (const entry of state.logs) string(entry, "état.logs[]");
   }
   if (state.journal !== undefined) {
     array(state.journal, "état.journal");
@@ -154,8 +151,7 @@ s) string(entry, "état.logs[]");
   }
   for (const contract of state.activeContracts) {
     object(contract, "état.activeContracts[]"); string(contract.id, "contrat.id"); integer(contract.cycle, "contrat.cycle", { min: 0 });
-    integer(contract.startedDay, "con
-trat.startedDay", { min: 0 });
+    integer(contract.startedDay, "contrat.startedDay", { min: 0 });
     if (typeof contract.completed !== "boolean") invalid("contrat.completed invalide");
   }
   if (state.contractHistory !== undefined) {
@@ -207,8 +203,7 @@ trat.startedDay", { min: 0 });
   for (const vehicle of state.vehicles) {
     integer(vehicle.id, "véhicule.id", { min: 1 });
     if (vehicleIds.has(vehicle.id)) invalid("véhicules avec identifiants dupliqués");
-    veh
-icleIds.add(vehicle.id);
+    vehicleIds.add(vehicle.id);
     if (!lineIds.has(vehicle.lineId) || !VEHICLE_MODES.has(vehicle.mode)) invalid("véhicule rattaché à une ligne inconnue");
     integer(vehicle.routeIndex, "véhicule.routeIndex", { min: 0 });
     finite(vehicle.progress, "véhicule.progress");
@@ -238,8 +233,7 @@ icleIds.add(vehicle.id);
     if (passenger.waitedMinutes < 0 || passenger.transfersDone < 0 || passenger.travelMinutes < 0) invalid("métrique de passager négative");
     if (passenger.itinerary !== null) {
       array(passenger.itinerary, "passager.itinerary");
-     
- for (const leg of passenger.itinerary) {
+      for (const leg of passenger.itinerary) {
         object(leg, "passager.itinerary[]");
         integer(leg.lineId, "étape de trajet.lineId", { min: 1 });
         if (!lineIds.has(leg.lineId) || !stopIds.has(leg.from) || !stopIds.has(leg.to)) invalid("étape de trajet incohérente");
@@ -277,8 +271,7 @@ export function serializeState(state, rngState = null) {
       roadworksReopenDay: [...(state.undergroundNetwork.roadworksReopenDay || [])]
     } : null
   });
-  const payload = { format: SAVE_FO
-RMAT, version: SAVE_FORMAT_VERSION, savedAt: new Date().toISOString(), rngState, state: clean };
+  const payload = { format: SAVE_FORMAT, version: SAVE_FORMAT_VERSION, savedAt: new Date().toISOString(), rngState, state: clean };
   return validateSavePayload(payload);
 }
 

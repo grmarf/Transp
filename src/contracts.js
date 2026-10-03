@@ -31,8 +31,7 @@ export function contractSummary(state, metrics = {}) {
   ensureContracts(state);
   return state.activeContracts.map(active => {
     const type = CONTRACT_TYPES.find(contract => contract.id === active.id);
-    const value = type?.metric(state, metrics) ||
- 0;
+    const value = type?.metric(state, metrics) || 0;
     return { ...active, ...type, value, progress: Math.max(0, Math.min(1, value / type.target)), remainingDays: Math.max(0, (state.contractsEndDay || 0) - (state.elapsedDays || 0)) };
   });
 }
