@@ -10,9 +10,8 @@ import { PASSENGER_STATES } from "./passengers.js";
 import { TICK_MINUTES } from "./constants.js";
 
 export const DEFAULT_VEHICLE_CAPACITY = 35;
-// V21.0 — vitesse de référence alignée sur le bus. L'ancienne valeur 0.004
-// imposait ~4 jours simulés par trajet, rendant toute ligne déficitaire.
-// 0.5 px/tick ≈ 50 min entre deux arrêts distants de 300 px.
+// V21.0 — vitesses accélérées pour rendre les trajets jouables. Les
+// sauvegardes historiques ne sont pas concernées : aucune n’existe encore.
 export const DEFAULT_VEHICLE_SPEED = 0.5;
 
 // V7.0 — transport modes.

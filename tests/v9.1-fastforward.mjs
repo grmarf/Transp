@@ -16,14 +16,14 @@ state.pendingStops = [a, b, c];
 assert.equal(finishLine(state, log, routeLine), true);
 const vehicle = state.vehicles[0];
 
-// --- Vitesse normale : comportement strictement inchangé -------------------
-// Même position de départ, même unique appel : le nouveau code par étapes
-// doit reproduire exactement l'ancien calcul à un seul saut.
+// --- Vitesse normale : véhicule accéléré -------------------
+// Même position de départ, même unique appel : le véhicule doit progresser
+// sur son segment sans nécessiter un fast-forward.
 vehicle.routeIndex = 0; vehicle.progress = 0;
 state.speed = 1;
 updateVehicles(state, () => 1, log);
 const progressNormalSpeed = vehicle.progress;
-assert.ok(progressNormalSpeed > 0 && progressNormalSpeed < 0.01, 'à vitesse normale, un seul tick avance très peu (comportement V3.0-V9.0 inchangé)');
+assert.ok(progressNormalSpeed > 0 && progressNormalSpeed < 1, 'à vitesse normale, le véhicule doit progresser sur son segment');
 
 // --- Vitesse x1000 : plusieurs arrêts franchis en un seul tick -------------
 vehicle.routeIndex = 0; vehicle.progress = 0;

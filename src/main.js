@@ -170,7 +170,16 @@ function screenPoint(e) {
 }
 
 function clickMap(e) {
-  const p = screenPoint(e);
+  // L’API publique historique reçoit des coordonnées dans le repère monde
+  // du canvas (sans type d’événement). Les vrais pointer events passent par
+  // la caméra et restent convertis par screenPoint().
+  let p = screenPoint(e);
+  if (e && !e.type && Number.isFinite(e.clientX) && canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    p = { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
+  }
   if (!p || !state) return;
   let nearest = null;
   let best = Infinity;
@@ -700,15 +709,29 @@ window.addEventListener("resize", function () {
 const initialSeed = createSeedFromQuery();
 const seedInputEl = document.getElementById("seedInput");
 if (seedInputEl) seedInputEl.value = initialSeed;
-
+const cityNameInputEl = document.getElementById("cityNameInput");
+if (cityNameInputEl) {
+  cityNameInputEl.addEventListener("input", function () {
+    if (!state) return;
+    const value = cityNameInputEl.value.trim();
+    if (value) state.city.name = value;
+  });
+  cityNameInputEl.addEventListener("blur", function () {
+    if (!state) return;
+    if (!cityNameInputEl.value.trim()) cityNameInputEl.value = state.city.name;
+  });
+}
 populateScenarioSelect();
 boot(initialSeed, "sandbox");
 
-window.__vieTLignes = {
+const publicGameApi = {
   getState: function () { return state; },
   cameraState: cameraState,
   recenterCameraOnCity: recenterCameraOnCity,
   clickMap: clickMap,
 };
+window.__vieTLignes = publicGameApi;
+// Compatibilité avec les smoke tests et intégrations V20 utilisant l’ancien nom.
+window.__transportTycoon = publicGameApi;
 
 // === FIN DU FICHIER main.js ===

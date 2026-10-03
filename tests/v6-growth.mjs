@@ -55,10 +55,10 @@ assert.equal(served.hasSpawnedSatellite, true);
 const newStop = city.stops[city.stops.length - 1];
 assert.ok(state.network.adjacency.get(newStop.id)?.length > 0, "le nouveau nœud doit avoir une connexion réseau");
 
-// Ne doit pas en générer un deuxième depuis le même arrêt.
+// L’expansion est désormais continue et ne s’arrête pas après un seul satellite.
 const stopsAfterOne = city.stops.length;
 growCity(state, rng, log);
-assert.equal(city.stops.length, stopsAfterOne, "un arrêt ne génère qu'un seul quartier satellite");
+assert.equal(city.stops.length, stopsAfterOne + 1, "la ville doit continuer à se développer sans plafond");
 
 // --- Intégration : step() déclenche bien la croissance une fois par jour -
 const state2 = createState(createCity('V6-STEP'));

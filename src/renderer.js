@@ -103,6 +103,72 @@ export function createRenderer(canvas, state) {
     ctx.closePath();
   }
 
+  function urbanNoise(x, y) {
+    const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+    return n - Math.floor(n);
+  }
+
+  function drawUrbanBase(left, top, viewW, viewH) {
+    ctx.fillStyle = "#d7e2df";
+    ctx.fillRect(left, top, viewW, viewH);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, viewW, viewH);
+    ctx.clip();
+
+    ctx.strokeStyle = "rgba(76, 201, 240, .26)";
+    ctx.lineWidth = 42;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(left - 80, top + viewH * .72);
+    ctx.bezierCurveTo(left + viewW * .2, top + viewH * .55, left + viewW * .62, top + viewH * .9, left + viewW + 80, top + viewH * .62);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255, 255, 255, .42)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const cell = 74;
+    const startX = Math.floor(left / cell) * cell - cell;
+    const startY = Math.floor(top / cell) * cell - cell;
+    for (let x = startX; x < left + viewW + cell; x += cell) {
+      for (let y = startY; y < top + viewH + cell; y += cell) {
+        const n = urbanNoise(x, y);
+        const inset = 7 + n * 7;
+        const w = cell - inset * 2;
+        const h = cell - inset * 2;
+        const park = n > .86;
+        ctx.fillStyle = park ? "#a8c99a" : (n > .48 ? "#cbd8d0" : "#c4d2cd");
+        roundRect(x + inset, y + inset, w, h, 8);
+        ctx.fill();
+        ctx.strokeStyle = park ? "rgba(42, 92, 70, .32)" : "rgba(31, 35, 64, .12)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        if (park) {
+          ctx.fillStyle = "rgba(42, 92, 70, .42)";
+          for (let tree = 0; tree < 4; tree++) {
+            const tx = x + inset + 14 + urbanNoise(x + tree * 11, y + 3) * Math.max(10, w - 28);
+            const ty = y + inset + 14 + urbanNoise(x + 7, y + tree * 13) * Math.max(10, h - 28);
+            ctx.beginPath();
+            ctx.arc(tx, ty, 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          const buildingCount = 2 + Math.floor(n * 4);
+          for (let building = 0; building < buildingCount; building++) {
+            const bw = 9 + urbanNoise(x + building * 17, y) * 13;
+            const bh = 8 + urbanNoise(x, y + building * 19) * 15;
+            const bx = x + inset + 7 + urbanNoise(x + building, y + 4) * Math.max(8, w - bw - 14);
+            const by = y + inset + 7 + urbanNoise(x + 4, y + building) * Math.max(8, h - bh - 14);
+            ctx.fillStyle = urbanNoise(x + building * 5, y + building * 3) > .5 ? "#f3e5c7" : "#b6c4c2";
+            roundRect(bx, by, bw, bh, 2);
+            ctx.fill();
+          }
+        }
+      }
+    }
+    ctx.restore();
+  }
+
   function drawCity(heatmap) {
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -120,22 +186,7 @@ export function createRenderer(canvas, state) {
     const left = camera.x - viewW / 2;
     const top = camera.y - viewH / 2;
 
-    ctx.fillStyle = CREAM;
-    ctx.fillRect(left, top, viewW, viewH);
-
-    if (camera.zoom > 0.7) {
-      const dotStep = 40;
-      ctx.fillStyle = "rgba(31, 35, 64, 0.08)";
-      const startX = Math.floor(left / dotStep) * dotStep;
-      const startY = Math.floor(top / dotStep) * dotStep;
-      for (let x = startX; x <= left + viewW; x += dotStep) {
-        for (let y = startY; y <= top + viewH; y += dotStep) {
-          ctx.beginPath();
-          ctx.arc(x, y, 1.2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-    }
+    drawUrbanBase(left, top, viewW, viewH);
 
     if (state.city && state.city.stops) {
       state.city.stops.forEach(function (stop) {
@@ -160,17 +211,17 @@ export function createRenderer(canvas, state) {
             })
           : null;
         const closed = edge && state.network.closedEdgeIds && state.network.closedEdgeIds.has(edge.id);
-        const width = road.type === "arterial" ? 10 : 6;
+        const width = road.type === "arterial" ? 14 : 9;
 
-        ctx.strokeStyle = INK;
-        ctx.lineWidth = width + 3;
+        ctx.strokeStyle = "rgba(31, 35, 64, .38)";
+        ctx.lineWidth = width + 5;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
 
-        ctx.strokeStyle = closed ? ROAD_CLOSED : ROAD_LIGHT;
+        ctx.strokeStyle = closed ? ROAD_CLOSED : "#66747b";
         ctx.lineWidth = width;
         if (closed) ctx.setLineDash([8, 8]);
         ctx.beginPath();
@@ -178,6 +229,16 @@ export function createRenderer(canvas, state) {
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
         ctx.setLineDash([]);
+        if (!closed) {
+          ctx.strokeStyle = road.type === "arterial" ? "rgba(255, 231, 150, .85)" : "rgba(238, 244, 234, .72)";
+          ctx.lineWidth = road.type === "arterial" ? 2 : 1.5;
+          ctx.setLineDash(road.type === "arterial" ? [12, 10] : [6, 10]);
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
       });
     }
 
@@ -375,7 +436,7 @@ export function createRenderer(canvas, state) {
     ctx.restore();
   }
 
-  function render(options) {
+  function render(options = {}) {
     options = options || {};
     drawCity(options.heatmap || null);
 
@@ -406,8 +467,10 @@ export function createRenderer(canvas, state) {
     const clockEl = document.getElementById("clock");
     if (clockEl) clockEl.textContent = formatTime(state.time);
 
-    const cityNameEl = document.getElementById("cityName");
-    if (cityNameEl) cityNameEl.textContent = state.city.name;
+    const cityNameEl = document.getElementById("cityNameInput");
+    if (cityNameEl && document.activeElement !== cityNameEl && cityNameEl.value !== state.city.name) {
+      cityNameEl.value = state.city.name;
+    }
 
     const seedEl = document.getElementById("seedInput");
     if (seedEl) seedEl.value = state.city.seed;

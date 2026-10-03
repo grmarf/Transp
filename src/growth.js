@@ -13,9 +13,6 @@ export const GROWTH_RATE_SERVED = 0.006;   // +0.6%/day for a well-served stop
 export const GROWTH_RATE_UNSERVED = 0.0005; // background growth even with no transit access
 export const SATELLITE_POP_THRESHOLD = 4000;
 export const SATELLITE_SERVICE_LEVEL = 0.4;
-// Hard cap: unbounded city growth would eventually degrade routing/render
-// performance and the UI's line-stop pickers for no gameplay benefit.
-export const MAX_STOPS = 20;
 
 /** 0 (no service) to 1 (very frequent service) for one stop.
  * Calibrated against this engine's actual headway scale, not an idealized
@@ -51,11 +48,8 @@ function growStop(state, stop) {
 }
 
 function maybeSpawnSatellite(state, rng, log, levels) {
-  if (state.city.stops.length >= MAX_STOPS) return;
-
   const candidate = state.city.stops.find(s =>
     s.population >= SATELLITE_POP_THRESHOLD &&
-    !s.hasSpawnedSatellite &&
     (levels.get(s.id) || 0) >= SATELLITE_SERVICE_LEVEL
   );
   if (!candidate) return;
@@ -67,6 +61,8 @@ function maybeSpawnSatellite(state, rng, log, levels) {
   // incremental patch — regenerating it here keeps metro tunnels reachable
   // to newly spawned districts too.
   if (state.undergroundNetwork) state.undergroundNetwork = createUndergroundNetwork(state.city);
+  // Le développement est volontairement sans plafond : un quartier peut
+  // continuer à essaimer si sa population et sa desserte le permettent.
   candidate.hasSpawnedSatellite = true;
   log(`Nouveau quartier : ${newStop.name}, raccordé à ${candidate.name} (croissance portée par le réseau).`);
 }

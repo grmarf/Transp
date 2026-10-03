@@ -23,8 +23,8 @@ assert.deepEqual(
 
 // Le centre-ville / gare (fort en emplois+commerces) doit rester plus
 // attractif que les quartiers résidentiels purs, conformément aux archétypes.
-const centre = city.stops.find(s => s.name === 'Centre');
-const nord = city.stops.find(s => s.name === 'Nord');
+const centre = city.stops[0];
+const nord = city.stops[1];
 assert.ok(centre.jobs > nord.jobs, 'le Centre doit offrir plus d\'emplois qu\'un quartier résidentiel');
 assert.ok(nord.population > centre.population, 'un quartier résidentiel doit loger plus d\'habitants que le Centre');
 

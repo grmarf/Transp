@@ -4,8 +4,12 @@ const DISTRICT_NAMES = [
 ];
 
 const STOP_NAMES = [
-  "Centre", "Nord", "Sud", "Ouest", "Est", "Nord-Ouest",
-  "Nord-Est", "Sud-Ouest", "Sud-Est", "Parc", "Université", "Gare"
+  "Bellevue", "Les Tilleuls", "La Roseraie", "Montfleury", "Les Acacias",
+  "Saint-Roch", "La Prairie", "Beauséjour", "Les Platanes", "Val Fleuri",
+  "Les Ormes", "La Fontaine", "Les Cèdres", "Petit-Moulin", "Les Vignes",
+  "La Passerelle", "Saint-Clair", "Les Alouettes", "Le Clos", "La Verrière",
+  "Les Marronniers", "La Colline", "Les Lilas", "Le Belvédère", "La Clairière",
+  "Les Jardins", "Le Hameau", "La Source", "Les Érables", "Le Rivage"
 ];
 
 const DEMAND_BASE = [1.7,1.2,1.25,1.35,1.4,.85,.95,.9,1,.8,1.1,1.65];
@@ -52,27 +56,46 @@ function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
 }
 
+function randomStopName(rng, used, index) {
+  const available = STOP_NAMES.filter(name => !used.has(name));
+  const pool = available.length ? available : STOP_NAMES;
+  const name = pool[Math.floor(rng() * pool.length)] || `Arrêt ${index + 1}`;
+  used.add(name);
+  return name;
+}
+
 export function createCity(seedInput) {
   const seed = String(seedInput || "TRANSPORT-2026").trim() || "TRANSPORT-2026";
   const numericSeed = hashSeed(seed);
   const rng = mulberry32(numericSeed);
 
-  const center = { x: 500, y: 325 };
-  const positions = [
-    [500,325],[500,105],[500,545],[175,325],[825,325],
-    [270,150],[730,150],[270,500],[730,500],[380,220],[620,220],[620,425]
-  ];
+  const positions = [];
+  const minDistance = 105;
+  for (let i = 0; i < 12; i++) {
+    let point = null;
+    for (let attempt = 0; attempt < 80 && !point; attempt++) {
+      const candidate = {
+        x: Math.round(90 + rng() * 820),
+        y: Math.round(75 + rng() * 500)
+      };
+      if (positions.every(other => Math.hypot(candidate.x - other.x, candidate.y - other.y) >= minDistance)) {
+        point = candidate;
+      }
+    }
+    if (!point) {
+      point = { x: Math.round(90 + rng() * 820), y: Math.round(75 + rng() * 500) };
+    }
+    positions.push(point);
+  }
 
-  const stops = positions.map(([x,y], i) => {
-    const scale = i === 0 ? 0 : (i < 5 ? 8 : 14);
-    const px = clamp(x + jitter(rng, scale), 70, 930);
-    const py = clamp(y + jitter(rng, scale), 60, 590);
+  const usedStopNames = new Set();
+  const stops = positions.map(({ x, y }, i) => {
     const demand = clamp(DEMAND_BASE[i] * (0.88 + rng() * 0.24), 0.45, 2.4);
     return {
       id: `stop-${i + 1}`,
-      name: STOP_NAMES[i],
-      x: Math.round(px),
-      y: Math.round(py),
+      name: randomStopName(rng, usedStopNames, i),
+      x,
+      y,
       demand: Number(demand.toFixed(2)),
       waiting: 0,
       waitingByDestination: {},
@@ -104,21 +127,32 @@ export function createCity(seedInput) {
     s.hasSpawnedSatellite = false;
   });
 
-  // V2.1 deliberately keeps roads as visual city infrastructure.
-  // Network topology/routing belongs to later V2.x versions.
+  // Génération procédurale d’une voirie connectée : les deux premiers axes
+  // garantissent la liaison du cœur de ville, puis chaque arrêt supplémentaire
+  // est raccordé à un arrêt déjà présent. Des liaisons secondaires aléatoires
+  // donnent ensuite une topologie moins radiale.
   const roads = [];
-  const addRoad = (a,b,type="arterial") => roads.push({a,b,type});
-  addRoad(stops[0].id, stops[1].id); addRoad(stops[0].id, stops[2].id);
-  addRoad(stops[0].id, stops[3].id); addRoad(stops[0].id, stops[4].id);
-  addRoad(stops[0].id, stops[5].id,"secondary"); addRoad(stops[0].id, stops[6].id,"secondary");
-  addRoad(stops[0].id, stops[7].id,"secondary"); addRoad(stops[0].id, stops[8].id,"secondary");
-  addRoad(stops[9].id, stops[10].id,"secondary");
-  addRoad(stops[10].id, stops[11].id,"secondary");
-  // Close the east-side branch so the V2.2 transport graph is connected.
-  addRoad(stops[9].id, stops[5].id,"secondary");
-  addRoad(stops[11].id, stops[6].id,"secondary");
-  addRoad(stops[5].id, stops[1].id,"secondary"); addRoad(stops[6].id, stops[1].id,"secondary");
-  addRoad(stops[7].id, stops[2].id,"secondary"); addRoad(stops[8].id, stops[2].id,"secondary");
+  const roadKeys = new Set();
+  const addRoad = (a, b, type = "secondary") => {
+    if (a === b) return;
+    const key = [a, b].sort().join("|");
+    if (key === [stops[1].id, stops[2].id].sort().join("|")) return;
+    if (roadKeys.has(key)) return;
+    roadKeys.add(key);
+    roads.push({ a, b, type });
+  };
+  addRoad(stops[0].id, stops[1].id, "arterial");
+  addRoad(stops[0].id, stops[2].id, "arterial");
+  for (let i = 3; i < stops.length; i++) {
+    const parent = stops[Math.floor(rng() * i)];
+    addRoad(parent.id, stops[i].id, rng() < 0.25 ? "arterial" : "secondary");
+  }
+  const extraRoads = 6;
+  for (let i = 0; i < extraRoads; i++) {
+    const a = stops[Math.floor(rng() * stops.length)];
+    const b = stops[Math.floor(rng() * stops.length)];
+    addRoad(a.id, b.id, "secondary");
+  }
 
   return {
     id: `city-${numericSeed.toString(16)}`,
@@ -147,7 +181,7 @@ export function addSatelliteStop(city, parent, rng) {
   const index = city.stops.length;
   const stop = {
     id: `stop-${index + 1}`,
-    name: `Quartier ${index + 1}`,
+    name: randomStopName(rng, new Set(city.stops.map(s => s.name)), index),
     x, y,
     demand: parent.demand, // legacy field, kept for structural consistency; unused by the engine
     waiting: 0,

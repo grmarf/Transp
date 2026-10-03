@@ -1,6 +1,6 @@
 {
-  "name": "Transport Tycoon",
-  "short_name": "Transport Tycoon",
+  "name": "Vie t'Lignes",
+  "short_name": "Vie t'Lignes",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#11161c",

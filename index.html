@@ -54,7 +54,8 @@
       <label for="scenarioSelect">🎲 Scénario</label>
       <select id="scenarioSelect" aria-label="Scénario de jeu"></select>
       <button id="newCityBtn" type="button" class="btn btn-warn" aria-label="Générer une nouvelle ville">🏙️ Nouvelle ville</button>
-      <span class="city-name">🏷️ <b id="cityName">—</b></span>
+      <label for="cityNameInput">🏷️ Ville</label>
+      <input id="cityNameInput" class="city-name-input" type="text" maxlength="60" autocomplete="off" spellcheck="false" aria-label="Nom de la ville">
     </div>
 
     <div class="instructions" id="instructions" aria-live="polite"></div>
@@ -177,6 +178,6 @@
   document.body.appendChild(b);
 })();
 </script>
-<script type="module" src="src/main.js"></script><script type="module" src="src/main.js"></script>
+<script type="module" src="src/main.js"></script>
 </body>
 </html>
