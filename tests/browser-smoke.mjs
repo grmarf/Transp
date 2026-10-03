@@ -84,6 +84,11 @@ try {
       }
       document.querySelector('#finishLineBtn').click();
       const created = window.__transportTycoon.getState().lines.length;
+      const cityNameInput = document.querySelector('#cityNameInput');
+      cityNameInput.focus();
+      cityNameInput.value = 'Lyon-sur-Test';
+      cityNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+      const renamed = window.__transportTycoon.getState().city.name;
       document.querySelector('#saveBtn').click();
       document.querySelector('#loadBtn').click();
       const loaded = window.__transportTycoon.getState().lines.length;
@@ -91,7 +96,7 @@ try {
       window.__transportTycoon.getState().logs.unshift(payload);
       document.querySelector('#toggleHeatmapBtn').click();
       return {
-        created, loaded,
+        created, loaded, renamed,
         escaped: document.querySelector('#log').innerHTML.includes('&lt;img'),
         executableImage: Boolean(document.querySelector('#log img')),
         money: document.querySelector('#money').textContent
@@ -102,6 +107,7 @@ try {
   assert.equal(consoleErrors.length, 0, `erreurs navigateur : ${consoleErrors.join('; ')}`);
   assert.equal(value.created, 1, 'la création d’une ligne doit fonctionner');
   assert.equal(value.loaded, 1, 'le chargement valide doit conserver la ligne');
+  assert.equal(value.renamed, 'Lyon-sur-Test', 'le nom de ville doit être modifiable sans écrasement');
   assert.equal(value.escaped, true, 'le journal doit échapper le HTML');
   assert.equal(value.executableImage, false, 'aucune balise img ne doit être créée');
   assert.match(value.money, /€/);
