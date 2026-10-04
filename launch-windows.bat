@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-title Transport Tycoon - Launcher
+title Vie t'Lignes - Launcher
 
 if "%~1"=="" (
   echo.

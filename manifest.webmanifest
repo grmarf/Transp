@@ -5,5 +5,8 @@
   "display": "standalone",
   "background_color": "#11161c",
   "theme_color": "#182029",
-  "lang": "fr"
+  "lang": "fr",
+  "icons": [
+    { "src": "./favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
 }

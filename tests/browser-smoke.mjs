@@ -72,7 +72,7 @@ try {
     awaitPromise: true,
     returnByValue: true,
     expression: `(() => {
-      const initial = window.__transportTycoon?.getState();
+      const initial = window.__vieTLignes?.getState();
       if (!initial) throw new Error('état global absent');
       document.querySelector('#newLineBtn').click();
       const canvas = document.querySelector('#map');
@@ -80,36 +80,36 @@ try {
       const scaleX = rect.width / canvas.width;
       const scaleY = rect.height / canvas.height;
       for (const stop of initial.city.stops.slice(0, 2)) {
-        window.__transportTycoon.clickMap({ clientX: rect.left + stop.x * scaleX, clientY: rect.top + stop.y * scaleY });
+        window.__vieTLignes.clickMap({ clientX: rect.left + stop.x * scaleX, clientY: rect.top + stop.y * scaleY });
       }
       document.querySelector('#finishLineBtn').click();
-      const created = window.__transportTycoon.getState().lines.length;
-      const worldClick = (x, y) => window.__transportTycoon.clickMap({
+      const created = window.__vieTLignes.getState().lines.length;
+      const worldClick = (x, y) => window.__vieTLignes.clickMap({
         clientX: rect.left + x * rect.width / canvas.width,
         clientY: rect.top + y * rect.height / canvas.height
       });
       document.querySelector('#buildRoadBtn').click();
       worldClick(120, 100);
       worldClick(250, 180);
-      const builtRoads = window.__transportTycoon.getState().city.roads.filter(road => road.built).length;
+      const builtRoads = window.__vieTLignes.getState().city.roads.filter(road => road.built).length;
       const cityNameInput = document.querySelector('#cityNameInput');
       cityNameInput.focus();
       cityNameInput.value = 'Lyon-sur-Test';
       cityNameInput.dispatchEvent(new Event('input', { bubbles: true }));
-      const renamed = window.__transportTycoon.getState().city.name;
+      const renamed = window.__vieTLignes.getState().city.name;
       const seedInput = document.querySelector('#seedInput');
       seedInput.focus();
       seedInput.value = 'MA-SEED-TEST';
       const typedSeed = seedInput.value;
       document.querySelector('#saveBtn').click();
       document.querySelector('#loadBtn').click();
-      const loaded = window.__transportTycoon.getState().lines.length;
-      const loadedRoad = window.__transportTycoon.getState().city.roads.find(road => road.built);
-      const loadedBuiltRoads = window.__transportTycoon.getState().city.roads.filter(road => road.built).length;
+      const loaded = window.__vieTLignes.getState().lines.length;
+      const loadedRoad = window.__vieTLignes.getState().city.roads.find(road => road.built);
+      const loadedBuiltRoads = window.__vieTLignes.getState().city.roads.filter(road => road.built).length;
       document.querySelector('#removeRoadBtn').click();
       const removeMode = document.querySelector('#removeRoadBtn').getAttribute('aria-pressed');
       const payload = '<img src=x onerror=alert(1)>';
-      window.__transportTycoon.getState().logs.unshift(payload);
+      window.__vieTLignes.getState().logs.unshift(payload);
       document.querySelector('#toggleHeatmapBtn').click();
       return {
         created, loaded, builtRoads, loadedBuiltRoads, removeMode, renamed, typedSeed,

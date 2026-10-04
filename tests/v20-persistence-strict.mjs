@@ -12,7 +12,7 @@ assert.equal(state.fareLevel, 1);
 assert.equal(state.activeCampaigns.length, 0);
 assert.equal(validateSavePayload(payload), payload);
 
-const storage = new Map([["transport-tycoon-v14-save", JSON.stringify(payload)]]);
+const storage = new Map([["vie-t-lignes-v14-save", JSON.stringify(payload)]]);
 const fakeStorage = { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) };
 assert.equal(readSavedGame(fakeStorage), null);
 
@@ -21,6 +21,6 @@ assert.throws(() => validateSavePayload(invalid), /version de format non support
 const missingField = { ...payload, state: { ...payload.state, dailyReports: undefined } };
 assert.throws(() => validateSavePayload(missingField), /dailyReports/);
 assert.throws(() => readSavedGame({ getItem: () => '{broken-json' }), /illisible/);
-assert.equal(SAVE_KEY, 'transport-tycoon-v20-save');
+assert.equal(SAVE_KEY, 'vie-t-lignes-v20-save');
 
 console.log(JSON.stringify({ ok: true, saveVersion: SAVE_VERSION, legacyRejected: true }));

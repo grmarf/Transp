@@ -1,4 +1,4 @@
-# Transport Tycoon — Transp V22
+# Vie t'Lignes — V22
 
 Jeu de gestion et de simulation de réseau de transport en JavaScript natif, Canvas et modules ES.
 

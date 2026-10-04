@@ -1,10 +1,9 @@
 /** V20.0 — strict current-save persistence, no historical migrations. */
 
 export const SAVE_FORMAT_VERSION = 2;
-// Backward-compatible export for callers using the pre-V20 name.
 export const SAVE_VERSION = SAVE_FORMAT_VERSION;
-export const SAVE_KEY = "transport-tycoon-v20-save";
-const SAVE_FORMAT = "transport-tycoon-save";
+export const SAVE_KEY = "vie-t-lignes-v20-save";
+const SAVE_FORMAT = "vie-t-lignes-save";
 const STATE_VERSION = "22.0";
 const UINT32_MAX = 0xFFFFFFFF;
 const PASSENGER_STATES = new Set(["WAITING", "BOARDING", "ON_VEHICLE", "TRANSFERRING", "ARRIVED", "ABANDONED"]);
@@ -304,7 +303,7 @@ export function exportGameToFile(state, rngState = null) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `transport-tycoon-v20-${state.city?.seed || "save"}.json`;
+  anchor.download = `vie-t-lignes-v20-${state.city?.seed || "save"}.json`;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return payload;

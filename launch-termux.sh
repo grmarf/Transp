@@ -1,10 +1,10 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# Launcher Termux pour Transport Tycoon.
+# Launcher Termux pour Vie t'Lignes.
 #
 # Usage :
 #   1) Deplacez/copiez (ou "glissez" via votre gestionnaire de fichiers)
 #      le DOSSIER du jeu (celui qui contient index.html) ici :
-#        ~/tycoon-www
+#        ~/vie-t-lignes-www
 #      puis lancez simplement :  bash launch-termux.sh
 #
 #   2) Ou passez directement le chemin du dossier en argument :

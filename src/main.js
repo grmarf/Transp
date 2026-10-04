@@ -950,7 +950,5 @@ const publicGameApi = {
   clickMap: clickMap,
 };
 window.__vieTLignes = publicGameApi;
-// Compatibilité avec les smoke tests et intégrations V20 utilisant l’ancien nom.
-window.__transportTycoon = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
