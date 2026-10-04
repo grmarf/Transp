@@ -129,6 +129,64 @@ function updateInstructions() {
   }
 }
 
+function findNearestStop(point, threshold = 40) {
+  let nearest = null;
+  let best = Infinity;
+  state.city.stops.forEach(function (stop) {
+    const distance = Math.hypot(stop.x - point.x, stop.y - point.y);
+    if (distance <= threshold && distance < best) {
+      nearest = stop;
+      best = distance;
+    }
+  });
+  return nearest;
+}
+
+function findLineAtPoint(point, threshold = 25) {
+  let closest = null;
+  let best = threshold;
+  const nodes = state.network && state.network.nodes;
+  (state.lines || []).forEach(function (line) {
+    const ids = (line.route && line.route.nodeIds) || [];
+    for (let i = 0; i < ids.length - 1; i++) {
+      const a = nodes && nodes.get(ids[i]);
+      const b = nodes && nodes.get(ids[i + 1]);
+      if (!a || !b) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const lengthSquared = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared));
+      const distance = Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
+      if (distance < best) {
+        best = distance;
+        closest = line;
+      }
+    }
+  });
+  return closest;
+}
+
+function toggleLineFocus(lineId) {
+  state.focusedLineId = state.focusedLineId === lineId ? null : lineId;
+  let exitButton = document.getElementById("exitFocusBtn");
+  if (state.focusedLineId && !exitButton) {
+    const toolbar = document.querySelector(".toolbar");
+    if (toolbar) {
+      exitButton = document.createElement("button");
+      exitButton.id = "exitFocusBtn";
+      exitButton.type = "button";
+      exitButton.className = "btn btn-warning";
+      exitButton.textContent = "🔦 Quitter le focus";
+      exitButton.setAttribute("aria-label", "Quitter le mode focus");
+      exitButton.addEventListener("click", function () { toggleLineFocus(null); });
+      toolbar.appendChild(exitButton);
+    }
+  } else if (!state.focusedLineId && exitButton) {
+    exitButton.remove();
+  }
+  refreshUI();
+}
+
 function bindTap(el, handler) {
   if (!el) return;
   let lastTouch = 0;
@@ -198,21 +256,40 @@ function clickMap(e) {
   if (!p || !state) return;
 
   if (state.roadEditMode === "build") {
+    const snappedStop = findNearestStop(p, 40);
+    const targetPoint = snappedStop ? { x: snappedStop.x, y: snappedStop.y } : { x: Math.round(p.x), y: Math.round(p.y) };
     if (!state.pendingRoadPoint) {
-      state.pendingRoadPoint = { x: Math.round(p.x), y: Math.round(p.y) };
+      state.pendingRoadPoint = targetPoint;
+      state.pendingRoadStopId = snappedStop ? snappedStop.id : null;
+      if (snappedStop) log(`Départ accroché à « ${snappedStop.name} ».`);
       log("Point de départ choisi. Clique un second point pour construire la route.");
     } else {
       const start = state.pendingRoadPoint;
-      const end = { x: Math.round(p.x), y: Math.round(p.y) };
+      const end = targetPoint;
       const length = Math.hypot(end.x - start.x, end.y - start.y);
       const cost = Math.max(25, Math.round(length * 0.45));
       if (length < 24) log("Route trop courte : éloigne le second point.");
       else if (state.money < cost) log(`Construction impossible : il faut ${cost.toLocaleString("fr-FR")} €.`);
       else {
         if (!Number.isInteger(state.nextRoadId)) state.nextRoadId = 1;
-        state.city.roads.push({ id: `built-road-${state.nextRoadId++}`, start, end, type: "secondary", built: true });
+        const road = { id: `built-road-${state.nextRoadId++}`, start, end, type: "secondary", built: true };
+        if (state.pendingRoadStopId) road.startStopId = state.pendingRoadStopId;
+        if (snappedStop) road.endStopId = snappedStop.id;
+        if (road.startStopId && road.endStopId) {
+          road.a = road.startStopId;
+          road.b = road.endStopId;
+        }
+        state.city.roads.push(road);
+        if (road.a && road.b) {
+          const closedEdgeIds = state.network && state.network.closedEdgeIds;
+          const roadworksReopenDay = state.network && state.network.roadworksReopenDay;
+          state.network = createNetwork(state.city);
+          if (closedEdgeIds) state.network.closedEdgeIds = new Set(closedEdgeIds);
+          if (roadworksReopenDay) state.network.roadworksReopenDay = new Map(roadworksReopenDay);
+        }
         state.money -= cost;
         state.pendingRoadPoint = null;
+        state.pendingRoadStopId = null;
         log(`Route construite (${cost.toLocaleString("fr-FR")} €).`);
       }
     }
@@ -260,6 +337,14 @@ function clickMap(e) {
       best = d;
     }
   });
+  if (!nearest && state.lines && state.lines.length) {
+    const clickedLine = findLineAtPoint(p, 28);
+    if (clickedLine) {
+      toggleLineFocus(clickedLine.id);
+      log(`${clickedLine.name}${state.focusedLineId ? " : focus activé" : " : focus désactivé"}.`);
+      return;
+    }
+  }
   if (!nearest) return;
   state.selectedStop = nearest.id;
   if (state.lineMode && state.pendingStops.indexOf(nearest.id) < 0) {

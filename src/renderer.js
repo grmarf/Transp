@@ -282,6 +282,15 @@ export function createRenderer(canvas, state) {
     const top = camera.y - viewH / 2;
 
     drawUrbanBase(left, top, viewW, viewH);
+    const connectedStopIds = new Set();
+    if (state.selectedStop && state.city && state.city.roads) {
+      state.city.roads.forEach(function (road) {
+        const roadA = road.a || road.startStopId;
+        const roadB = road.b || road.endStopId;
+        if (roadA === state.selectedStop && roadB) connectedStopIds.add(roadB);
+        if (roadB === state.selectedStop && roadA) connectedStopIds.add(roadA);
+      });
+    }
 
     if (state.city && state.city.stops) {
 
@@ -297,15 +306,17 @@ export function createRenderer(canvas, state) {
 
     if (state.city && state.city.roads) {
       state.city.roads.forEach(function (road) {
-        const aStop = state.city.stops.find(function (s) { return s.id === road.a; });
-        const bStop = state.city.stops.find(function (s) { return s.id === road.b; });
+        const aStop = state.city.stops.find(function (s) { return s.id === (road.a || road.startStopId); });
+        const bStop = state.city.stops.find(function (s) { return s.id === (road.b || road.endStopId); });
         const a = aStop || (road.start ? { id: road.id + "-a", x: road.start.x, y: road.start.y } : null);
         const b = bStop || (road.end ? { id: road.id + "-b", x: road.end.x, y: road.end.y } : null);
         if (!a || !b) return;
 
         const edge = state.network && state.network.edges
           ? state.network.edges.find(function (e) {
-              return (e.a === road.a && e.b === road.b) || (e.a === road.b && e.b === road.a);
+              const roadA = road.a || road.startStopId;
+              const roadB = road.b || road.endStopId;
+              return (e.a === roadA && e.b === roadB) || (e.a === roadB && e.b === roadA);
             })
           : null;
         const closed = edge && state.network.closedEdgeIds && state.network.closedEdgeIds.has(edge.id);
@@ -338,6 +349,26 @@ export function createRenderer(canvas, state) {
           ctx.stroke();
           ctx.setLineDash([]);
         }
+      });
+    }
+
+    if (connectedStopIds.size) {
+      state.city.roads.forEach(function (road) {
+        const roadA = road.a || road.startStopId;
+        const roadB = road.b || road.endStopId;
+        if (!roadA || !roadB || (roadA !== state.selectedStop && roadB !== state.selectedStop)) return;
+        const a = state.city.stops.find(function (stop) { return stop.id === roadA; });
+        const b = state.city.stops.find(function (stop) { return stop.id === roadB; });
+        if (!a || !b) return;
+        const path = routeAroundBuildings(a, b);
+        ctx.strokeStyle = "#ff6b35";
+        ctx.lineWidth = 4;
+        ctx.setLineDash([7, 5]);
+        ctx.beginPath();
+        ctx.moveTo(path[0].x, path[0].y);
+        path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
+        ctx.stroke();
+        ctx.setLineDash([]);
       });
     }
 
@@ -488,6 +519,7 @@ export function createRenderer(canvas, state) {
     if (state.city && state.city.stops) {
       state.city.stops.forEach(function (s) {
         const selected = state.selectedStop === s.id;
+        const connected = connectedStopIds.has(s.id);
         const pending = state.pendingStops && state.pendingStops.indexOf(s.id) >= 0;
         const served = state.lines && state.lines.some(function (l) { return l.stopIds.indexOf(s.id) >= 0; });
 
@@ -513,6 +545,13 @@ export function createRenderer(canvas, state) {
         ctx.beginPath();
         ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
         ctx.stroke();
+        if (selected || connected) {
+          ctx.strokeStyle = selected ? "#ff6b35" : "#4ecdc4";
+          ctx.lineWidth = selected ? 3 : 2.5;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, radius + (selected ? 8 : 5), 0, Math.PI * 2);
+          ctx.stroke();
+        }
 
         const fontSize = Math.max(10, 13 / camera.zoom);
         ctx.font = "800 " + fontSize + 'px "Nunito", system-ui, sans-serif';
@@ -559,6 +598,37 @@ export function createRenderer(canvas, state) {
           ctx.textBaseline = "alphabetic";
         }
       });
+    }
+
+    if (state.focusedLineId != null) {
+      const focusedLine = state.lines && state.lines.find(function (line) { return line.id === state.focusedLineId; });
+      if (focusedLine) {
+        ctx.fillStyle = "rgba(20, 20, 30, .68)";
+        ctx.fillRect(left, top, viewW, viewH);
+        const focusedNodes = (focusedLine.route && focusedLine.route.nodeIds || [])
+          .map(function (id) { return state.network && state.network.nodes.get(id); })
+          .filter(Boolean);
+        if (focusedNodes.length > 1) {
+          ctx.strokeStyle = "rgba(255, 255, 255, .42)";
+          ctx.lineWidth = 13;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.beginPath();
+          focusedNodes.forEach(function (node, index) {
+            if (index === 0) ctx.moveTo(node.x, node.y);
+            else ctx.lineTo(node.x, node.y);
+          });
+          ctx.stroke();
+          ctx.strokeStyle = focusedLine.color || ORANGE;
+          ctx.lineWidth = 7;
+          ctx.beginPath();
+          focusedNodes.forEach(function (node, index) {
+            if (index === 0) ctx.moveTo(node.x, node.y);
+            else ctx.lineTo(node.x, node.y);
+          });
+          ctx.stroke();
+        }
+      }
     }
 
     ctx.restore();

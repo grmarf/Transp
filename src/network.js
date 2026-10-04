@@ -18,8 +18,8 @@ export function createNetwork(city) {
   const adjacency = new Map(city.stops.map(s => [s.id, []]));
 
   for (const road of city.roads) {
-    const a = nodes.get(road.a);
-    const b = nodes.get(road.b);
+    const a = nodes.get(road.a || road.startStopId);
+    const b = nodes.get(road.b || road.endStopId);
     if (!a || !b) continue;
     const weight = distance(a, b);
     const edge = { id: `road-${edges.length + 1}`, a: a.id, b: b.id, type: road.type, weight };
