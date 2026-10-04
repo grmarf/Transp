@@ -5,6 +5,8 @@ export function createState(city, scenario = null) {
     version: "22.0",
     city,
     network: null,
+    tramNetwork: null,
+    undergroundNetwork: null,
     money: scenario?.startingMoney ?? INITIAL_MONEY,
     time: 8 * 60,
     elapsedDays: 0,
@@ -18,6 +20,9 @@ export function createState(city, scenario = null) {
     selectedStop: null,
     lineMode: false,
     pendingStops: [],
+    roadType: "local",
+    pendingRoadPoint: null,
+    roadEditMode: null,
     // V12.0 — line editing: non-null while the player is choosing new stops
     // to append to an existing line (as opposed to building a brand new one).
     extendingLineId: null,

@@ -101,7 +101,11 @@ export function finishExtendLine(state, log, routeLine) {
   const mode = vehicleMode(line.mode);
   // V13.0: extending a metro line stays underground; same fallback as
   // finishLine when no undergroundNetwork exists.
-  const network = mode.id === "metro" && state.undergroundNetwork ? state.undergroundNetwork : state.network;
+  const network = mode.id === "metro" && state.undergroundNetwork
+    ? state.undergroundNetwork
+    : mode.id === "tram" && state.tramNetwork?.edges?.length
+      ? state.tramNetwork
+      : state.network;
   const route = routeLine(network, newStopIds);
   if (!route) {
     log(mode.id === "metro"
@@ -148,7 +152,11 @@ export function finishLine(state, log, routeLine, modeId = "bus") {
   // following the road graph like bus/tram. Falls back to the surface
   // network when none was built (older callers/tests that never set
   // state.undergroundNetwork), preserving V12's behavior exactly.
-  const network = mode.id === "metro" && state.undergroundNetwork ? state.undergroundNetwork : state.network;
+  const network = mode.id === "metro" && state.undergroundNetwork
+    ? state.undergroundNetwork
+    : mode.id === "tram" && state.tramNetwork?.edges?.length
+      ? state.tramNetwork
+      : state.network;
   const route = routeLine(network, stopIds);
   if (!route) {
     log(mode.id === "metro"

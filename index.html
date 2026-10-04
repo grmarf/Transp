@@ -35,6 +35,12 @@
     <div class="toolbar" role="toolbar" aria-label="Commandes de partie">
       <button id="newLineBtn" type="button" class="btn btn-primary" aria-label="Créer ou annuler une nouvelle ligne">✏️ Nouvelle ligne</button>
       <button id="buildRoadBtn" type="button" class="btn" aria-label="Construire une route libre">🛣️ Construire une route</button>
+      <label class="sr-only" for="roadTypeSelect">Type de route</label>
+      <select id="roadTypeSelect" aria-label="Type de route à construire" title="Hiérarchie de la voirie">
+        <option value="local">🏘️ Locale · desserte · arrêts</option>
+        <option value="secondary">🔗 Secondaire · liaison · arrêts</option>
+        <option value="arterial">🛣️ Boulevard 2×2 · transit · sans arrêt</option>
+      </select>
       <button id="removeRoadBtn" type="button" class="btn" aria-label="Supprimer une route libre">🧹 Supprimer une route</button>
       <label class="sr-only" for="modeSelect">Mode de transport</label>
       <select id="modeSelect" aria-label="Mode de transport">

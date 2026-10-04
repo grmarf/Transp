@@ -320,7 +320,7 @@ export function createRenderer(canvas, state) {
             })
           : null;
         const closed = edge && state.network.closedEdgeIds && state.network.closedEdgeIds.has(edge.id);
-        const width = road.type === "arterial" ? 14 : 9;
+        const width = road.type === "arterial" ? 16 : road.type === "secondary" ? 11 : 7;
         const path = routeAroundBuildings(a, b);
 
         ctx.strokeStyle = "rgba(31, 35, 64, .38)";
@@ -340,9 +340,9 @@ export function createRenderer(canvas, state) {
         ctx.stroke();
         ctx.setLineDash([]);
         if (!closed) {
-          ctx.strokeStyle = road.type === "arterial" ? "rgba(255, 231, 150, .85)" : "rgba(238, 244, 234, .72)";
-          ctx.lineWidth = road.type === "arterial" ? 2 : 1.5;
-          ctx.setLineDash(road.type === "arterial" ? [12, 10] : [6, 10]);
+          ctx.strokeStyle = road.type === "arterial" ? "rgba(255, 231, 150, .9)" : road.type === "secondary" ? "rgba(238, 244, 234, .82)" : "rgba(238, 244, 234, .58)";
+          ctx.lineWidth = road.type === "arterial" ? 2.4 : road.type === "secondary" ? 1.7 : 1.2;
+          ctx.setLineDash(road.type === "arterial" ? [12, 10] : road.type === "secondary" ? [7, 9] : [3, 9]);
           ctx.beginPath();
           ctx.moveTo(path[0].x, path[0].y);
           path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
@@ -351,6 +351,20 @@ export function createRenderer(canvas, state) {
         }
       });
     }
+
+    // Les feux appartiennent aux carrefours du réseau, pas aux arrêts.
+    const junctions = state.network?.junctions || state.city?.junctions || [];
+    junctions.forEach(function (junction) {
+      if (!junction.signal) return;
+      const node = state.network?.nodes?.get(junction.nodeId) || state.city.stops.find(function (stop) { return stop.id === junction.nodeId; });
+      if (!node) return;
+      ctx.fillStyle = "#263238";
+      ctx.beginPath(); ctx.arc(node.x + 15, node.y - 15, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = junction.phase === "green-main" ? "#72d572" : "#ffd23f";
+      ctx.beginPath(); ctx.arc(node.x + 15, node.y - 15, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(31,35,64,.6)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(node.x, node.y); ctx.lineTo(node.x + 10, node.y - 10); ctx.stroke();
+    });
 
     if (connectedStopIds.size) {
       state.city.roads.forEach(function (road) {

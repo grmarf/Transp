@@ -127,32 +127,46 @@ export function createCity(seedInput) {
     s.hasSpawnedSatellite = false;
   });
 
-  // Génération procédurale d’une voirie connectée : les deux premiers axes
-  // garantissent la liaison du cœur de ville, puis chaque arrêt supplémentaire
-  // est raccordé à un arrêt déjà présent. Des liaisons secondaires aléatoires
-  // donnent ensuite une topologie moins radiale.
+  // V23 — la voirie est générée depuis la structure urbaine, pas depuis des
+  // connexions aléatoires entre arrêts. Le cœur forme une petite colonne
+  // continue d’artère ; les quartiers s’y accrochent par des secondaires,
+  // puis par quelques boucles locales. Les arrêts restent des points de
+  // desserte : une artère est marquée comme infrastructure de transit et ne
+  // devient jamais une opportunité de placement d’arrêt.
   const roads = [];
   const roadKeys = new Set();
-  const addRoad = (a, b, type = "secondary") => {
+  const addRoad = (a, b, type = "local", extra = {}) => {
     if (a === b) return;
     const key = [a, b].sort().join("|");
     if (key === [stops[1].id, stops[2].id].sort().join("|")) return;
     if (roadKeys.has(key)) return;
     roadKeys.add(key);
-    roads.push({ a, b, type });
+    roads.push({ a, b, type, lanes: type === "arterial" ? 2 : 1,
+      speed: type === "arterial" ? 1.35 : type === "secondary" ? 1.1 : 0.85,
+      allowStops: type !== "arterial", built: false, ...extra });
   };
-  addRoad(stops[0].id, stops[1].id, "arterial");
-  addRoad(stops[0].id, stops[2].id, "arterial");
+  // Deux corridors continus autour du centre, prolongés par la croissance.
+  addRoad(stops[1].id, stops[0].id, "arterial", { corridorId: "north-south" });
+  addRoad(stops[0].id, stops[2].id, "arterial", { corridorId: "north-south" });
+  // Chaque nouveau quartier se branche au quartier déjà le plus proche. La
+  // hiérarchie est stable pour une seed donnée et ne crée pas d’artères en
+  // cascade.
   for (let i = 3; i < stops.length; i++) {
-    const parent = stops[Math.floor(rng() * i)];
-    addRoad(parent.id, stops[i].id, rng() < 0.25 ? "arterial" : "secondary");
+    const child = stops[i];
+    const parent = stops.slice(0, i).reduce((best, candidate) =>
+      Math.hypot(candidate.x - child.x, candidate.y - child.y) <
+      Math.hypot(best.x - child.x, best.y - child.y) ? candidate : best);
+    addRoad(parent.id, child.id, i % 3 === 0 ? "secondary" : "local");
   }
-  const extraRoads = 6;
-  for (let i = 0; i < extraRoads; i++) {
-    const a = stops[Math.floor(rng() * stops.length)];
-    const b = stops[Math.floor(rng() * stops.length)];
-    addRoad(a.id, b.id, "secondary");
+  // Boucle de rabattement : le premier axe reste fermable sans isoler la ville.
+  if (stops.length > 3) {
+    addRoad(stops[1].id, stops[3].id, "secondary", { corridorId: "north-south-feeder" });
+    addRoad(stops[2].id, stops[3].id, "local");
   }
+  // Une seule liaison secondaire par côté complète les quartiers sans
+  // multiplier les croisements d’artères.
+  const byX = stops.slice(3).slice().sort((a, b) => a.x - b.x);
+  for (let i = 1; i < byX.length; i += 3) addRoad(byX[i - 1].id, byX[i].id, "secondary");
 
   return {
     id: `city-${numericSeed.toString(16)}`,
@@ -164,6 +178,12 @@ export function createCity(seedInput) {
     districts,
     stops,
     roads,
+    // Réseaux distincts : le tram peut être tracé hors voirie, comme le métro.
+    tramTracks: [],
+    junctions: [],
+    corridors: [
+      { id: "north-south", type: "arterial", axis: "y", stopIds: [stops[1].id, stops[0].id, stops[2].id] }
+    ],
     generatedAt: new Date().toISOString()
   };
 }
@@ -203,7 +223,8 @@ export function addSatelliteStop(city, parent, rng) {
     populationFactor: parentDistrict?.populationFactor ?? 1
   });
 
-  city.roads.push({ a: parent.id, b: stop.id, type: "secondary" });
+  city.roads.push({ a: parent.id, b: stop.id, type: "secondary", lanes: 1,
+    speed: 1.1, allowStops: true, built: false, extensionOf: parent.id });
   city.stops.push(stop);
   return stop;
 }

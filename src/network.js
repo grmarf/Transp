@@ -6,6 +6,16 @@
 
 import { distance } from "./constants.js";
 
+export const ROAD_TYPES = {
+  local:    { id: "local", name: "Route locale", lanes: 1, speed: 0.85, cost: 0.45, allowStops: true, color: "#87969b" },
+  secondary:{ id: "secondary", name: "Route secondaire", lanes: 1, speed: 1.1, cost: 0.7, allowStops: true, color: "#66747b" },
+  arterial: { id: "arterial", name: "Boulevard / artère", lanes: 2, speed: 1.35, cost: 1.15, allowStops: false, color: "#4b5962" }
+};
+
+export function roadType(type) {
+  return ROAD_TYPES[type] || ROAD_TYPES.secondary;
+}
+
 export function createNetwork(city) {
   const nodes = new Map(city.stops.map(s => [s.id, {
     id: s.id,
@@ -21,18 +31,38 @@ export function createNetwork(city) {
     const a = nodes.get(road.a || road.startStopId);
     const b = nodes.get(road.b || road.endStopId);
     if (!a || !b) continue;
-    const weight = distance(a, b);
-    const edge = { id: `road-${edges.length + 1}`, a: a.id, b: b.id, type: road.type, weight };
+    const spec = roadType(road.type);
+    const length = distance(a, b);
+    // Le coût de routage représente le temps de parcours : les artères sont
+    // donc naturellement attractives sans devenir des lignes de bus dédiées.
+    const weight = length / spec.speed;
+    const edge = {
+      id: road.id || `road-${edges.length + 1}`, a: a.id, b: b.id,
+      type: spec.id, lanes: road.lanes || spec.lanes, speed: road.speed || spec.speed,
+      allowStops: road.allowStops ?? spec.allowStops, weight, length,
+      corridorId: road.corridorId || null
+    };
     edges.push(edge);
     adjacency.get(a.id).push({ to: b.id, edge, weight });
     adjacency.get(b.id).push({ to: a.id, edge, weight });
   }
 
+  const junctions = [];
+  for (const [nodeId, links] of adjacency) {
+    if (links.length < 2) continue;
+    const types = new Set(links.map(link => link.edge.type));
+    const arterialCount = links.filter(link => link.edge.type === "arterial").length;
+    const signal = arterialCount >= 2 || (arterialCount >= 1 && types.has("secondary"));
+    junctions.push({ id: `junction-${nodeId}`, nodeId, roadTypes: [...types], signal, phase: "green-main" });
+  }
+  city.junctions = junctions;
+
   return {
-    version: "2.2",
+    version: "23.0",
     nodes,
     edges,
     adjacency,
+    junctions,
     pathCache: new Map()
   };
 }
@@ -162,6 +192,30 @@ export function routeLine(network, stopIds) {
   };
 }
 
+// V23 — le tram peut disposer de voies indépendantes de la voirie.
+// Tant qu’aucune voie n’est posée, le moteur conserve le réseau de surface.
+export function createTramNetwork(city) {
+  const tracks = city.tramTracks || [];
+  const nodes = new Map(city.stops.map(s => [s.id, { id: s.id, x: s.x, y: s.y, name: s.name }]));
+  const adjacency = new Map(city.stops.map(s => [s.id, []]));
+  const edges = [];
+  for (const track of tracks) {
+    const ids = track.stopIds || (track.a && track.b ? [track.a, track.b] : []);
+    for (let i = 0; i < ids.length - 1; i++) {
+      const a = nodes.get(ids[i]);
+      const b = nodes.get(ids[i + 1]);
+      if (!a || !b) continue;
+      const weight = distance(a, b);
+      const edge = { id: track.id || `tram-track-${edges.length + 1}`, a: a.id, b: b.id,
+        type: "tram-track", weight, length: weight, allowStops: true };
+      edges.push(edge);
+      adjacency.get(a.id).push({ to: b.id, edge, weight });
+      adjacency.get(b.id).push({ to: a.id, edge, weight });
+    }
+  }
+  return { version: "23.0-tram", nodes, edges, adjacency, pathCache: new Map(), independent: true };
+}
+
 // V6.0 — grafts a new node onto an existing one (used when a satellite
 // district appears). A single new edge is enough since satellites are
 // leaf branches; clearing the path cache keeps routing correct even
@@ -175,11 +229,14 @@ export function addNetworkNode(network, id, x, y, parentId) {
   network.adjacency.set(id, []);
 
   const weight = distance(parent, { x, y });
-  const edge = { id: `road-${network.edges.length + 1}`, a: parentId, b: id, type: "secondary", weight };
+  const spec = roadType("secondary");
+  const edge = { id: `road-${network.edges.length + 1}`, a: parentId, b: id, type: "secondary",
+    lanes: spec.lanes, speed: spec.speed, allowStops: true, length: weight, weight: weight / spec.speed };
   network.edges.push(edge);
-  network.adjacency.get(parentId).push({ to: id, edge, weight });
-  network.adjacency.get(id).push({ to: parentId, edge, weight });
+  network.adjacency.get(parentId).push({ to: id, edge, weight: edge.weight });
+  network.adjacency.get(id).push({ to: parentId, edge, weight: edge.weight });
   network.pathCache.clear();
+  network.junctions = network.junctions || [];
 }
 
 // V13.0 — underground network: a metro tunnel doesn't need existing roads,

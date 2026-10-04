@@ -2,7 +2,7 @@ import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
 import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal } from "./engine.js";
-import { createNetwork, routeLine, createUndergroundNetwork } from "./network.js";
+import { createNetwork, routeLine, createUndergroundNetwork, createTramNetwork, roadType } from "./network.js";
 import { createRenderer } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
@@ -118,7 +118,9 @@ function updateInstructions() {
     newLineBtn.textContent = state.lineMode ? "✕ Annuler la ligne" : "✏️ Nouvelle ligne";
   }
   const buildRoadBtn = document.getElementById("buildRoadBtn");
+  const roadTypeSelect = document.getElementById("roadTypeSelect");
   const removeRoadBtn = document.getElementById("removeRoadBtn");
+  if (roadTypeSelect) roadTypeSelect.value = state.roadType || "local";
   if (buildRoadBtn) {
     buildRoadBtn.textContent = state.roadEditMode === "build" ? "✕ Annuler construction" : "🛣️ Construire une route";
     buildRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "build"));
@@ -267,12 +269,15 @@ function clickMap(e) {
       const start = state.pendingRoadPoint;
       const end = targetPoint;
       const length = Math.hypot(end.x - start.x, end.y - start.y);
-      const cost = Math.max(25, Math.round(length * 0.45));
+      const selectedType = roadType(state.roadType || "local");
+      const cost = Math.max(25, Math.round(length * selectedType.cost));
       if (length < 24) log("Route trop courte : éloigne le second point.");
       else if (state.money < cost) log(`Construction impossible : il faut ${cost.toLocaleString("fr-FR")} €.`);
       else {
         if (!Number.isInteger(state.nextRoadId)) state.nextRoadId = 1;
-        const road = { id: `built-road-${state.nextRoadId++}`, start, end, type: "secondary", built: true };
+        const road = { id: `built-road-${state.nextRoadId++}`, start, end,
+          type: selectedType.id, lanes: selectedType.lanes, speed: selectedType.speed,
+          allowStops: selectedType.allowStops, built: true };
         if (state.pendingRoadStopId) road.startStopId = state.pendingRoadStopId;
         if (snappedStop) road.endStopId = snappedStop.id;
         if (road.startStopId && road.endStopId) {
@@ -613,6 +618,7 @@ function boot(seed, scenarioId, restoredPayload) {
     }
     nextState.network.pathCache.clear();
     nextState.undergroundNetwork = createUndergroundNetwork(nextState.city);
+    nextState.tramNetwork = createTramNetwork(nextState.city);
     nextRng = mulberry32(nextState.city.numericSeed ^ 0xA57E2);
     if (restoredPayload.rngState != null && nextRng.setState) {
       nextRng.setState(restoredPayload.rngState);
@@ -623,6 +629,7 @@ function boot(seed, scenarioId, restoredPayload) {
     nextState = createState(city, scenario);
     nextState.network = createNetwork(city);
     nextState.undergroundNetwork = createUndergroundNetwork(city);
+    nextState.tramNetwork = createTramNetwork(city);
     nextRng = mulberry32(city.numericSeed ^ 0xA57E2);
   }
 
@@ -641,6 +648,7 @@ function boot(seed, scenarioId, restoredPayload) {
   nextState.latestReport = nextState.latestReport || null;
   nextState.seasonsEnabled = true;
   nextState.pendingStops = nextState.pendingStops || [];
+  nextState.roadType = nextState.roadType || "local";
   nextState.logs = nextState.logs || [];
 
   state = nextState;
@@ -752,6 +760,15 @@ bindTap(document.getElementById("newLineBtn"), function () {
   else createLine(state);
   updateInstructions();
   refreshUI();
+});
+
+const roadTypeSelectEl = document.getElementById("roadTypeSelect");
+if (roadTypeSelectEl) roadTypeSelectEl.addEventListener("change", function () {
+  if (!state) return;
+  if (roadTypeSelectEl.value === "local" || roadTypeSelectEl.value === "secondary" || roadTypeSelectEl.value === "arterial") {
+    state.roadType = roadTypeSelectEl.value;
+    updateInstructions();
+  }
 });
 
 bindTap(document.getElementById("buildRoadBtn"), function () {
