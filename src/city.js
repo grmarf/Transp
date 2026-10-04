@@ -232,8 +232,10 @@ export function addSatelliteStop(city, parent, rng) {
 export function createSeedFromQuery() {
   try {
     const params = new URLSearchParams(location.search);
-    return params.get("seed") || "TRANSPORT-2026";
+    const requested = params.get("seed");
+    if (requested) return requested;
+    return String(Math.floor(100000000 + Math.random() * 900000000));
   } catch {
-    return "TRANSPORT-2026";
+    return String(Math.floor(100000000 + Math.random() * 900000000));
   }
 }
