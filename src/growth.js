@@ -48,11 +48,15 @@ function growStop(state, stop) {
 }
 
 function maybeSpawnSatellite(state, rng, log, levels) {
-  const candidate = state.city.stops.find(s =>
-    s.population >= SATELLITE_POP_THRESHOLD &&
-    (levels.get(s.id) || 0) >= SATELLITE_SERVICE_LEVEL
-  );
+  // La croissance urbaine est autonome : le service accélère l’essor mais ne
+  // bloque plus l’extension. Un seul quartier par jour garde une pression
+  // lisible pour le joueur et évite une explosion artificielle de la carte.
+  const candidates = state.city.stops
+    .filter(s => s.population >= SATELLITE_POP_THRESHOLD)
+    .sort((a, b) => b.population - a.population);
+  const candidate = candidates[0];
   if (!candidate) return;
+  const service = levels.get(candidate.id) || 0;
 
   const newStop = addSatelliteStop(state.city, candidate, rng);
   addNetworkNode(state.network, newStop.id, newStop.x, newStop.y, candidate.id);
@@ -61,10 +65,11 @@ function maybeSpawnSatellite(state, rng, log, levels) {
   // incremental patch — regenerating it here keeps metro tunnels reachable
   // to newly spawned districts too.
   if (state.undergroundNetwork) state.undergroundNetwork = createUndergroundNetwork(state.city);
-  // Le développement est volontairement sans plafond : un quartier peut
-  // continuer à essaimer si sa population et sa desserte le permettent.
+  // Le développement est volontairement sans plafond : les quartiers
+  // peuvent continuer à essaimer et chaque nouvelle route est ajoutée au
+  // réseau, puis révélée par l’animation de tracé du renderer.
   candidate.hasSpawnedSatellite = true;
-  log(`Nouveau quartier : ${newStop.name}, raccordé à ${candidate.name} (croissance portée par le réseau).`);
+  log(`Nouveau quartier : ${newStop.name}, raccordé à ${candidate.name} (service ${Math.round(service * 100)} %, extension autonome).`);
 }
 
 /** Run once per simulated day. */

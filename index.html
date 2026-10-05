@@ -34,6 +34,7 @@
   <section class="map-panel" aria-label="Carte et commandes de transport">
     <div class="toolbar" role="toolbar" aria-label="Commandes de partie">
       <button id="newLineBtn" type="button" class="btn btn-primary" aria-label="Créer ou annuler une nouvelle ligne">✏️ Nouvelle ligne</button>
+      <button id="advertisingBtn" type="button" class="btn btn-warn" aria-label="Ouvrir les campagnes publicitaires">📣 Publicité</button>
       <button id="buildRoadBtn" type="button" class="btn" aria-label="Construire une route libre">🛣️ Construire une route</button>
       <label class="sr-only" for="roadTypeSelect">Type de route</label>
       <select id="roadTypeSelect" aria-label="Type de route à construire" title="Hiérarchie de la voirie">
@@ -130,6 +131,7 @@
             </select>
           </label>
           <div id="intermodalStats"></div>
+          <div class="advertising-box" id="advertisingPanel" aria-live="polite"></div>
           <h3>💹 Finances (14 jours)</h3>
           <canvas id="financialChart" width="200" height="100" aria-label="Évolution financière sur 14 jours"></canvas>
         </section>
@@ -165,6 +167,15 @@
       </div>
     </details>
   </aside>
+  <dialog id="lineEditorModal" class="game-modal" aria-labelledby="lineEditorTitle">
+    <form method="dialog" class="modal-card" id="lineEditorForm">
+      <div class="modal-header"><h2 id="lineEditorTitle">Modifier la ligne</h2><button type="submit" class="icon-button" aria-label="Fermer">×</button></div>
+      <p class="muted">Réordonne les arrêts, retire ceux qui ne servent plus ou ajoute un nouvel arrêt.</p>
+      <div id="lineEditorStops" class="editor-stop-list"></div>
+      <div class="editor-add-row"><label for="lineEditorAddStop">Ajouter un arrêt</label><select id="lineEditorAddStop"></select><button type="button" class="small" id="lineEditorAddBtn">＋ Ajouter</button></div>
+      <div class="modal-actions"><button type="button" class="btn" id="lineEditorCancelBtn">Annuler</button><button type="button" class="btn btn-success" id="lineEditorSaveBtn">Enregistrer</button></div>
+    </form>
+  </dialog>
 </main>
 
 <footer>🚌 Vie t'Lignes — Vit la ville plus vite, en lignes !</footer>

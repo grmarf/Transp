@@ -6,6 +6,7 @@ import { contractSummary } from "./contracts.js";
 import { latestReport } from "./reports.js";
 import { seasonSummary } from "./seasons.js";
 import { passengerStats, waitStats, PASSENGER_STATES } from "./passengers.js";
+import { CAMPAIGNS, activeCampaigns } from "./advertising.js";
 import { escapeHtml as h } from "./html.js";
 
 const INK = "#1f2340";
@@ -103,48 +104,72 @@ export function createRenderer(canvas, state) {
     ctx.closePath();
   }
 
-  function urbanNoise(x, y) {
-    const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  // Générateur déterministe léger : la carte reste identique pour une même seed.
+  function urbanNoise(x, y, seed) {
+    const n = Math.sin(x * 12.9898 + y * 78.233 + (seed || 0) * 0.0001) * 43758.5453;
     return n - Math.floor(n);
   }
-
+  let cityBlocksCache = null;
   let urbanObstaclesCache = null;
+  let urbanCacheCityKey = null;
+  let roadPathCacheCityKey = null;
   const roadPathCache = new Map();
+  const roadAnimationStarts = new Map();
+  const stopAnimationStarts = new Map();
 
-  function urbanObstacles() {
-    if (urbanObstaclesCache) return urbanObstaclesCache;
-    const obstacles = [];
-    const cell = 74;
-    for (let x = -cell; x < 1000 + cell; x += cell) {
-      for (let y = -cell; y < 650 + cell; y += cell) {
-        const n = urbanNoise(x, y);
-        if (n > .86) continue;
-        const inset = 7 + n * 7;
-        const w = cell - inset * 2;
-        const h = cell - inset * 2;
-        const buildingCount = 2 + Math.floor(n * 4);
-        for (let building = 0; building < buildingCount; building++) {
-          const bw = 9 + urbanNoise(x + building * 17, y) * 13;
-          const bh = 8 + urbanNoise(x, y + building * 19) * 15;
-          const bx = x + inset + 7 + urbanNoise(x + building, y + 4) * Math.max(8, w - bw - 14);
-          const by = y + inset + 7 + urbanNoise(x + 4, y + building) * Math.max(8, h - bh - 14);
-          obstacles.push({ x: bx, y: by, w: bw, h: bh });
+  function cityCacheKey() {
+    const city = state.city || {};
+    return (city.id || city.seed || "default-city") + "|" + (city.width || 1000) + "x" + (city.height || 650);
+  }
+
+  function ensureCityGeometry() {
+    const city = state.city || {};
+    const key = cityCacheKey();
+    if (cityBlocksCache && urbanCacheCityKey === key) return cityBlocksCache;
+
+    const blocks = [];
+    const cell = 120;
+    const seed = Number(city.numericSeed) || 0;
+    // Les retraits réguliers forment des rues même avant le calcul d'itinéraire.
+    for (let x = -cell; x < (city.width || 1000) + cell; x += cell) {
+      for (let y = -cell; y < (city.height || 650) + cell; y += cell) {
+        const n = urbanNoise(x, y, seed);
+        if (n > 0.88) {
+          blocks.push({ type: "park", x: x + 15, y: y + 15, w: cell - 30, h: cell - 30, n });
+        } else {
+          const inset = 15 + n * 7;
+          blocks.push({ type: "block", x: x + inset, y: y + inset, w: cell - inset * 2, h: cell - inset * 2, n });
         }
       }
     }
-    urbanObstaclesCache = obstacles;
-    return obstacles;
+    cityBlocksCache = blocks;
+    urbanObstaclesCache = blocks.filter(function (block) { return block.type === "block"; });
+    urbanCacheCityKey = key;
+    roadPathCache.clear();
+    roadPathCacheCityKey = key;
+    return blocks;
+  }
+
+  function urbanObstacles() {
+    ensureCityGeometry();
+    return urbanObstaclesCache || [];
   }
 
   function routeAroundBuildings(a, b) {
     const key = [a.id, b.id].sort().join("|");
+    const cityKey = cityCacheKey();
+    if (roadPathCacheCityKey !== cityKey) {
+      roadPathCache.clear();
+      roadPathCacheCityKey = cityKey;
+    }
     if (roadPathCache.has(key)) {
       const cached = roadPathCache.get(key);
       return a.id < b.id ? cached : cached.slice().reverse();
     }
     const step = 20;
-    const cols = 51;
-    const rows = 34;
+    const city = state.city || {};
+    const cols = Math.max(51, Math.ceil(((city.width || 1000) + 40) / step));
+    const rows = Math.max(34, Math.ceil(((city.height || 650) + 40) / step));
     const obstacles = urbanObstacles();
     const blocked = function (x, y, endpoint) {
       if (endpoint) return false;
@@ -203,68 +228,80 @@ export function createRenderer(canvas, state) {
     return a.id < b.id ? simplified : simplified.slice().reverse();
   }
 
+  function drawOrganicPark(block, seed) {
+    ctx.save();
+    ctx.fillStyle = "#A8C99A";
+    ctx.strokeStyle = "rgba(42, 92, 70, .35)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const cx = block.x + block.w / 2;
+    const cy = block.y + block.h / 2;
+    ctx.arc(cx - 14, cy + 5, block.w * .29, 0, Math.PI * 2);
+    ctx.arc(cx + 15, cy - 9, block.w * .25, 0, Math.PI * 2);
+    ctx.arc(cx + 1, cy + 18, block.w * .19, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "rgba(42, 92, 70, .32)";
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      ctx.arc(block.x + 15 + urbanNoise(block.x + i * 17, block.y, seed) * (block.w - 30), block.y + 15 + urbanNoise(block.x, block.y + i * 19, seed) * (block.h - 30), 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function drawUrbanBase(left, top, viewW, viewH) {
-    ctx.fillStyle = "#d7e2df";
+    const blocks = ensureCityGeometry();
+    const city = state.city || {};
+    const seed = Number(city.numericSeed) || 0;
+    ctx.fillStyle = "#E6DCC4";
     ctx.fillRect(left, top, viewW, viewH);
     ctx.save();
     ctx.beginPath();
     ctx.rect(left, top, viewW, viewH);
     ctx.clip();
-
-    ctx.strokeStyle = "rgba(76, 201, 240, .26)";
-    ctx.lineWidth = 42;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(left - 80, top + viewH * .72);
-    ctx.bezierCurveTo(left + viewW * .2, top + viewH * .55, left + viewW * .62, top + viewH * .9, left + viewW + 80, top + viewH * .62);
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(255, 255, 255, .42)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    const cell = 74;
-    const startX = Math.floor(left / cell) * cell - cell;
-    const startY = Math.floor(top / cell) * cell - cell;
-    for (let x = startX; x < left + viewW + cell; x += cell) {
-      for (let y = startY; y < top + viewH + cell; y += cell) {
-        const n = urbanNoise(x, y);
-        const inset = 7 + n * 7;
-        const w = cell - inset * 2;
-        const h = cell - inset * 2;
-        const park = n > .86;
-        ctx.fillStyle = park ? "#a8c99a" : (n > .48 ? "#cbd8d0" : "#c4d2cd");
-        roundRect(x + inset, y + inset, w, h, 8);
-        ctx.fill();
-        ctx.strokeStyle = park ? "rgba(42, 92, 70, .32)" : "rgba(31, 35, 64, .12)";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        if (park) {
-          ctx.fillStyle = "rgba(42, 92, 70, .42)";
-          for (let tree = 0; tree < 4; tree++) {
-            const tx = x + inset + 14 + urbanNoise(x + tree * 11, y + 3) * Math.max(10, w - 28);
-            const ty = y + inset + 14 + urbanNoise(x + 7, y + tree * 13) * Math.max(10, h - 28);
-            ctx.beginPath();
-            ctx.arc(tx, ty, 4, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        } else {
-          const buildingCount = 2 + Math.floor(n * 4);
-          for (let building = 0; building < buildingCount; building++) {
-            const bw = 9 + urbanNoise(x + building * 17, y) * 13;
-            const bh = 8 + urbanNoise(x, y + building * 19) * 15;
-            const bx = x + inset + 7 + urbanNoise(x + building, y + 4) * Math.max(8, w - bw - 14);
-            const by = y + inset + 7 + urbanNoise(x + 4, y + building) * Math.max(8, h - bh - 14);
-            ctx.fillStyle = urbanNoise(x + building * 5, y + building * 3) > .5 ? "#f3e5c7" : "#b6c4c2";
-            roundRect(bx, by, bw, bh, 2);
-            ctx.fill();
-          }
-        }
+    blocks.forEach(function (block) {
+      if (block.x + block.w < left || block.x > left + viewW || block.y + block.h < top || block.y > top + viewH) return;
+      if (block.type === "park") {
+        drawOrganicPark(block, seed);
+        return;
       }
-    }
+      ctx.fillStyle = "rgba(31, 35, 64, 0.2)";
+      roundRect(block.x + 3, block.y + 3, block.w, block.h, 10);
+      ctx.fill();
+      ctx.fillStyle = "#D4C5A9";
+      roundRect(block.x, block.y, block.w, block.h, 10);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(31, 35, 64, .18)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Quelques volumes internes suggèrent des bâtiments sans recréer le bruit visuel initial.
+      ctx.fillStyle = "rgba(255, 248, 236, .28)";
+      const inner = 2 + Math.floor(block.n * 3);
+      for (let i = 0; i < inner; i++) {
+        const bw = 16 + urbanNoise(block.x + i * 23, block.y, seed) * 24;
+        const bh = 12 + urbanNoise(block.x, block.y + i * 23, seed) * 20;
+        const bx = block.x + 12 + urbanNoise(block.x + i, block.y + 4, seed) * Math.max(8, block.w - bw - 24);
+        const by = block.y + 12 + urbanNoise(block.x + 4, block.y + i, seed) * Math.max(8, block.h - bh - 24);
+        roundRect(bx, by, bw, bh, 3);
+        ctx.fill();
+      }
+    });
     ctx.restore();
   }
-
+  function pathLength(path) {
+    let length = 0;
+    for (let i = 1; i < path.length; i++) length += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+    return Math.max(1, length);
+  }
+  function strokePath(path) {
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
+    ctx.stroke();
+  }
   function drawCity(heatmap) {
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -320,34 +357,48 @@ export function createRenderer(canvas, state) {
             })
           : null;
         const closed = edge && state.network.closedEdgeIds && state.network.closedEdgeIds.has(edge.id);
-        const width = road.type === "arterial" ? 16 : road.type === "secondary" ? 11 : 7;
+        const width = road.type === "arterial" ? 19 : road.type === "secondary" ? 13 : 8;
+        const asphalt = road.type === "arterial" ? "#4A5568" : road.type === "secondary" ? "#5A6577" : "#6B7889";
         const path = routeAroundBuildings(a, b);
+        const roadKey = road.id || [road.a || road.startStopId, road.b || road.endStopId].sort().join("|");
+        if (!roadAnimationStarts.has(roadKey)) roadAnimationStarts.set(roadKey, now);
+        const progress = Math.min(1, Math.max(0, (now - roadAnimationStarts.get(roadKey)) / 850));
+        const length = pathLength(path);
+        const drawProgress = function () {
+          if (progress < 1) {
+            ctx.setLineDash([length, length]);
+            ctx.lineDashOffset = length * (1 - progress);
+          }
+          strokePath(path);
+          ctx.setLineDash([]);
+          ctx.lineDashOffset = 0;
+        };
 
-        ctx.strokeStyle = "rgba(31, 35, 64, .38)";
+        ctx.strokeStyle = "rgba(31, 35, 64, .32)";
         ctx.lineWidth = width + 5;
         ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(path[0].x, path[0].y);
-        path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
-        ctx.stroke();
+        drawProgress();
 
-        ctx.strokeStyle = closed ? ROAD_CLOSED : "#66747b";
+        ctx.strokeStyle = closed ? ROAD_CLOSED : asphalt;
         ctx.lineWidth = width;
         if (closed) ctx.setLineDash([8, 8]);
-        ctx.beginPath();
-        ctx.moveTo(path[0].x, path[0].y);
-        path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
-        ctx.stroke();
+        drawProgress();
         ctx.setLineDash([]);
         if (!closed) {
-          ctx.strokeStyle = road.type === "arterial" ? "rgba(255, 231, 150, .9)" : road.type === "secondary" ? "rgba(238, 244, 234, .82)" : "rgba(238, 244, 234, .58)";
-          ctx.lineWidth = road.type === "arterial" ? 2.4 : road.type === "secondary" ? 1.7 : 1.2;
-          ctx.setLineDash(road.type === "arterial" ? [12, 10] : road.type === "secondary" ? [7, 9] : [3, 9]);
-          ctx.beginPath();
-          ctx.moveTo(path[0].x, path[0].y);
-          path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
-          ctx.stroke();
+          ctx.strokeStyle = road.type === "arterial" ? "#F4D35E" : "#F7F5EE";
+          ctx.lineWidth = road.type === "arterial" ? 2.2 : road.type === "secondary" ? 1.7 : 1;
+          ctx.setLineDash(road.type === "arterial" ? [13, 10] : road.type === "secondary" ? [8, 10] : [3, 11]);
+          if (progress < 1) ctx.lineDashOffset = length * (1 - progress);
+          strokePath(path);
+          // Les artères ont une seconde ligne centrale discrète, comme une vraie voirie hiérarchisée.
+          if (road.type === "arterial") {
+            ctx.strokeStyle = "rgba(255,255,255,.72)";
+            ctx.lineWidth = 1;
+            ctx.lineDashOffset = length * (1 - progress) + 11;
+            strokePath(path);
+          }
           ctx.setLineDash([]);
+          ctx.lineDashOffset = 0;
         }
       });
     }
@@ -538,8 +589,19 @@ export function createRenderer(canvas, state) {
         const served = state.lines && state.lines.some(function (l) { return l.stopIds.indexOf(s.id) >= 0; });
 
         const baseRadius = STOP_RADIUS;
-        const radius = pending ? baseRadius + 6 : (selected ? baseRadius + 4 : baseRadius);
+        if (pending && !stopAnimationStarts.has(s.id)) stopAnimationStarts.set(s.id, now);
+        const stopProgress = pending ? Math.min(1, (now - stopAnimationStarts.get(s.id)) / 700) : 1;
+        const scaleUp = pending ? 0.82 + 0.18 * (1 - Math.pow(1 - stopProgress, 3)) : 1;
+        const radius = (pending ? baseRadius + 6 : (selected ? baseRadius + 4 : baseRadius)) * scaleUp;
 
+        if (pending) {
+          const pulse = (now - stopAnimationStarts.get(s.id)) % 1100 / 1100;
+          ctx.strokeStyle = "rgba(255, 210, 63, " + (0.65 * (1 - pulse)) + ")";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, radius + 8 + pulse * 18, 0, Math.PI * 2);
+          ctx.stroke();
+        }
         ctx.fillStyle = "rgba(31, 35, 64, 0.3)";
         ctx.beginPath();
         ctx.arc(s.x + 2, s.y + 3, radius, 0, Math.PI * 2);
@@ -550,8 +612,12 @@ export function createRenderer(canvas, state) {
         ctx.fillStyle = pending ? SUN : (selected ? "#ffffff" : PAPER);
         ctx.fill();
 
+        // Halo blanc systématique : il garantit la lisibilité sur routes, parcs et îlots.
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 3;
+        ctx.stroke();
         ctx.strokeStyle = served ? serviceLevelColor(serviceLevel(state, s)) : INK;
-        ctx.lineWidth = 3.5;
+        ctx.lineWidth = 2.2;
         ctx.stroke();
 
         ctx.strokeStyle = INK;
@@ -577,6 +643,8 @@ export function createRenderer(canvas, state) {
         const padX = 6;
         const boxH = fontSize + 6;
 
+        ctx.save();
+        ctx.globalAlpha = 0.95;
         ctx.fillStyle = PAPER;
         roundRect(s.x - textWidth / 2 - padX, labelY - fontSize + 2, textWidth + padX * 2, boxH, 6);
         ctx.fill();
@@ -587,6 +655,7 @@ export function createRenderer(canvas, state) {
 
         ctx.fillStyle = INK;
         ctx.fillText(s.name, s.x, labelY);
+        ctx.restore();
 
         const waiting = Object.values(s.waitingByDestination || {}).reduce(function (a, v) { return a + v; }, 0);
         if (waiting > 1) {
@@ -755,7 +824,7 @@ export function createRenderer(canvas, state) {
             '<div class="muted">+' + Math.round(l.income).toLocaleString("fr-FR") + ' € · -' + Math.round(l.expenses || 0).toLocaleString("fr-FR") + ' € · <span style="color:' + (net >= 0 ? GRASS : CORAL) + ';font-weight:900">' + (net >= 0 ? "+" : "") + Math.round(net).toLocaleString("fr-FR") + ' €</span></div>' +
             '<div class="line-actions">' +
               '<button type="button" class="small" data-buy-vehicle="' + h(l.id) + '">➕ Bus (' + vehicleMode(l.mode).purchaseCost.toLocaleString("fr-FR") + ' €)</button>' +
-              '<button type="button" class="small" data-extend-line="' + h(l.id) + '">↔️ Prolonger</button>' +
+              '<button type="button" class="small" data-edit-line="' + h(l.id) + '">✏️ Modifier</button>' +
               sellBtn +
               '<button type="button" class="small danger" data-delete-line="' + h(l.id) + '">🗑️ Supprimer</button>' +
             '</div>' +
@@ -763,6 +832,20 @@ export function createRenderer(canvas, state) {
         }).join("");
         linesEl.innerHTML = rows;
       }
+    }
+
+    const advertisingEl = document.getElementById("advertisingPanel");
+    if (advertisingEl) {
+      const running = activeCampaigns(state);
+      const campaignRows = Object.values(CAMPAIGNS).map(function (campaign) {
+        const disabled = running.length > 0 || (state.campaignCooldownUntil || 0) > (state.elapsedDays || 0) || state.money < campaign.cost;
+        return '<div class="campaign-row"><div><b>' + h(campaign.icon + " " + campaign.label) + '</b><small>×' + campaign.demandMultiplier.toFixed(2) + ' · ' + campaign.durationDays + ' jour(s) · ' + campaign.cost.toLocaleString("fr-FR") + ' €</small></div>' +
+          '<button type="button" class="small" data-campaign="' + h(campaign.id) + '"' + (disabled ? ' disabled' : '') + '>Lancer</button></div>';
+      }).join("");
+      const activeText = running.length
+        ? '<div class="muted">Campagne active : <b>' + h(running[0].id) + '</b> · jusqu’au jour ' + running[0].endsDay + '</div>'
+        : ((state.campaignCooldownUntil || 0) > (state.elapsedDays || 0) ? '<div class="muted">Marketing en pause jusqu’au jour ' + state.campaignCooldownUntil + '.</div>' : '<div class="muted">Attire de nouveaux voyageurs.</div>');
+      advertisingEl.innerHTML = '<h3>📣 Campagnes publicitaires</h3>' + activeText + campaignRows;
     }
 
     const stopEl = document.getElementById("stopInfo");

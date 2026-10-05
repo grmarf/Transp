@@ -122,8 +122,8 @@ export function createCity(seedInput) {
     s.jobs = Math.round(JOBS_BASE[i] * factor * (0.85 + rng() * 0.3) * 1400);
     s.commerce = Math.round(COMMERCE_BASE[i] * factor * (0.85 + rng() * 0.3) * 900);
     s.density = Math.round(s.population / DISTRICT_AREA_KM2);
-    // V6.0: whether this stop has already produced a satellite district —
-    // caps growth so the map can't spawn unboundedly from the same origin.
+    // Indicateur historique conservé pour les sauvegardes : la croissance
+    // moderne n’impose plus de plafond par quartier.
     s.hasSpawnedSatellite = false;
   });
 
@@ -195,8 +195,14 @@ export function createCity(seedInput) {
 export function addSatelliteStop(city, parent, rng) {
   const angle = rng() * Math.PI * 2;
   const dist = 120 + rng() * 100;
-  const x = Math.round(clamp(parent.x + Math.cos(angle) * dist, 70, 930));
-  const y = Math.round(clamp(parent.y + Math.sin(angle) * dist, 60, 590));
+  // La ville ne possède plus de bord fixe : les nouveaux quartiers peuvent
+  // étendre sa surface utile dans toutes les directions positives. On évite
+  // seulement les coordonnées négatives, incompatibles avec les anciennes
+  // sauvegardes et la mini-carte.
+  const x = Math.round(Math.max(40, parent.x + Math.cos(angle) * dist));
+  const y = Math.round(Math.max(40, parent.y + Math.sin(angle) * dist));
+  city.width = Math.max(Number(city.width) || 1000, x + 120);
+  city.height = Math.max(Number(city.height) || 650, y + 120);
 
   const index = city.stops.length;
   const stop = {

@@ -139,6 +139,54 @@ export function finishExtendLine(state, log, routeLine) {
   return true;
 }
 
+/** V24 — édition complète d’une ligne depuis la fenêtre de gestion.
+ * Le nouvel ordre doit rester composé d’au moins deux arrêts distincts. Les
+ * véhicules sont replacés au début du nouvel itinéraire et les passagers en
+ * cours sont remis en attente afin d’éviter tout trajet incohérent.
+ */
+export function editLineStops(state, lineId, stopIds, routeLine, log = () => {}) {
+  const line = state.lines.find(l => l.id === lineId);
+  if (!line) return false;
+  const ids = Array.isArray(stopIds) ? stopIds.map(String) : [];
+  if (ids.length < 2 || new Set(ids).size !== ids.length || ids.some(id => !stopById(state, id))) {
+    log("Modification impossible : une ligne doit contenir au moins deux arrêts distincts.");
+    return false;
+  }
+  const mode = vehicleMode(line.mode);
+  const network = mode.id === "metro" && state.undergroundNetwork
+    ? state.undergroundNetwork
+    : mode.id === "tram" && state.tramNetwork?.edges?.length
+      ? state.tramNetwork
+      : state.network;
+  const route = routeLine(network, ids);
+  if (!route) {
+    log("Modification impossible : les arrêts ne sont pas reliés par le réseau.");
+    return false;
+  }
+  const oldLength = lineLength(state, line);
+  const addedLength = Math.max(0, (route.totalLength || 0) - oldLength);
+  const infrastructureCost = Math.round(addedLength * mode.trackCostPerPixel);
+  if (state.money < infrastructureCost) {
+    log(`Modification impossible : ${infrastructureCost.toLocaleString("fr-FR")} € nécessaires.`);
+    return false;
+  }
+  if (infrastructureCost) state.money -= infrastructureCost;
+  for (const vehicleId of line.vehicles) {
+    const vehicle = state.vehicles.find(v => v.id === vehicleId);
+    if (!vehicle) continue;
+    returnPassengersToWaiting(state, vehicle);
+    vehicle.routeIndex = 0;
+    vehicle.progress = 0;
+    vehicle.direction = 1;
+    vehicle.congestion = 1;
+  }
+  line.stopIds = ids;
+  line.route = route;
+  invalidateRoutingCache(state);
+  log(`${line.name} mise à jour : ${ids.length} arrêts${infrastructureCost ? ` (−${infrastructureCost.toLocaleString("fr-FR")} € d’infrastructure)` : ""}.`);
+  return true;
+}
+
 export function finishLine(state, log, routeLine, modeId = "bus") {
   if (state.pendingStops.length < 2) {
     log("Une ligne nécessite au moins 2 arrêts.");

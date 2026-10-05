@@ -1024,3 +1024,36 @@ footer {
 
   .line-actions { grid-template-columns: 1fr; }
 }
+/* -------------------------- Popups & campagnes --------------------- */
+.game-modal {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  max-width: min(94vw, 560px);
+  width: 100%;
+}
+.game-modal::backdrop { background: rgba(31,35,64,.62); backdrop-filter: blur(2px); }
+.modal-card {
+  margin: 0;
+  padding: 16px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 3px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+.modal-header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.modal-header h2 { margin:0; font-size:1.1rem; }
+.icon-button { min-height:34px; padding:3px 10px; font-size:1.3rem; line-height:1; }
+.modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+.editor-stop-list { display:flex; flex-direction:column; gap:7px; margin:14px 0; max-height:42vh; overflow:auto; }
+.editor-stop-row { display:grid; grid-template-columns: 30px 1fr auto auto; align-items:center; gap:6px; padding:7px; background:var(--paper-2); border:2px solid var(--ink); border-radius:8px; }
+.editor-stop-row .stop-index { font-weight:900; text-align:center; }
+.editor-stop-row button { min-height:32px; padding:4px 8px; font-size:.75rem; }
+.editor-add-row { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+.editor-add-row label { font-weight:800; }
+.editor-add-row select { flex:1 1 180px; min-height:38px; }
+.advertising-box { margin-top:10px; padding-top:10px; border-top:2px dashed var(--ink); }
+.campaign-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; padding:7px 0; border-bottom:1px solid rgba(31,35,64,.18); }
+.campaign-row:last-child { border-bottom:0; }
+.campaign-row small { display:block; color:var(--muted); }

@@ -1,11 +1,12 @@
 import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
-import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal } from "./engine.js";
+import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, editLineStops, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal } from "./engine.js";
 import { createNetwork, routeLine, createUndergroundNetwork, createTramNetwork, roadType } from "./network.js";
 import { createRenderer } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
+import { startCampaign } from "./advertising.js";
 
 const canvas = document.getElementById("map");
 const miniMapCanvas = document.getElementById("miniMapCanvas");
@@ -754,6 +755,56 @@ function loadCurrentGame() {
   }
 }
 
+let editingLineId = null;
+let editingStopIds = [];
+function renderLineEditor() {
+  const list = document.getElementById("lineEditorStops");
+  const select = document.getElementById("lineEditorAddStop");
+  if (!list || !select || !state) return;
+  const line = state.lines.find(function (item) { return item.id === editingLineId; });
+  if (!line) return;
+  list.innerHTML = editingStopIds.map(function (id, index) {
+    const stop = state.city.stops.find(function (item) { return item.id === id; });
+    return '<div class="editor-stop-row"><span class="stop-index">' + (index + 1) + '</span><b>' + h(stop ? stop.name : id) + '</b>' +
+      '<button type="button" data-editor-action="up" data-editor-index="' + index + '"' + (index === 0 ? ' disabled' : '') + '>↑</button>' +
+      '<button type="button" data-editor-action="down" data-editor-index="' + index + '"' + (index === editingStopIds.length - 1 ? ' disabled' : '') + '>↓</button>' +
+      '<button type="button" data-editor-action="remove" data-editor-index="' + index + '"' + (editingStopIds.length <= 2 ? ' disabled' : '') + '>✕</button></div>';
+  }).join("");
+  const available = state.city.stops.filter(function (stop) { return editingStopIds.indexOf(stop.id) < 0; });
+  select.innerHTML = available.length
+    ? available.map(function (stop) { return '<option value="' + h(stop.id) + '">' + h(stop.name) + '</option>'; }).join("")
+    : '<option value="">Tous les arrêts sont déjà dans la ligne</option>';
+  select.disabled = !available.length;
+}
+function openLineEditor(lineId) {
+  if (!state) return;
+  const line = state.lines.find(function (item) { return item.id === lineId; });
+  if (!line) return;
+  editingLineId = lineId;
+  editingStopIds = [...line.stopIds];
+  renderLineEditor();
+  const modal = document.getElementById("lineEditorModal");
+  if (modal && typeof modal.showModal === "function") modal.showModal();
+  else if (modal) modal.setAttribute("open", "true");
+}
+function closeLineEditor() {
+  const modal = document.getElementById("lineEditorModal");
+  if (modal && typeof modal.close === "function") modal.close();
+  else if (modal) modal.removeAttribute("open");
+  editingLineId = null;
+  editingStopIds = [];
+}
+function applyEditorAction(action, index) {
+  if (!Number.isInteger(index) || index < 0 || index >= editingStopIds.length) return;
+  if (action === "up" && index > 0) {
+    [editingStopIds[index - 1], editingStopIds[index]] = [editingStopIds[index], editingStopIds[index - 1]];
+  } else if (action === "down" && index < editingStopIds.length - 1) {
+    [editingStopIds[index + 1], editingStopIds[index]] = [editingStopIds[index], editingStopIds[index + 1]];
+  } else if (action === "remove" && editingStopIds.length > 2) {
+    editingStopIds.splice(index, 1);
+  }
+  renderLineEditor();
+}
 bindTap(document.getElementById("newLineBtn"), function () {
   if (!state) return;
   if (state.lineMode) cancelLineMode(state);
@@ -857,6 +908,41 @@ bindDelegatedTap(document.getElementById("lines"), "[data-extend-line]", functio
   startExtendLine(state, Number(target.dataset.extendLine));
   updateInstructions();
   refreshUI();
+});
+
+bindDelegatedTap(document.getElementById("lines"), "[data-edit-line]", function (target) {
+  openLineEditor(Number(target.dataset.editLine));
+});
+bindDelegatedTap(document.getElementById("advertisingPanel"), "[data-campaign]", function (target) {
+  if (!state) return;
+  startCampaign(state, target.dataset.campaign, log);
+  refreshUI();
+});
+bindTap(document.getElementById("advertisingBtn"), function () {
+  const panel = document.getElementById("advertisingPanel");
+  const details = panel && panel.closest("details");
+  if (details) details.open = true;
+  if (panel) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+const editorStopsEl = document.getElementById("lineEditorStops");
+if (editorStopsEl) {
+  bindDelegatedTap(editorStopsEl, "[data-editor-action]", function (target) {
+    applyEditorAction(target.dataset.editorAction, Number(target.dataset.editorIndex));
+  });
+}
+bindTap(document.getElementById("lineEditorAddBtn"), function () {
+  const select = document.getElementById("lineEditorAddStop");
+  if (!select || !select.value || editingStopIds.indexOf(select.value) >= 0) return;
+  editingStopIds.push(select.value);
+  renderLineEditor();
+});
+bindTap(document.getElementById("lineEditorCancelBtn"), closeLineEditor);
+bindTap(document.getElementById("lineEditorSaveBtn"), function () {
+  if (!state || editingLineId == null) return;
+  if (editLineStops(state, editingLineId, editingStopIds, routeLine, log)) {
+    closeLineEditor();
+    refreshUI();
+  }
 });
 
 bindTap(document.getElementById("toggleHeatmapBtn"), function () {
