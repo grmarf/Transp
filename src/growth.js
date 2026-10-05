@@ -53,8 +53,16 @@ function maybeSpawnSatellite(state, rng, log, levels) {
   // lisible pour le joueur et évite une explosion artificielle de la carte.
   const candidates = state.city.stops
     .filter(s => s.population >= SATELLITE_POP_THRESHOLD)
-    .sort((a, b) => b.population - a.population);
-  const candidate = candidates[0];
+    .map(stop => ({
+      stop,
+      // Une zone dont le voisinage est déjà dense est moins intéressante
+      // qu’un front urbain : on développe donc d’abord la périphérie.
+      frontier: Math.min(...state.city.stops
+        .filter(other => other.id !== stop.id)
+        .map(other => Math.hypot(stop.x - other.x, stop.y - other.y)))
+    }))
+    .sort((a, b) => b.frontier - a.frontier || b.stop.population - a.stop.population);
+  const candidate = candidates[0]?.stop;
   if (!candidate) return;
   const service = levels.get(candidate.id) || 0;
 

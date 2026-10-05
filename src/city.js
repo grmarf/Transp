@@ -55,6 +55,19 @@ function jitter(rng, amount) {
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
 }
+export function averageStopSpacing(stops) {
+  if (!Array.isArray(stops) || stops.length < 2) return 105;
+  let total = 0;
+  for (const stop of stops) {
+    let nearest = Infinity;
+    for (const other of stops) {
+      if (other === stop) continue;
+      nearest = Math.min(nearest, Math.hypot(stop.x - other.x, stop.y - other.y));
+    }
+    total += nearest;
+  }
+  return total / stops.length;
+}
 
 function randomStopName(rng, used, index) {
   const available = STOP_NAMES.filter(name => !used.has(name));
@@ -103,6 +116,7 @@ export function createCity(seedInput) {
     };
   });
 
+  const initialStopSpacing = averageStopSpacing(stops);
   const districts = stops.map((s, i) => ({
     id: `district-${i + 1}`,
     name: DISTRICT_NAMES[i],
@@ -175,6 +189,9 @@ export function createCity(seedInput) {
     numericSeed,
     width: 1000,
     height: 650,
+    // Référence immuable : les quartiers futurs doivent respecter au moins
+    // cet espacement moyen local observé sur la carte initiale.
+    initialStopSpacing,
     districts,
     stops,
     roads,
@@ -193,14 +210,39 @@ export function createCity(seedInput) {
 // no dependency on network/lines (kept in growth.js, which orchestrates
 // this together with the live network graph).
 export function addSatelliteStop(city, parent, rng) {
-  const angle = rng() * Math.PI * 2;
-  const dist = 120 + rng() * 100;
-  // La ville ne possède plus de bord fixe : les nouveaux quartiers peuvent
-  // étendre sa surface utile dans toutes les directions positives. On évite
-  // seulement les coordonnées négatives, incompatibles avec les anciennes
-  // sauvegardes et la mini-carte.
-  const x = Math.round(Math.max(40, parent.x + Math.cos(angle) * dist));
-  const y = Math.round(Math.max(40, parent.y + Math.sin(angle) * dist));
+  const minDistance = Math.max(105, Number(city.initialStopSpacing) || averageStopSpacing(city.stops));
+  const existing = city.stops;
+  let point = null;
+  // On tente plusieurs anneaux autour du parent. Chaque position est
+  // validée contre TOUS les arrêts existants : aucun quartier ne peut donc
+  // apparaître dans le tissu déjà occupé. Les anneaux supplémentaires
+  // poussent naturellement l’expansion vers la périphérie.
+  for (let ring = 0; ring < 12 && !point; ring++) {
+    const radius = minDistance * (1.08 + ring * 0.38 + rng() * 0.24);
+    const samples = 24 + ring * 4;
+    const offset = rng() * Math.PI * 2;
+    for (let sample = 0; sample < samples && !point; sample++) {
+      const angle = offset + (sample / samples) * Math.PI * 2;
+      const candidate = {
+        x: Math.round(Math.max(40, parent.x + Math.cos(angle) * radius)),
+        y: Math.round(Math.max(40, parent.y + Math.sin(angle) * radius))
+      };
+      if (existing.every(stop => Math.hypot(candidate.x - stop.x, candidate.y - stop.y) >= minDistance)) {
+        point = candidate;
+      }
+    }
+  }
+  // À une échelle extrême, une recherche en spirale garantit quand même la
+  // règle de distance au lieu de créer un arrêt trop proche par repli.
+  if (!point) {
+    let radius = minDistance * 6;
+    while (!point) {
+      const candidate = { x: Math.round(parent.x + radius), y: Math.round(Math.max(40, parent.y)) };
+      if (existing.every(stop => Math.hypot(candidate.x - stop.x, candidate.y - stop.y) >= minDistance)) point = candidate;
+      radius += minDistance;
+    }
+  }
+  const { x, y } = point;
   city.width = Math.max(Number(city.width) || 1000, x + 120);
   city.height = Math.max(Number(city.height) || 650, y + 120);
 
