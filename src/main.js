@@ -3,9 +3,10 @@ import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
 import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, editLineStops, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal } from "./engine.js";
 import { createNetwork, routeLine, createUndergroundNetwork, createTramNetwork, roadType } from "./network.js";
-import { createRenderer } from "./renderer.js";
+import { createRenderer, clearRendererCaches } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
+import { invalidateRoutingCache } from "./routing.js";
 import { startCampaign } from "./advertising.js";
 
 const canvas = document.getElementById("map");
@@ -83,6 +84,27 @@ function resetCameraView() {
   refreshUI();
 }
 
+function updateToolbarVisibility() {
+  const voirieGroup = document.getElementById("voirieGroup");
+  if (voirieGroup && state) {
+    const active = state.roadEditMode !== null || voirieGroup.dataset.open === "true";
+    voirieGroup.classList.toggle("is-active", active);
+    const button = document.getElementById("voirieBtn");
+    if (button) button.setAttribute("aria-expanded", String(active));
+  }
+  const modeGroup = document.getElementById("modeGroup");
+  if (modeGroup && state) modeGroup.classList.toggle("is-active", state.lineMode === true);
+  const menu = document.getElementById("gameMenuDropdown");
+  const menuButton = document.getElementById("gameMenuBtn");
+  if (menuButton) menuButton.setAttribute("aria-expanded", String(!!(menu && menu.classList.contains("is-open"))));
+}
+function toggleGameMenu(force) {
+  const menu = document.getElementById("gameMenuDropdown");
+  if (!menu) return;
+  const open = force === undefined ? !menu.classList.contains("is-open") : force;
+  menu.classList.toggle("is-open", open);
+  updateToolbarVisibility();
+}
 function updateInstructions() {
   const el = document.getElementById("instructions");
   const finish = document.getElementById("finishLineBtn");
@@ -130,6 +152,7 @@ function updateInstructions() {
     removeRoadBtn.textContent = state.roadEditMode === "remove" ? "✕ Annuler suppression" : "🧹 Supprimer une route";
     removeRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "remove"));
   }
+  updateToolbarVisibility();
 }
 
 function findNearestStop(point, threshold = 40) {
@@ -326,6 +349,14 @@ function clickMap(e) {
     });
     if (nearestRoad) {
       state.city.roads = state.city.roads.filter(function (road) { return road !== nearestRoad; });
+      const closedEdgeIds = state.network && state.network.closedEdgeIds;
+      const roadworksReopenDay = state.network && state.network.roadworksReopenDay;
+      state.network = createNetwork(state.city);
+      if (closedEdgeIds) state.network.closedEdgeIds = new Set(closedEdgeIds);
+      if (roadworksReopenDay) state.network.roadworksReopenDay = new Map(roadworksReopenDay);
+      if (state.network && state.network.pathCache) state.network.pathCache.clear();
+      invalidateRoutingCache(state);
+      clearRendererCaches();
       log("Route construite supprimée.");
     } else log("Aucune route construite sous le curseur.");
     updateInstructions();
@@ -604,6 +635,7 @@ function startLoop() {
 
 function boot(seed, scenarioId, restoredPayload) {
   bootCount += 1;
+  clearRendererCaches();
   let nextState;
   let nextRng;
 
@@ -813,6 +845,23 @@ bindTap(document.getElementById("newLineBtn"), function () {
   refreshUI();
 });
 
+bindTap(document.getElementById("seedDiceBtn"), function () {
+  const input = document.getElementById("seedInput");
+  if (!input) return;
+  input.value = String(Math.floor(100000000 + Math.random() * 900000000));
+});
+bindTap(document.getElementById("gameMenuBtn"), function () { toggleGameMenu(); });
+bindTap(document.getElementById("voirieBtn"), function () {
+  const group = document.getElementById("voirieGroup");
+  if (group) group.dataset.open = group.dataset.open === "true" ? "false" : "true";
+  updateToolbarVisibility();
+});
+document.addEventListener("click", function (event) {
+  const menu = document.getElementById("gameMenuDropdown");
+  const button = document.getElementById("gameMenuBtn");
+  if (menu && button && !menu.contains(event.target) && event.target !== button) toggleGameMenu(false);
+});
+
 const roadTypeSelectEl = document.getElementById("roadTypeSelect");
 if (roadTypeSelectEl) roadTypeSelectEl.addEventListener("change", function () {
   if (!state) return;
@@ -876,6 +925,7 @@ bindTap(document.getElementById("newCityBtn"), function () {
   const seed = (input && input.value.trim()) || ("CITY-" + Date.now());
   const scenarioSelect = document.getElementById("scenarioSelect");
   boot(seed, (scenarioSelect && scenarioSelect.value) || "sandbox");
+  toggleGameMenu(false);
 });
 
 bindMap();

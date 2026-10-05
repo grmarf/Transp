@@ -19,7 +19,14 @@ const SKY = "#4cc9f0";
 const GRASS = "#7ac74f";
 const ROAD_LIGHT = "#f0e7cd";
 const ROAD_CLOSED = "#ffb347";
+let activeRendererCacheReset = function () {};
 
+export function invalidateUrbanCache() {
+  activeRendererCacheReset();
+}
+export function clearRendererCaches() {
+  activeRendererCacheReset();
+}
 function serviceLevelColor(level) {
   if (level >= 0.6) return GRASS;
   if (level >= 0.3) return SUN;
@@ -115,6 +122,13 @@ export function createRenderer(canvas, state) {
   let roadPathCacheCityKey = null;
   const roadPathCache = new Map();
   const roadAnimationStarts = new Map();
+  activeRendererCacheReset = function () {
+    cityBlocksCache = null;
+    urbanObstaclesCache = null;
+    urbanCacheCityKey = null;
+    roadPathCache.clear();
+    roadPathCacheCityKey = null;
+  };
   const stopAnimationStarts = new Map();
 
   function cityCacheKey() {
@@ -818,10 +832,13 @@ export function createRenderer(canvas, state) {
             ? '<button type="button" class="small" data-sell-vehicle="' + h(l.id) + '" data-vehicle-id="' + h(lastVehicleId) + '">➖ Vendre (+' + Math.round(vehicleMode(l.mode).purchaseCost / 2).toLocaleString("fr-FR") + ' €)</button>'
             : "";
           return '<div class="line-row">' +
-            '<div class="line-head"><strong style="color:' + h(l.color) + '">' + modeEmoji + ' ' + h(l.name) + '</strong><span class="pill">' + l.riders + ' 🧑</span></div>' +
+            '<div class="line-head"><strong style="color:' + h(l.color) + '">' + modeEmoji + ' ' + h(l.name) + '</strong><span class="badge" style="background:' + occColor + ';color:#fff">' + (occupancy != null ? Math.round(occupancy * 100) + '%' : '—') + '</span></div>' +
             '<div style="margin-top:4px">' + stopNames + '</div>' +
-            '<div class="muted">' + l.vehicles.length + ' véhicule' + (l.vehicles.length > 1 ? 's' : '') + headwayLine + occLine + '</div>' +
-            '<div class="muted">+' + Math.round(l.income).toLocaleString("fr-FR") + ' € · -' + Math.round(l.expenses || 0).toLocaleString("fr-FR") + ' € · <span style="color:' + (net >= 0 ? GRASS : CORAL) + ';font-weight:900">' + (net >= 0 ? "+" : "") + Math.round(net).toLocaleString("fr-FR") + ' €</span></div>' +
+            '<div class="muted">' + l.vehicles.length + ' véhicule' + (l.vehicles.length > 1 ? 's' : '') + headwayLine + '</div>' +
+            '<div class="line-details">' +
+              '<div>Occupation : ' + (occupancy != null ? Math.round(occupancy * 100) + '%' : 'non disponible') + occLine + '</div>' +
+              '<div>+' + Math.round(l.income).toLocaleString("fr-FR") + ' € · -' + Math.round(l.expenses || 0).toLocaleString("fr-FR") + ' € · <span style="color:' + (net >= 0 ? GRASS : CORAL) + ';font-weight:900">' + (net >= 0 ? "+" : "") + Math.round(net).toLocaleString("fr-FR") + ' €</span></div>' +
+            '</div>' +
             '<div class="line-actions">' +
               '<button type="button" class="small" data-buy-vehicle="' + h(l.id) + '">➕ Bus (' + vehicleMode(l.mode).purchaseCost.toLocaleString("fr-FR") + ' €)</button>' +
               '<button type="button" class="small" data-edit-line="' + h(l.id) + '">✏️ Modifier</button>' +
@@ -1000,7 +1017,19 @@ export function createRenderer(canvas, state) {
     return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
   }
 
-  return { render: render, camera: camera, resizeCanvas: resizeCanvas };
+  return {
+    render: render,
+    camera: camera,
+    resizeCanvas: resizeCanvas,
+    invalidateUrbanCache: function () {
+      urbanObstaclesCache = null;
+      cityBlocksCache = null;
+      urbanCacheCityKey = null;
+      roadPathCache.clear();
+      roadPathCacheCityKey = null;
+    },
+    clearRendererCaches: function () { activeRendererCacheReset(); }
+  };
 }
 
 // === FIN DU FICHIER renderer.js ===

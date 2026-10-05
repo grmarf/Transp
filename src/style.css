@@ -1057,3 +1057,37 @@ footer {
 .campaign-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; padding:7px 0; border-bottom:1px solid rgba(31,35,64,.18); }
 .campaign-row:last-child { border-bottom:0; }
 .campaign-row small { display:block; color:var(--muted); }
+/* ------------------------ UI carte prioritaire --------------------- */
+.topbar-controls { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; width:100%; }
+.topbar-controls input, .topbar-controls select { min-height:38px; max-width:180px; }
+.topbar-controls .city-name-input { flex:1 1 140px; min-width:120px; }
+.seed-control { display:flex; align-items:center; gap:3px; }
+.seed-control input { width:115px; }
+.icon-button { min-height:34px; padding:5px 9px; }
+.time-controls { display:flex; align-items:center; gap:4px; }
+.toolbar-caption { font-weight:900; }
+.menu-wrap { position:relative; }
+.menu-dropdown { display:none; position:absolute; top:calc(100% + 7px); right:0; z-index:120; min-width:190px; padding:8px; background:var(--paper); border:2.5px solid var(--ink); border-radius:12px; box-shadow:var(--shadow); }
+.menu-dropdown.is-open { display:grid; gap:6px; }
+.menu-dropdown input[type="file"] { display:none; }
+.menu-dropdown .btn, .menu-file-label { width:100%; text-align:left; min-height:36px; padding:7px 10px; cursor:pointer; font-weight:800; border:2px solid var(--ink); border-radius:8px; background:var(--paper-2); }
+.floating-toolbar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); display:flex; align-items:center; flex-wrap:wrap; justify-content:center; gap:8px; padding:8px 12px; background:rgba(255,248,236,.95); border:2px solid rgba(31,35,64,.22); border-radius:12px; box-shadow:0 4px 20px rgba(31,35,64,.2); z-index:100; max-width:calc(100vw - 20px); }
+.tool-group { display:none; align-items:center; flex-wrap:wrap; gap:6px; }
+.tool-group.is-active { display:flex; }
+.map-overlays { position:absolute; inset:8px; z-index:50; pointer-events:none; }
+.map-overlay-right { position:absolute; top:0; right:0; display:flex; gap:6px; }
+.map-overlay-btn { pointer-events:auto; width:40px; height:40px; min-height:40px; padding:0; border-radius:50%; background:rgba(255,248,236,.9); border:2px solid var(--ink); cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; z-index:50; }
+.map-overlays > .map-overlay-btn { position:absolute; top:0; left:0; }
+.map-overlay-btn[aria-pressed="true"] { background:var(--sun); }
+.line-row .badge { display:inline-block; padding:2px 6px; border-radius:4px; font-size:.8em; font-weight:bold; color:#fff; }
+.line-details { display:none; margin-top:4px; font-size:.9em; color:#666; }
+.line-row:hover .line-details, .line-row:focus-within .line-details { display:block; }
+.dashboard-tab label { display:block; margin-top:8px; font-weight:800; }
+@media (max-width: 700px) {
+  .topbar-controls { justify-content:stretch; }
+  .topbar-controls input, .topbar-controls select, .time-controls, .menu-wrap { flex:1 1 calc(50% - 6px); max-width:none; }
+  .seed-control { flex:1 1 calc(50% - 6px); }
+  .seed-control input { width:100%; min-width:0; }
+  .floating-toolbar { bottom:10px; gap:5px; padding:6px; }
+  .floating-toolbar .btn, .floating-toolbar select { min-height:36px; padding:6px 8px; font-size:.72rem; }
+}

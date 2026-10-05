@@ -512,6 +512,9 @@ export function step(state, rng, log) {
   for (let d = 0; d < daysCrossed; d++) {
     state.elapsedDays = (state.elapsedDays || 0) + 1;
     growCity(state, rng, log);
+    if (typeof globalThis !== "undefined" && typeof globalThis.__vieTLignesInvalidateUrbanCache === "function") {
+      globalThis.__vieTLignesInvalidateUrbanCache();
+    }
     applySeasonalGrowth(state);
     maybeEndRoadworks(state, log);
     maybeStartRoadworks(state, rng, log);

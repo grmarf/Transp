@@ -17,61 +17,52 @@
 <header class="topbar" aria-label="En-tête du jeu">
   <div class="brand">
     <span class="brand-bus" aria-hidden="true">🚌</span>
-    <div>
-      <h1>Vie t'Lignes</h1>
-      <span class="tagline">Vit la ville plus vite, en lignes !</span>
+    <div><h1>Vie t'Lignes</h1><span class="tagline">Vit la ville plus vite, en lignes !</span></div>
+  </div>
+  <div class="topbar-controls" aria-label="Contrôles principaux">
+    <label class="sr-only" for="cityNameInput">Nom de la ville</label>
+    <input id="cityNameInput" class="city-name-input" type="text" maxlength="60" autocomplete="off" spellcheck="false" aria-label="Nom de la ville" placeholder="Nom de la ville">
+    <label class="sr-only" for="seedInput">Seed</label>
+    <div class="seed-control"><input id="seedInput" type="text" maxlength="40" readonly autocomplete="off" spellcheck="false" aria-label="Seed de la ville" title="Même seed = même ville générée"><button id="seedDiceBtn" type="button" class="icon-button" aria-label="Générer une nouvelle seed" title="Nouvelle seed">🎲</button></div>
+    <label class="sr-only" for="scenarioSelect">Scénario</label>
+    <select id="scenarioSelect" aria-label="Scénario de jeu"></select>
+    <div class="time-controls" aria-label="Temps"><span class="toolbar-caption">⏱️</span><button id="pauseBtn" type="button" class="btn" aria-label="Mettre en pause ou reprendre la partie">⏸ Pause</button><button id="speedBtn" type="button" class="btn" aria-label="Modifier la vitesse de simulation">▶ 1×</button></div>
+    <div class="menu-wrap"><button id="gameMenuBtn" type="button" class="btn" aria-expanded="false" aria-controls="gameMenuDropdown">☰ Menu</button>
+      <div id="gameMenuDropdown" class="menu-dropdown" role="menu">
+        <button id="newCityBtn" type="button" role="menuitem" class="btn btn-warn">🏙️ Nouvelle ville</button>
+        <button id="saveBtn" type="button" role="menuitem" class="btn">💾 Sauvegarder</button>
+        <button id="loadBtn" type="button" role="menuitem" class="btn">📂 Charger</button>
+        <button id="exportBtn" type="button" role="menuitem" class="btn">📤 Exporter</button>
+        <label role="menuitem" class="menu-file-label" for="importFile">📥 Importer</label><input id="importFile" type="file" accept="application/json" aria-label="Importer une sauvegarde JSON">
+      </div>
     </div>
   </div>
-  <div class="stats" aria-label="Statistiques principales">
-    <span class="stat-chip" aria-label="Budget">💰 <b id="money">0 €</b></span>
-    <span class="stat-chip" aria-label="Passagers transportés">👥 <b id="passengers">0</b></span>
-    <span class="stat-chip" aria-label="Satisfaction">😊 <b id="satisfaction">0%</b></span>
-    <span class="stat-chip" aria-label="Heure de jeu">🕒 <b id="clock">08:00</b></span>
-  </div>
+  <div class="stats" aria-label="Statistiques principales"><span class="stat-chip" aria-label="Budget">💰 <b id="money">0 €</b></span><span class="stat-chip" aria-label="Passagers transportés">👥 <b id="passengers">0</b></span><span class="stat-chip" aria-label="Satisfaction">😊 <b id="satisfaction">0%</b></span><span class="stat-chip" aria-label="Heure de jeu">🕒 <b id="clock">08:00</b></span></div>
 </header>
 
 <main class="app-shell">
   <section class="map-panel" aria-label="Carte et commandes de transport">
-    <div class="toolbar" role="toolbar" aria-label="Commandes de partie">
-      <button id="newLineBtn" type="button" class="btn btn-primary" aria-label="Créer ou annuler une nouvelle ligne">✏️ Nouvelle ligne</button>
-      <button id="advertisingBtn" type="button" class="btn btn-warn" aria-label="Ouvrir les campagnes publicitaires">📣 Publicité</button>
-      <button id="buildRoadBtn" type="button" class="btn" aria-label="Construire une route libre">🛣️ Construire une route</button>
-      <label class="sr-only" for="roadTypeSelect">Type de route</label>
-      <select id="roadTypeSelect" aria-label="Type de route à construire" title="Hiérarchie de la voirie">
-        <option value="local">🏘️ Locale · desserte · arrêts</option>
-        <option value="secondary">🔗 Secondaire · liaison · arrêts</option>
-        <option value="arterial">🛣️ Boulevard 2×2 · transit · sans arrêt</option>
-      </select>
-      <button id="removeRoadBtn" type="button" class="btn" aria-label="Supprimer une route libre">🧹 Supprimer une route</button>
-      <label class="sr-only" for="modeSelect">Mode de transport</label>
-      <select id="modeSelect" aria-label="Mode de transport">
-        <option value="bus">🚌 Bus</option>
-        <option value="tram">🚊 Tramway</option>
-        <option value="metro">🚇 Métro</option>
-      </select>
-      <button id="finishLineBtn" type="button" class="btn btn-success" aria-label="Terminer la ligne" hidden>✅ Terminer</button>
-      <button id="pauseBtn" type="button" class="btn" aria-label="Mettre en pause ou reprendre la partie">⏸ Pause</button>
-      <button id="speedBtn" type="button" class="btn" aria-label="Modifier la vitesse de simulation">▶ 1×</button>
+    <div class="floating-toolbar" role="toolbar" aria-label="Outils de carte">
+      <button id="newLineBtn" type="button" class="btn btn-primary" aria-label="Créer ou annuler une nouvelle ligne">✏️ Ligne</button>
       <button id="resetZoomBtn" type="button" class="btn" aria-label="Recentrer la carte sur la ville">🎯 Recentrer</button>
-      <button id="saveBtn" type="button" class="btn" aria-label="Sauvegarder la partie">💾 Sauver</button>
-      <button id="loadBtn" type="button" class="btn" aria-label="Charger la partie sauvegardée">📂 Charger</button>
+      <button id="voirieBtn" type="button" class="btn" aria-expanded="false" aria-controls="voirieGroup">🛣️ Voirie</button>
+      <div id="voirieGroup" class="tool-group" data-open="false">
+        <button id="buildRoadBtn" type="button" class="btn" aria-label="Construire une route libre">🛣️ Construire</button>
+        <button id="removeRoadBtn" type="button" class="btn" aria-label="Supprimer une route libre">🧹 Supprimer</button>
+        <label class="sr-only" for="roadTypeSelect">Type de route</label><select id="roadTypeSelect" aria-label="Type de route à construire"><option value="local">🏘️ Locale</option><option value="secondary">🔗 Secondaire</option><option value="arterial">🛣️ Artère</option></select>
+      </div>
+      <div id="modeGroup" class="tool-group"><label class="sr-only" for="modeSelect">Mode de transport</label><select id="modeSelect" aria-label="Mode de transport"><option value="bus">🚌 Bus</option><option value="tram">🚊 Tramway</option><option value="metro">🚇 Métro</option></select></div>
+      <button id="finishLineBtn" type="button" class="btn btn-success" aria-label="Terminer la ligne" hidden>✅ Terminer</button>
     </div>
-
-    <div class="city-controls" aria-label="Paramètres de ville">
-      <label for="seedInput">🌱 Seed</label>
-      <input id="seedInput" type="text" maxlength="40" autocomplete="off" spellcheck="false" aria-label="Seed de la ville" title="Même seed = même ville générée">
-      <label for="scenarioSelect">🎲 Scénario</label>
-      <select id="scenarioSelect" aria-label="Scénario de jeu"></select>
-      <button id="newCityBtn" type="button" class="btn btn-warn" aria-label="Générer une nouvelle ville">🏙️ Nouvelle ville</button>
-      <label for="cityNameInput">🏷️ Ville</label>
-      <input id="cityNameInput" class="city-name-input" type="text" maxlength="60" autocomplete="off" spellcheck="false" aria-label="Nom de la ville">
-    </div>
-
     <div class="instructions" id="instructions" aria-live="polite"></div>
     <div class="scenario-banner" id="scenarioBanner" aria-live="polite" hidden></div>
 
     <div class="canvas-wrap">
       <canvas id="map" aria-label="Carte de la ville et du réseau de transport"></canvas>
+      <div class="map-overlays" aria-label="Affichages de la carte">
+        <button id="advertisingBtn" type="button" class="map-overlay-btn" aria-label="Ouvrir les campagnes publicitaires" title="Publicité">📣</button>
+        <div class="map-overlay-right"><button id="toggleHeatmapBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false" title="Congestion">🔥</button><button id="toggleCoverageBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la couverture du réseau" aria-pressed="false" title="Couverture">📍</button></div>
+      </div>
 
       <div id="heatmapLegend" class="heatmap-legend" hidden aria-hidden="true">
         <b>🔥 Congestion</b>
@@ -97,6 +88,7 @@
           </div>
         </section>
         <section class="card"><h2>🕸️ Mon réseau</h2><div id="networkStats"></div></section>
+        <section class="card"><h2>💰 Finances & Tendances</h2><div id="intermodalStats"></div><div class="advertising-box" id="advertisingPanel" aria-live="polite"></div><h3>💹 Finances (14 jours)</h3><canvas id="financialChart" width="200" height="100" aria-label="Évolution financière sur 14 jours"></canvas></section>
         <section class="card"><h2>💡 Idées & alertes</h2><div id="opportunities"></div></section>
         <section class="card"><h2>📍 Arrêt sélectionné</h2><div id="stopInfo">Clique sur un arrêt sur la carte !</div></section>
         <section class="card"><h2>🗺️ Vue d'ensemble</h2><div id="cityOverview"></div></section>
@@ -109,35 +101,17 @@
       <summary>🚌 Lignes & flotte</summary>
       <div class="tab-content">
         <section class="card"><h2>🛣️ Mes lignes</h2><div id="lines"></div></section>
-        <section class="card">
-          <h2>🧰 Outils</h2>
-          <button id="toggleHeatmapBtn" type="button" class="btn" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false">🔥 Congestion</button>
-          <button id="toggleCoverageBtn" type="button" class="btn" aria-label="Afficher ou masquer la couverture du réseau" aria-pressed="false">📍 Couverture</button>
-          <label for="fareLevelSelect" style="display:block;margin-top:8px">🎟️ Tarif :
-            <select id="fareLevelSelect" class="btn">
-              <option value="0.8">Réduit (×0,8)</option>
-              <option value="1" selected>Normal (×1)</option>
-              <option value="1.2">Élevé (×1,2)</option>
-              <option value="1.5">Premium (×1,5)</option>
-            </select>
-          </label>
-          <label for="wageLevelSelect" style="display:block;margin-top:8px">👷 Salaires :
-            <select id="wageLevelSelect" class="btn">
-              <option value="0.8">Bas (×0,8)</option>
-              <option value="0.9">Réduit (×0,9)</option>
-              <option value="1" selected>Normal (×1)</option>
-              <option value="1.1">Élevé (×1,1)</option>
-              <option value="1.2">Très élevé (×1,2)</option>
-            </select>
-          </label>
-          <div id="intermodalStats"></div>
-          <div class="advertising-box" id="advertisingPanel" aria-live="polite"></div>
-          <h3>💹 Finances (14 jours)</h3>
-          <canvas id="financialChart" width="200" height="100" aria-label="Évolution financière sur 14 jours"></canvas>
-        </section>
+
       </div>
     </details>
 
+    <details class="dashboard-tab">
+      <summary>⚙️ Réglages & Affichage</summary>
+      <div class="tab-content"><section class="card"><h2>⚙️ Préférences</h2>
+        <label for="fareLevelSelect">🎟️ Tarif : <select id="fareLevelSelect" class="btn"><option value="0.8">Réduit (×0,8)</option><option value="1" selected>Normal (×1)</option><option value="1.2">Élevé (×1,2)</option><option value="1.5">Premium (×1,5)</option></select></label>
+        <label for="wageLevelSelect">👷 Salaires : <select id="wageLevelSelect" class="btn"><option value="0.8">Bas (×0,8)</option><option value="0.9">Réduit (×0,9)</option><option value="1" selected>Normal (×1)</option><option value="1.1">Élevé (×1,1)</option><option value="1.2">Très élevé (×1,2)</option></select></label>
+      </section></div>
+    </details>
     <details class="dashboard-tab">
       <summary>🏆 Défis & succès</summary>
       <div class="tab-content">
@@ -159,9 +133,7 @@
         <section class="card"><h2>📖 Journal de ville</h2><div id="journal" aria-live="polite"></div></section>
         <section class="card">
           <h2>💾 Sauvegarde fichier</h2>
-          <button id="exportBtn" type="button" class="btn" aria-label="Exporter la sauvegarde au format JSON">📤 Exporter</button>
-          <label class="import-label" for="importFile">📥 Importer</label>
-          <input id="importFile" type="file" accept="application/json" aria-label="Importer une sauvegarde JSON">
+
         </section>
         <section class="card log-card"><h2>🗒️ Journal technique</h2><div id="log" aria-live="polite"></div></section>
       </div>
