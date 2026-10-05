@@ -50,16 +50,22 @@ export function maybeStartRoadworks(state, rng, log) {
   const openEdges = network.edges.filter(e => !network.closedEdgeIds.has(e.id));
   if (openEdges.length < 2) return;
 
-  const edge = openEdges[Math.floor(rng() * openEdges.length)];
-
   // Never let a closure fully sever the network into unreachable pieces —
-  // tentatively close it, check connectivity, undo if that would isolate
-  // any stop.
-  network.closedEdgeIds.add(edge.id);
-  if (countComponents(network) > 1) {
-    network.closedEdgeIds.delete(edge.id);
-    return;
+  // tentatively close each candidate, starting at the random position, and
+  // skip bridges. This keeps roadworks active even when the first random
+  // edge happens to be the only connection to a district.
+  const startIndex = Math.floor(rng() * openEdges.length);
+  let edge = null;
+  for (let offset = 0; offset < openEdges.length; offset++) {
+    const candidate = openEdges[(startIndex + offset) % openEdges.length];
+    network.closedEdgeIds.add(candidate.id);
+    if (countComponents(network) === 1) {
+      edge = candidate;
+      break;
+    }
+    network.closedEdgeIds.delete(candidate.id);
   }
+  if (!edge) return;
 
   const duration = ROADWORKS_DURATION_DAYS_MIN +
     Math.floor(rng() * (ROADWORKS_DURATION_DAYS_MAX - ROADWORKS_DURATION_DAYS_MIN + 1));

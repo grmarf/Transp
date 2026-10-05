@@ -216,29 +216,33 @@ export function createTramNetwork(city) {
   return { version: "23.0-tram", nodes, edges, adjacency, pathCache: new Map(), independent: true };
 }
 
-// V6.0 — grafts a new node onto an existing one (used when a satellite
-// district appears). A single new edge is enough since satellites are
-// leaf branches; clearing the path cache keeps routing correct even
-// though, in practice, a leaf addition can't shorten any existing path.
+// V6.0/V24 — helpers for extending the surface graph as the city grows.
+export function addNetworkEdge(network, aId, bId, type = "secondary") {
+  if (aId === bId || !network.nodes.has(aId) || !network.nodes.has(bId)) return null;
+  const duplicate = network.edges.find(edge =>
+    (edge.a === aId && edge.b === bId) || (edge.a === bId && edge.b === aId));
+  if (duplicate) return duplicate;
+  const a = network.nodes.get(aId);
+  const b = network.nodes.get(bId);
+  const spec = roadType(type);
+  const length = distance(a, b);
+  const edge = { id: `road-${network.edges.length + 1}`, a: aId, b: bId, type: spec.id,
+    lanes: spec.lanes, speed: spec.speed, allowStops: spec.allowStops, length,
+    weight: length / spec.speed };
+  network.edges.push(edge);
+  network.adjacency.get(aId).push({ to: bId, edge, weight: edge.weight });
+  network.adjacency.get(bId).push({ to: aId, edge, weight: edge.weight });
+  network.pathCache.clear();
+  return edge;
+}
 export function addNetworkNode(network, id, x, y, parentId) {
   if (network.nodes.has(id)) return;
-  const parent = network.nodes.get(parentId);
-  if (!parent) return;
-
+  if (!network.nodes.has(parentId)) return;
   network.nodes.set(id, { id, x, y, name: id });
   network.adjacency.set(id, []);
-
-  const weight = distance(parent, { x, y });
-  const spec = roadType("secondary");
-  const edge = { id: `road-${network.edges.length + 1}`, a: parentId, b: id, type: "secondary",
-    lanes: spec.lanes, speed: spec.speed, allowStops: true, length: weight, weight: weight / spec.speed };
-  network.edges.push(edge);
-  network.adjacency.get(parentId).push({ to: id, edge, weight: edge.weight });
-  network.adjacency.get(id).push({ to: parentId, edge, weight: edge.weight });
-  network.pathCache.clear();
+  addNetworkEdge(network, parentId, id, "secondary");
   network.junctions = network.junctions || [];
 }
-
 // V13.0 — underground network: a metro tunnel doesn't need existing roads,
 // so metro lines route through a fully independent, complete graph over
 // the city's stops (every pair of stops has a direct tunnel edge) instead

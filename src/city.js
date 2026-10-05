@@ -76,6 +76,26 @@ function randomStopName(rng, used, index) {
   used.add(name);
   return name;
 }
+function nearestThreeStops(stop, stops) {
+  return stops
+    .filter(other => other.id !== stop.id)
+    .sort((a, b) => Math.hypot(a.x - stop.x, a.y - stop.y) - Math.hypot(b.x - stop.x, b.y - stop.y))
+    .slice(0, 3);
+}
+function chooseRoadParents(stop, availableStops, rng) {
+  const nearest = nearestThreeStops(stop, availableStops);
+  if (!nearest.length) return [];
+  // Le premier raccordement est tiré parmi les trois voisins les plus
+  // proches. Une seconde liaison apparaît parfois, mais reste dans ce même
+  // voisinage pour limiter les croisements et les longues diagonales.
+  const primary = nearest[Math.floor(rng() * nearest.length)];
+  const parents = [primary];
+  if (nearest.length > 1 && rng() < 0.35) {
+    const alternatives = nearest.filter(candidate => candidate.id !== primary.id);
+    parents.push(alternatives[Math.floor(rng() * alternatives.length)]);
+  }
+  return parents;
+}
 
 export function createCity(seedInput) {
   const seed = String(seedInput || "TRANSPORT-2026").trim() || "TRANSPORT-2026";
@@ -162,25 +182,30 @@ export function createCity(seedInput) {
   // Deux corridors continus autour du centre, prolongés par la croissance.
   addRoad(stops[1].id, stops[0].id, "arterial", { corridorId: "north-south" });
   addRoad(stops[0].id, stops[2].id, "arterial", { corridorId: "north-south" });
-  // Chaque nouveau quartier se branche au quartier déjà le plus proche. La
-  // hiérarchie est stable pour une seed donnée et ne crée pas d’artères en
-  // cascade.
+  // Chaque quartier se branche aléatoirement à l’un des trois arrêts les
+  // plus proches. Une seconde liaison facultative reste limitée à ces trois
+  // voisins, ce qui conserve la connectivité tout en réduisant les croisements.
   for (let i = 3; i < stops.length; i++) {
     const child = stops[i];
-    const parent = stops.slice(0, i).reduce((best, candidate) =>
-      Math.hypot(candidate.x - child.x, candidate.y - child.y) <
-      Math.hypot(best.x - child.x, best.y - child.y) ? candidate : best);
-    addRoad(parent.id, child.id, i % 3 === 0 ? "secondary" : "local");
+    const parents = chooseRoadParents(child, stops.slice(0, i), rng);
+    parents.forEach((parent, linkIndex) => {
+      addRoad(parent.id, child.id, linkIndex === 0 ? "secondary" : "local");
+    });
   }
-  // Boucle de rabattement : le premier axe reste fermable sans isoler la ville.
-  if (stops.length > 3) {
-    addRoad(stops[1].id, stops[3].id, "secondary", { corridorId: "north-south-feeder" });
-    addRoad(stops[2].id, stops[3].id, "local");
+
+  // Une carte entièrement arborescente ne permettrait aucune fermeture de
+  // route sans isoler un quartier. Si le tirage aléatoire n’a produit aucune
+  // seconde liaison, on crée une boucle de secours, toujours vers l’un des
+  // trois voisins les plus proches.
+  if (roads.length === stops.length - 1 && stops.length > 3) {
+    const child = stops[3];
+    const existingParents = new Set(roads
+      .filter(road => road.a === child.id || road.b === child.id)
+      .map(road => road.a === child.id ? road.b : road.a));
+    const backupParent = nearestThreeStops(child, stops.slice(0, 3))
+      .find(candidate => !existingParents.has(candidate.id));
+    if (backupParent) addRoad(backupParent.id, child.id, "local");
   }
-  // Une seule liaison secondaire par côté complète les quartiers sans
-  // multiplier les croisements d’artères.
-  const byX = stops.slice(3).slice().sort((a, b) => a.x - b.x);
-  for (let i = 1; i < byX.length; i += 3) addRoad(byX[i - 1].id, byX[i].id, "secondary");
 
   return {
     id: `city-${numericSeed.toString(16)}`,
@@ -271,8 +296,17 @@ export function addSatelliteStop(city, parent, rng) {
     populationFactor: parentDistrict?.populationFactor ?? 1
   });
 
-  city.roads.push({ a: parent.id, b: stop.id, type: "secondary", lanes: 1,
-    speed: 1.1, allowStops: true, built: false, extensionOf: parent.id });
+  const parents = chooseRoadParents(stop, city.stops, rng);
+  // Le parent historique reste un filet de sécurité pour les anciennes
+  // sauvegardes ou cartes atypiques, mais la règle normale passe bien par les
+  // trois voisins les plus proches.
+  const roadParents = parents.length ? parents : [parent];
+  roadParents.forEach((roadParent, linkIndex) => {
+    city.roads.push({ a: roadParent.id, b: stop.id, type: linkIndex === 0 ? "secondary" : "local",
+      lanes: 1, speed: linkIndex === 0 ? 1.1 : 0.85, allowStops: true, built: false,
+      extensionOf: roadParent.id });
+  });
+  stop.roadParentIds = roadParents.map(roadParent => roadParent.id);
   city.stops.push(stop);
   return stop;
 }

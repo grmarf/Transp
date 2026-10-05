@@ -5,7 +5,7 @@
  * city itself expands with a new district.
  */
 import { DISTRICT_AREA_KM2, addSatelliteStop } from "./city.js";
-import { addNetworkNode, createUndergroundNetwork } from "./network.js";
+import { addNetworkNode, addNetworkEdge, createUndergroundNetwork } from "./network.js";
 import { lineHeadwayMinutes } from "./vehicles.js";
 
 // Daily growth rates (this runs once per simulated day, not per tick).
@@ -67,7 +67,9 @@ function maybeSpawnSatellite(state, rng, log, levels) {
   const service = levels.get(candidate.id) || 0;
 
   const newStop = addSatelliteStop(state.city, candidate, rng);
-  addNetworkNode(state.network, newStop.id, newStop.x, newStop.y, candidate.id);
+  const [primaryParentId, ...secondaryParentIds] = newStop.roadParentIds || [candidate.id];
+  addNetworkNode(state.network, newStop.id, newStop.x, newStop.y, primaryParentId);
+  for (const parentId of secondaryParentIds) addNetworkEdge(state.network, parentId, newStop.id, "local");
   // V13.0: the underground network is a complete graph over every stop, so
   // a new stop needs a fresh rebuild (cheap at this scale) rather than an
   // incremental patch — regenerating it here keeps metro tunnels reachable
