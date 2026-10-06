@@ -84,10 +84,18 @@ export function buyVehicleForLine(state, lineId, log) {
 }
 
 export function returnPassengersToWaiting(state, vehicle) {
+  // Correction : les passagers redescendent a l'arret reseau le plus proche de
+  // la position actuelle du vehicule, pas a leur origine, sinon une revente
+  // ou une modification de ligne les teleportait gratuitement au depart.
+  const line = state.lines.find(l => l.id === vehicle.lineId);
+  const routeIds = line?.route?.nodeIds;
+  const dropStopId = Array.isArray(routeIds) && routeIds.length
+    ? routeIds[Math.min(vehicle.routeIndex || 0, routeIds.length - 1)]
+    : null;
   for (const passengerId of vehicle.onboard) {
     const passenger = state.passengers.find(p => p.id === passengerId);
     if (!passenger) continue;
-    passenger.currentStopId = passenger.originId;
+    passenger.currentStopId = dropStopId || passenger.currentStopId || passenger.originId;
     passenger.legIndex = 0;
     passenger.itinerary = null;
     passenger.vehicleId = null;
@@ -252,7 +260,10 @@ function alightPassengers(state, line, vehicle, stop) {
       passenger.transfersDone = (passenger.transfersDone || 0) + 1;
       passenger.currentStopId = stop.id;
       passenger.vehicleId = null;
-      passenger.waitedMinutes = (passenger.waitedMinutes || 0) + 5 * state.speed;
+      // Correction : penalite de correspondance fixe (5 minutes simulees).
+      // Elle etait multipliee par state.speed, donc une correspondance a 1000x
+      // ajoutait 5000 min d'attente fictive et ruinait la satisfaction.
+      passenger.waitedMinutes = (passenger.waitedMinutes || 0) + 5;
       passenger.state = PASSENGER_STATES.WAITING;
     }
   }

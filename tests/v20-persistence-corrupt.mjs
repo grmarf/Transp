@@ -29,7 +29,9 @@ const invalidCases = [
   ['route vers arrêt inconnu', payload => { payload.state.city.roads[0].b = 'stop-unknown'; }],
   ['RNG négatif', payload => { payload.rngState = -1; }],
   ['RNG hors uint32', payload => { payload.rngState = 0x100000000; }],
-  ['argent négatif', payload => { payload.state.money = -1; }],
+  // La dette est desormais legale (voir engine.js) ; on verifie a la place
+  // qu'un argent non numerique reste refuse.
+  ['argent non numérique', payload => { payload.state.money = NaN; }],
   ['heure hors journée', payload => { payload.state.time = 1440; }],
   ['réseau mal sérialisé', payload => { payload.state.network.closedEdgeIds = ['road-1', 42]; }],
 ];

@@ -1,7 +1,7 @@
 /** V17.0 — renewable network contracts. */
 
 export const CONTRACT_TYPES = Object.freeze([
-  { id: "ridership", label: "Plan de fréquentation", description: "Transporter 25 passagers pendant la période.", target: 25, reward: 1800, reputation: 3, metric: state => state.totalArrived },
+  { id: "ridership", label: "Plan de fréquentation", description: "Transporter 25 passagers pendant la période.", target: 25, reward: 1800, reputation: 3, metric: (state, _metrics, active) => Math.max(0, (state.totalArrived || 0) - (active?.baseline ?? 0)) },
   { id: "service", label: "Qualité de service", description: "Maintenir 65% de satisfaction.", target: 65, reward: 2200, reputation: 4, metric: (_state, metrics) => metrics.satisfaction || 0 },
   { id: "coverage", label: "Desserte urbaine", description: "Desservir au moins 35% de la population.", target: 0.35, reward: 2600, reputation: 5, metric: (_state, metrics) => metrics.coverage || 0 },
   { id: "intermodal", label: "Correspondances fluides", description: "Atteindre 10% de trajets avec correspondance.", target: 0.1, reward: 3000, reputation: 6, metric: (_state, metrics) => metrics.transferShare || 0 }
@@ -23,7 +23,7 @@ export function refreshContracts(state, day = state.elapsedDays || 0) {
   if (state.activeContracts.length && state.contractsEndDay > day) return false;
   state.contractCycle += 1;
   state.contractsEndDay = day + 3;
-  state.activeContracts = selectContracts(state.contractCycle).map(contract => ({ id: contract.id, cycle: state.contractCycle, startedDay: day, completed: false }));
+  state.activeContracts = selectContracts(state.contractCycle).map(contract => ({ id: contract.id, cycle: state.contractCycle, startedDay: day, completed: false, baseline: state.totalArrived || 0 }));
   return true;
 }
 
@@ -31,7 +31,7 @@ export function contractSummary(state, metrics = {}) {
   ensureContracts(state);
   return state.activeContracts.map(active => {
     const type = CONTRACT_TYPES.find(contract => contract.id === active.id);
-    const value = type?.metric(state, metrics) || 0;
+    const value = type?.metric(state, metrics, active) || 0;
     return { ...active, ...type, value, progress: Math.max(0, Math.min(1, value / type.target)), remainingDays: Math.max(0, (state.contractsEndDay || 0) - (state.elapsedDays || 0)) };
   });
 }

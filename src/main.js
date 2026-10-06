@@ -641,8 +641,12 @@ function boot(seed, scenarioId, restoredPayload) {
 
   if (restoredPayload) {
     nextState = restoredPayload.state;
-    nextState.network = createNetwork(nextState.city);
+    // Correction : les fermetures pour travaux (closedEdgeIds /
+    // roadworksReopenDay) doivent etre lues AVANT de reconstruire le reseau
+    // depuis la ville, sinon elles etaient definitivement perdues au
+    // chargement d'une sauvegarde (les travaux rouvraient en silence).
     const savedNetwork = restoredPayload.state.network;
+    nextState.network = createNetwork(nextState.city);
     if (savedNetwork && savedNetwork.closedEdgeIds && savedNetwork.closedEdgeIds.length) {
       nextState.network.closedEdgeIds = new Set(savedNetwork.closedEdgeIds);
     }

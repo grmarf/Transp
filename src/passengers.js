@@ -6,9 +6,11 @@ export const PASSENGER_STATES = Object.freeze({
 
 let nextPassengerId = 1;
 
-export function createPassenger({ originId, destinationId, createdAt = 0, demographic = null }) {
+export function createPassenger({ id = null, originId, destinationId, createdAt = 0, demographic = null }) {
   return {
-    id: nextPassengerId++, originId, destinationId, currentStopId: originId,
+    // Correction : id explicite optionnel, l'appelant qui gere un compteur
+    // d'etat (sauvegardes) n'ecrase plus l'id du compteur du module.
+    id: id ?? nextPassengerId++, originId, destinationId, currentStopId: originId,
     state: PASSENGER_STATES.WAITING, itinerary: null, legIndex: 0,
     vehicleId: null, createdAt, waitedMinutes: 0, arrivedAt: null,
     transfersDone: 0, travelMinutes: 0, demographic
