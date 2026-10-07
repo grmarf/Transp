@@ -21,7 +21,7 @@
 
 set -e
 PORT=8791
-GAMEDIR="${1:-$HOME/tycoon-www}"
+GAMEDIR="${1:-$HOME/vie-t-lignes-www}"
 
 if [ ! -f "$GAMEDIR/index.html" ]; then
   echo ""

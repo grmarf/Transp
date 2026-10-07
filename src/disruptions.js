@@ -32,7 +32,9 @@ export function refreshAllLineRoutes(state, log) {
       // through; clamp it back onto the line rather than leaving it
       // indexing past the end of the new route.
       if (vehicle && vehicle.routeIndex >= newRoute.nodeIds.length) {
-        vehicle.routeIndex = 0;
+        // Correction : clamper au dernier noeud valide du nouvel itineraire au
+        // lieu de repartir de 0 (le vehicule etait teleporte au depart).
+        vehicle.routeIndex = Math.max(0, newRoute.nodeIds.length - 1);
         vehicle.progress = 0;
       }
     }

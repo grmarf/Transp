@@ -112,7 +112,9 @@ function validateState(state) {
   const stopIds = validateCity(state.city);
   for (const field of ["lines", "vehicles", "passengers", "dailyStats", "dailyReports", "activeEvents", "activeContracts", "activeCampaigns", "completedGoals"]) array(state[field], `état.${field}`);
   for (const field of ["money", "time", "elapsedDays", "nextLineId", "nextVehicleId", "nextPassengerId", "transported", "totalDemand", "totalGenerated", "totalBoarded", "totalArrived"]) finite(state[field], `état.${field}`);
-  if (state.money < 0 || state.time < 0 || state.time >= 1440 || state.elapsedDays < 0) invalid("compteur temporel ou financier hors limites");
+  // Correction : l'argent peut desormais etre negatif (dette visible),
+  // seuls les compteurs temporels restent bornes.
+  if (state.time < 0 || state.time >= 1440 || state.elapsedDays < 0) invalid("compteur temporel hors limites");
   for (const field of ["elapsedDays", "nextLineId", "nextVehicleId", "nextPassengerId", "transported", "totalBoarded", "totalArrived"]) integer(state[field], `état.${field}`, { min: 0 });
   if (state.totalAbandoned !== undefined) integer(state.totalAbandoned, "état.totalAbandoned", { min: 0 });
   if (state.logs !== undefined) {
@@ -152,6 +154,7 @@ function validateState(state) {
     object(contract, "état.activeContracts[]"); string(contract.id, "contrat.id"); integer(contract.cycle, "contrat.cycle", { min: 0 });
     integer(contract.startedDay, "contrat.startedDay", { min: 0 });
     if (typeof contract.completed !== "boolean") invalid("contrat.completed invalide");
+    if (contract.baseline !== undefined) integer(contract.baseline, "contrat.baseline", { min: 0 });
   }
   if (state.contractHistory !== undefined) {
     array(state.contractHistory, "état.contractHistory");

@@ -333,11 +333,11 @@ export function generateDemand(state, rng) {
 
         for (let n = 0; n < count; n++) {
           const passenger = createPassenger({
+            id: state.nextPassengerId++,
             originId: origin.id,
             destinationId: destination.id,
             createdAt: (state.time + slice * sliceMinutes) % 1440
           });
-          passenger.id = state.nextPassengerId++;
           if (state.demographicsEnabled) passenger.demographic = pickDemographic(rng, hour);
           passenger.itinerary = findPassengerRoute(state, origin.id, destination.id);
           if (!passenger.itinerary) {
@@ -575,8 +575,10 @@ export function step(state, rng, log) {
     cleanupPassengers(state);
   }
   state.time = newTime % 1440;
-  if (state.money < 0) {
-    state.money = 0;
-    if (rng() < 0.05) log("Les finances sont à zéro : le réseau accumule du retard.");
+  // Correction : un budget negatif n'est plus silencieusement remis a zero
+  // chaque tick (dettes effacees = argent gratuit). La dette reste visible et
+  // sauvegardable ; le joueur doit la combler.
+  if (state.money < 0 && rng() < 0.05) {
+    log("Le budget est négatif : réduisez les dépenses pour éviter la faillite.");
   }
 }
