@@ -65,6 +65,9 @@ try {
   await cdp('Runtime.enable');
   await cdp('Log.enable');
   await cdp('Page.enable');
+  await cdp('Emulation.setDeviceMetricsOverride', {
+    width: 1280, height: 900, deviceScaleFactor: 1, mobile: false
+  });
   await cdp('Page.navigate', { url });
   await sleep(1000);
 
@@ -74,6 +77,9 @@ try {
     expression: `(() => {
       const initial = window.__vieTLignes?.getState();
       if (!initial) throw new Error('état global absent');
+      const dashboard = document.querySelector('.dashboard');
+      const dashboardRect = dashboard.getBoundingClientRect();
+      const desktopDashboardVisible = dashboardRect.width > 0 && dashboardRect.right <= window.innerWidth + 1;
       document.querySelector('#newLineBtn').click();
       const canvas = document.querySelector('#map');
       const rect = canvas.getBoundingClientRect();
@@ -118,6 +124,7 @@ try {
       document.querySelector('#toggleHeatmapBtn').click();
       return {
         created, loaded, builtRoads, loadedBuiltRoads, removeMode, renamed, seedFieldRemoved,
+        desktopDashboardVisible,
         initialRoadCount, initialRoadsAfterRemove,
         escaped: document.querySelector('#log').innerHTML.includes('&lt;img'),
         executableImage: Boolean(document.querySelector('#log img')),
@@ -134,6 +141,7 @@ try {
   assert.equal(value.removeMode, 'true', 'le mode suppression doit pouvoir être activé');
   assert.equal(value.renamed, 'Lyon-sur-Test', 'le nom de ville doit être modifiable sans écrasement');
   assert.equal(value.seedFieldRemoved, true, 'le seed ne doit plus être affiché');
+  assert.equal(value.desktopDashboardVisible, true, 'le tableau de bord droit doit rester visible sur PC');
   assert.equal(value.initialRoadsAfterRemove, value.initialRoadCount - 1, 'une route initiale doit pouvoir être supprimée');
   assert.equal(value.escaped, true, 'le journal doit échapper le HTML');
   assert.equal(value.executableImage, false, 'aucune balise img ne doit être créée');
