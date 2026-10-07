@@ -115,7 +115,7 @@ function updateInstructions() {
   if (state.roadEditMode === "build") {
     el.innerHTML = state.pendingRoadPoint ? "Construction : clique le <b>second point</b>." : "Construction : clique le <b>premier point</b>.";
   } else if (state.roadEditMode === "remove") {
-    el.innerHTML = "Suppression : clique une <b>route construite</b>.";
+    el.innerHTML = "Suppression : clique une <b>route</b>.";
   } else if (state.lineMode) {
     if (extending) {
       const line = state.lines.find(function (l) { return l.id === state.extendingLineId; });
@@ -268,6 +268,23 @@ function screenPoint(e) {
   return { x: worldX, y: worldY };
 }
 
+function roadDegree(stopId, ignoredRoad = null) {
+  if (!state || !stopId) return 0;
+  return state.city.roads.reduce(function (degree, road) {
+    if (road === ignoredRoad) return degree;
+    return degree + (road.a === stopId || road.b === stopId ? 1 : 0);
+  }, 0);
+}
+
+function roadEndpoints(road) {
+  if (road.start && road.end) return { start: road.start, end: road.end };
+  const startStop = state.city.stops.find(function (stop) { return stop.id === (road.a || road.startStopId); });
+  const endStop = state.city.stops.find(function (stop) { return stop.id === (road.b || road.endStopId); });
+  return startStop && endStop
+    ? { start: { x: startStop.x, y: startStop.y }, end: { x: endStop.x, y: endStop.y } }
+    : null;
+}
+
 function clickMap(e) {
   // L’API publique historique reçoit des coordonnées dans le repère monde
   // du canvas (sans type d’événement). Les vrais pointer events passent par
@@ -308,18 +325,25 @@ function clickMap(e) {
           road.a = road.startStopId;
           road.b = road.endStopId;
         }
-        state.city.roads.push(road);
-        if (road.a && road.b) {
+        const overCapacity = (road.a && roadDegree(road.a) >= 3) || (road.b && roadDegree(road.b) >= 3);
+        if (overCapacity) {
+          log("Construction impossible : un arrêt ne peut pas être relié à plus de 3 routes.");
+        } else {
+          state.city.roads.push(road);
+        }
+        if (!overCapacity && road.a && road.b) {
           const closedEdgeIds = state.network && state.network.closedEdgeIds;
           const roadworksReopenDay = state.network && state.network.roadworksReopenDay;
           state.network = createNetwork(state.city);
           if (closedEdgeIds) state.network.closedEdgeIds = new Set(closedEdgeIds);
           if (roadworksReopenDay) state.network.roadworksReopenDay = new Map(roadworksReopenDay);
         }
-        state.money -= cost;
-        state.pendingRoadPoint = null;
-        state.pendingRoadStopId = null;
-        log(`Route construite (${cost.toLocaleString("fr-FR")} €).`);
+        if (!overCapacity) {
+          state.money -= cost;
+          state.pendingRoadPoint = null;
+          state.pendingRoadStopId = null;
+          log(`Route construite (${cost.toLocaleString("fr-FR")} €).`);
+        }
       }
     }
     updateInstructions();
@@ -331,16 +355,17 @@ function clickMap(e) {
     let nearestRoad = null;
     let nearestDistance = 100 / cameraState.zoom;
     state.city.roads.forEach(function (road) {
-      if (!road.built || !road.start || !road.end) return;
-      const dx = road.end.x - road.start.x;
-      const dy = road.end.y - road.start.y;
+      const endpoints = roadEndpoints(road);
+      if (!endpoints) return;
+      const dx = endpoints.end.x - endpoints.start.x;
+      const dy = endpoints.end.y - endpoints.start.y;
       const lengthSquared = dx * dx + dy * dy || 1;
-      const t = Math.max(0, Math.min(1, ((p.x - road.start.x) * dx + (p.y - road.start.y) * dy) / lengthSquared));
-      const distanceToRoad = Math.hypot(p.x - (road.start.x + t * dx), p.y - (road.start.y + t * dy));
-      const inDetourBounds = p.x >= Math.min(road.start.x, road.end.x) - 30 &&
-        p.x <= Math.max(road.start.x, road.end.x) + 30 &&
-        p.y >= Math.min(road.start.y, road.end.y) - 30 &&
-        p.y <= Math.max(road.start.y, road.end.y) + 30;
+      const t = Math.max(0, Math.min(1, ((p.x - endpoints.start.x) * dx + (p.y - endpoints.start.y) * dy) / lengthSquared));
+      const distanceToRoad = Math.hypot(p.x - (endpoints.start.x + t * dx), p.y - (endpoints.start.y + t * dy));
+      const inDetourBounds = p.x >= Math.min(endpoints.start.x, endpoints.end.x) - 30 &&
+        p.x <= Math.max(endpoints.start.x, endpoints.end.x) + 30 &&
+        p.y >= Math.min(endpoints.start.y, endpoints.end.y) - 30 &&
+        p.y <= Math.max(endpoints.start.y, endpoints.end.y) + 30;
       const hitDistance = inDetourBounds ? Math.min(distanceToRoad, 30) : distanceToRoad;
       if (hitDistance < nearestDistance) {
         nearestDistance = hitDistance;
@@ -357,8 +382,8 @@ function clickMap(e) {
       if (state.network && state.network.pathCache) state.network.pathCache.clear();
       invalidateRoutingCache(state);
       clearRendererCaches();
-      log("Route construite supprimée.");
-    } else log("Aucune route construite sous le curseur.");
+      log("Route supprimée.");
+    } else log("Aucune route sous le curseur.");
     updateInstructions();
     refreshUI();
     return;
@@ -716,8 +741,6 @@ function boot(seed, scenarioId, restoredPayload) {
   if (fareLevelSelect) fareLevelSelect.value = String(state.fareLevel ?? 1);
   const wageLevelSelect = document.getElementById("wageLevelSelect");
   if (wageLevelSelect) wageLevelSelect.value = String(state.wageLevel ?? 1);
-  const seedInput = document.getElementById("seedInput");
-  if (seedInput) seedInput.value = state.city.seed;
   const scenarioSelect = document.getElementById("scenarioSelect");
   if (scenarioSelect) scenarioSelect.value = (state.scenario && state.scenario.id) || "sandbox";
   const pauseBtn = document.getElementById("pauseBtn");
@@ -849,11 +872,6 @@ bindTap(document.getElementById("newLineBtn"), function () {
   refreshUI();
 });
 
-bindTap(document.getElementById("seedDiceBtn"), function () {
-  const input = document.getElementById("seedInput");
-  if (!input) return;
-  input.value = String(Math.floor(100000000 + Math.random() * 900000000));
-});
 bindTap(document.getElementById("gameMenuBtn"), function () { toggleGameMenu(); });
 bindTap(document.getElementById("voirieBtn"), function () {
   const group = document.getElementById("voirieGroup");
@@ -925,8 +943,7 @@ bindTap(document.getElementById("saveBtn"), saveCurrentGame);
 bindTap(document.getElementById("loadBtn"), loadCurrentGame);
 
 bindTap(document.getElementById("newCityBtn"), function () {
-  const input = document.getElementById("seedInput");
-  const seed = (input && input.value.trim()) || ("CITY-" + Date.now());
+  const seed = "CITY-" + Date.now() + "-" + Math.floor(Math.random() * 1000000);
   const scenarioSelect = document.getElementById("scenarioSelect");
   boot(seed, (scenarioSelect && scenarioSelect.value) || "sandbox");
   toggleGameMenu(false);
@@ -1066,8 +1083,6 @@ window.addEventListener("resize", function () {
 });
 
 const initialSeed = createSeedFromQuery();
-const seedInputEl = document.getElementById("seedInput");
-if (seedInputEl) seedInputEl.value = initialSeed;
 const cityNameInputEl = document.getElementById("cityNameInput");
 if (cityNameInputEl) {
   cityNameInputEl.addEventListener("input", function () {

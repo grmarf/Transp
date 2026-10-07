@@ -1,9 +1,19 @@
-const DISTRICT_NAMES = [
+const DISTRICT_BASE_NAMES = [
   "Centre", "Nord", "Sud", "Ouest", "Est", "Nord-Ouest",
   "Nord-Est", "Sud-Ouest", "Sud-Est", "Parc", "Université", "Gare"
 ];
+const DISTRICT_PREFIXES = [
+  "Grand", "Petit", "Vieux", "Nouveau", "Haut", "Bas", "Bel", "Sainte",
+  "Saint", "Long", "Doux", "Clair", "Vert", "Royal", "Central", "Rive",
+  "Pont", "Mont", "Val", "Bois", "Clos", "Champ", "Côte", "Bourg",
+  "Port", "Lac", "Plaine", "Jardin", "Roc", "Belle"
+];
+const DISTRICT_NAMES = [
+  ...DISTRICT_BASE_NAMES,
+  ...DISTRICT_PREFIXES.flatMap(prefix => DISTRICT_BASE_NAMES.map(name => `${prefix} ${name}`))
+];
 
-const STOP_NAMES = [
+const STOP_BASE_NAMES = [
   "Bellevue", "Les Tilleuls", "La Roseraie", "Montfleury", "Les Acacias",
   "Saint-Roch", "La Prairie", "Beauséjour", "Les Platanes", "Val Fleuri",
   "Les Ormes", "La Fontaine", "Les Cèdres", "Petit-Moulin", "Les Vignes",
@@ -11,6 +21,26 @@ const STOP_NAMES = [
   "Les Marronniers", "La Colline", "Les Lilas", "Le Belvédère", "La Clairière",
   "Les Jardins", "Le Hameau", "La Source", "Les Érables", "Le Rivage"
 ];
+const STOP_PREFIXES = [
+  "Belle", "Grand", "Petit", "Vieux", "Nouveau", "Haut", "Bas", "Saint",
+  "Sainte", "Clair", "Vert", "Doux", "Joli", "Long", "Mont", "Val",
+  "Bois", "Rive", "Pont", "Port", "Lac", "Plaine", "Champ", "Côte",
+  "Clos", "Jardin", "Roc", "Aube", "Étoile", "Horizon"
+];
+const STOP_SUFFIXES = [
+  "des Fleurs", "des Pins", "des Sources", "du Moulin", "du Parc", "du Pont",
+  "des Vignes", "de la Gare", "du Lac", "des Prés", "des Peupliers", "des Roses",
+  "du Château", "des Écoles", "du Marché", "des Hirondelles", "du Verger", "de la Plaine",
+  "des Lumières", "du Canal", "des Oliviers", "du Belvédère", "des Artisans", "de la Rivière",
+  "du Coteau", "des Érables", "de la Fontaine", "des Jardins", "du Levant", "des Acacias"
+];
+// 30 noms historiques + 30 × 30 combinaisons = 930 possibilités.
+const STOP_NAMES = [
+  ...STOP_BASE_NAMES,
+  ...STOP_PREFIXES.flatMap(prefix => STOP_SUFFIXES.map(suffix => `${prefix} ${suffix}`))
+];
+export const STOP_NAME_CATALOG_SIZE = STOP_NAMES.length;
+export const DISTRICT_NAME_CATALOG_SIZE = DISTRICT_NAMES.length;
 
 const DEMAND_BASE = [1.7,1.2,1.25,1.35,1.4,.85,.95,.9,1,.8,1.1,1.65];
 
@@ -76,14 +106,18 @@ function randomStopName(rng, used, index) {
   used.add(name);
   return name;
 }
-function nearestThreeStops(stop, stops) {
+function roadDegree(roads, stopId) {
+  return roads.reduce((degree, road) => degree + ((road.a === stopId || road.b === stopId) ? 1 : 0), 0);
+}
+function nearestThreeStops(stop, stops, roads = null) {
   return stops
     .filter(other => other.id !== stop.id)
-    .sort((a, b) => Math.hypot(a.x - stop.x, a.y - stop.y) - Math.hypot(b.x - stop.x, b.y - stop.y))
+    .filter(other => !roads || (roadDegree(roads, other.id) < 3 && roadDegree(roads, stop.id) < 3))
+    .sort((a, b) => Math.hypot(stop.x - a.x, stop.y - a.y) - Math.hypot(stop.x - b.x, stop.y - b.y))
     .slice(0, 3);
 }
-function chooseRoadParents(stop, availableStops, rng) {
-  const nearest = nearestThreeStops(stop, availableStops);
+function chooseRoadParents(stop, availableStops, rng, roads = null) {
+  const nearest = nearestThreeStops(stop, availableStops, roads);
   if (!nearest.length) return [];
   // Le premier raccordement est tiré parmi les trois voisins les plus
   // proches. Une seconde liaison apparaît parfois, mais reste dans ce même
@@ -174,6 +208,7 @@ export function createCity(seedInput) {
     const key = [a, b].sort().join("|");
     if (key === [stops[1].id, stops[2].id].sort().join("|")) return;
     if (roadKeys.has(key)) return;
+    if (roadDegree(roads, a) >= 3 || roadDegree(roads, b) >= 3) return;
     roadKeys.add(key);
     roads.push({ a, b, type, lanes: type === "arterial" ? 2 : 1,
       speed: type === "arterial" ? 1.35 : type === "secondary" ? 1.1 : 0.85,
@@ -187,7 +222,7 @@ export function createCity(seedInput) {
   // voisins, ce qui conserve la connectivité tout en réduisant les croisements.
   for (let i = 3; i < stops.length; i++) {
     const child = stops[i];
-    const parents = chooseRoadParents(child, stops.slice(0, i), rng);
+    const parents = chooseRoadParents(child, stops.slice(0, i), rng, roads);
     parents.forEach((parent, linkIndex) => {
       addRoad(parent.id, child.id, linkIndex === 0 ? "secondary" : "local");
     });
@@ -202,14 +237,14 @@ export function createCity(seedInput) {
     const existingParents = new Set(roads
       .filter(road => road.a === child.id || road.b === child.id)
       .map(road => road.a === child.id ? road.b : road.a));
-    const backupParent = nearestThreeStops(child, stops.slice(0, 3))
+    const backupParent = nearestThreeStops(child, stops.slice(0, 3), roads)
       .find(candidate => !existingParents.has(candidate.id));
     if (backupParent) addRoad(backupParent.id, child.id, "local");
   }
 
   return {
     id: `city-${numericSeed.toString(16)}`,
-    name: `Ville ${seed}`,
+    name: `Ville ${stops[0].name}`,
     seed,
     numericSeed,
     width: 1000,
@@ -296,12 +331,15 @@ export function addSatelliteStop(city, parent, rng) {
     populationFactor: parentDistrict?.populationFactor ?? 1
   });
 
-  const parents = chooseRoadParents(stop, city.stops, rng);
+  const parents = chooseRoadParents(stop, city.stops, rng, city.roads);
   // Le parent historique reste un filet de sécurité pour les anciennes
   // sauvegardes ou cartes atypiques, mais la règle normale passe bien par les
   // trois voisins les plus proches.
-  const roadParents = parents.length ? parents : [parent];
+  const roadParents = parents.length
+    ? parents
+    : (roadDegree(city.roads, parent.id) < 3 ? [parent] : []);
   roadParents.forEach((roadParent, linkIndex) => {
+    if (roadDegree(city.roads, roadParent.id) >= 3) return;
     city.roads.push({ a: roadParent.id, b: stop.id, type: linkIndex === 0 ? "secondary" : "local",
       lanes: 1, speed: linkIndex === 0 ? 1.1 : 0.85, allowStops: true, built: false,
       extensionOf: roadParent.id });

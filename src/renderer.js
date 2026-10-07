@@ -767,10 +767,6 @@ export function createRenderer(canvas, state) {
       cityNameEl.value = state.city.name;
     }
 
-    const seedEl = document.getElementById("seedInput");
-    if (seedEl && document.activeElement !== seedEl && seedEl.value !== state.city.seed) {
-      seedEl.value = state.city.seed;
-    }
 
     const pStats = passengerStats(state);
     const wStats = waitStats(state);

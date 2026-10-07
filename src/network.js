@@ -26,11 +26,14 @@ export function createNetwork(city) {
 
   const edges = [];
   const adjacency = new Map(city.stops.map(s => [s.id, []]));
+  const degree = new Map(city.stops.map(s => [s.id, 0]));
 
   for (const road of city.roads) {
     const a = nodes.get(road.a || road.startStopId);
     const b = nodes.get(road.b || road.endStopId);
     if (!a || !b) continue;
+    // Une intersection ne peut jamais recevoir plus de trois routes.
+    if ((degree.get(a.id) || 0) >= 3 || (degree.get(b.id) || 0) >= 3) continue;
     const spec = roadType(road.type);
     const length = distance(a, b);
     // Le coût de routage représente le temps de parcours : les artères sont
@@ -43,6 +46,8 @@ export function createNetwork(city) {
       corridorId: road.corridorId || null
     };
     edges.push(edge);
+    degree.set(a.id, (degree.get(a.id) || 0) + 1);
+    degree.set(b.id, (degree.get(b.id) || 0) + 1);
     adjacency.get(a.id).push({ to: b.id, edge, weight });
     adjacency.get(b.id).push({ to: a.id, edge, weight });
   }
@@ -222,6 +227,7 @@ export function addNetworkEdge(network, aId, bId, type = "secondary") {
   const duplicate = network.edges.find(edge =>
     (edge.a === aId && edge.b === bId) || (edge.a === bId && edge.b === aId));
   if (duplicate) return duplicate;
+  if ((network.adjacency.get(aId)?.length || 0) >= 3 || (network.adjacency.get(bId)?.length || 0) >= 3) return null;
   const a = network.nodes.get(aId);
   const b = network.nodes.get(bId);
   const spec = roadType(type);

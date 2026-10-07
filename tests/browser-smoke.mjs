@@ -97,22 +97,28 @@ try {
       cityNameInput.value = 'Lyon-sur-Test';
       cityNameInput.dispatchEvent(new Event('input', { bubbles: true }));
       const renamed = window.__vieTLignes.getState().city.name;
-      const seedInput = document.querySelector('#seedInput');
-      seedInput.focus();
-      seedInput.value = 'MA-SEED-TEST';
-      const typedSeed = seedInput.value;
+      const seedFieldRemoved = document.querySelector('#seedInput') === null;
       document.querySelector('#saveBtn').click();
       document.querySelector('#loadBtn').click();
       const loaded = window.__vieTLignes.getState().lines.length;
       const loadedRoad = window.__vieTLignes.getState().city.roads.find(road => road.built);
       const loadedBuiltRoads = window.__vieTLignes.getState().city.roads.filter(road => road.built).length;
+      const initialRoad = window.__vieTLignes.getState().city.roads.find(road => !road.built && road.a && road.b);
+      const initialRoadCount = window.__vieTLignes.getState().city.roads.filter(road => !road.built && road.a && road.b).length;
       document.querySelector('#removeRoadBtn').click();
       const removeMode = document.querySelector('#removeRoadBtn').getAttribute('aria-pressed');
+      if (initialRoad) {
+        const a = window.__vieTLignes.getState().city.stops.find(stop => stop.id === initialRoad.a);
+        const b = window.__vieTLignes.getState().city.stops.find(stop => stop.id === initialRoad.b);
+        worldClick((a.x + b.x) / 2, (a.y + b.y) / 2);
+      }
+      const initialRoadsAfterRemove = window.__vieTLignes.getState().city.roads.filter(road => !road.built && road.a && road.b).length;
       const payload = '<img src=x onerror=alert(1)>';
       window.__vieTLignes.getState().logs.unshift(payload);
       document.querySelector('#toggleHeatmapBtn').click();
       return {
-        created, loaded, builtRoads, loadedBuiltRoads, removeMode, renamed, typedSeed,
+        created, loaded, builtRoads, loadedBuiltRoads, removeMode, renamed, seedFieldRemoved,
+        initialRoadCount, initialRoadsAfterRemove,
         escaped: document.querySelector('#log').innerHTML.includes('&lt;img'),
         executableImage: Boolean(document.querySelector('#log img')),
         money: document.querySelector('#money').textContent
@@ -127,7 +133,8 @@ try {
   assert.equal(value.loadedBuiltRoads, 1, 'une route libre doit être sauvegardée');
   assert.equal(value.removeMode, 'true', 'le mode suppression doit pouvoir être activé');
   assert.equal(value.renamed, 'Lyon-sur-Test', 'le nom de ville doit être modifiable sans écrasement');
-  assert.equal(value.typedSeed, 'MA-SEED-TEST', 'le seed doit rester éditable');
+  assert.equal(value.seedFieldRemoved, true, 'le seed ne doit plus être affiché');
+  assert.equal(value.initialRoadsAfterRemove, value.initialRoadCount - 1, 'une route initiale doit pouvoir être supprimée');
   assert.equal(value.escaped, true, 'le journal doit échapper le HTML');
   assert.equal(value.executableImage, false, 'aucune balise img ne doit être créée');
   assert.match(value.money, /€/);

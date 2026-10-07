@@ -1061,8 +1061,6 @@ footer {
 .topbar-controls { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; width:100%; }
 .topbar-controls input, .topbar-controls select { min-height:38px; max-width:180px; }
 .topbar-controls .city-name-input { flex:1 1 140px; min-width:120px; }
-.seed-control { display:flex; align-items:center; gap:3px; }
-.seed-control input { width:115px; }
 .icon-button { min-height:34px; padding:5px 9px; }
 .time-controls { display:flex; align-items:center; gap:4px; }
 .toolbar-caption { font-weight:900; }
@@ -1086,8 +1084,6 @@ footer {
 @media (max-width: 700px) {
   .topbar-controls { justify-content:stretch; }
   .topbar-controls input, .topbar-controls select, .time-controls, .menu-wrap { flex:1 1 calc(50% - 6px); max-width:none; }
-  .seed-control { flex:1 1 calc(50% - 6px); }
-  .seed-control input { width:100%; min-width:0; }
   .floating-toolbar { bottom:10px; gap:5px; padding:6px; }
   .floating-toolbar .btn, .floating-toolbar select { min-height:36px; padding:6px 8px; font-size:.72rem; }
 }
