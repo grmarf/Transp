@@ -80,6 +80,18 @@ try {
       const dashboard = document.querySelector('.dashboard');
       const dashboardRect = dashboard.getBoundingClientRect();
       const desktopDashboardVisible = dashboardRect.width > 0 && dashboardRect.right <= window.innerWidth + 1;
+      const linesTab = [...document.querySelectorAll('.dashboard-tab')].find(tab => tab.querySelector('#lines'));
+      document.querySelectorAll('.dashboard-tab').forEach(tab => { tab.open = false; });
+      linesTab.open = true;
+      const lines = document.querySelector('#lines');
+      lines.innerHTML = Array.from({ length: 50 }, (_, index) => '<div class="line-row">Ligne ' + (index + 1) + '</div>').join('');
+      const linesContent = linesTab.querySelector('.tab-content');
+      const linesContentRect = linesContent.getBoundingClientRect();
+      const dashboardAfterRect = dashboard.getBoundingClientRect();
+      const linesTabRect = linesTab.getBoundingClientRect();
+      const linesContentStyle = getComputedStyle(linesContent);
+      const fiftyLinesScrollable = linesContent.scrollHeight > linesContent.clientHeight &&
+        linesContent.clientHeight > 0 && linesContentRect.bottom <= window.innerHeight + 1;
       document.querySelector('#newLineBtn').click();
       const canvas = document.querySelector('#map');
       const rect = canvas.getBoundingClientRect();
@@ -124,7 +136,20 @@ try {
       document.querySelector('#toggleHeatmapBtn').click();
       return {
         created, loaded, builtRoads, loadedBuiltRoads, removeMode, renamed, seedFieldRemoved,
-        desktopDashboardVisible,
+        desktopDashboardVisible, fiftyLinesScrollable,
+        fiftyLinesMetrics: {
+          contentHeight: linesContent.clientHeight,
+          contentScrollHeight: linesContent.scrollHeight,
+          contentBottom: linesContentRect.bottom,
+          contentTop: linesContentRect.top,
+          viewportHeight: window.innerHeight,
+          dashboardHeight: dashboardAfterRect.height,
+          dashboardTop: dashboardAfterRect.top,
+          tabHeight: linesTabRect.height,
+          tabTop: linesTabRect.top,
+          contentFlex: linesContentStyle.flex,
+          tabFlex: getComputedStyle(linesTab).flex
+        },
         initialRoadCount, initialRoadsAfterRemove,
         escaped: document.querySelector('#log').innerHTML.includes('&lt;img'),
         executableImage: Boolean(document.querySelector('#log img')),
@@ -142,6 +167,7 @@ try {
   assert.equal(value.renamed, 'Lyon-sur-Test', 'le nom de ville doit être modifiable sans écrasement');
   assert.equal(value.seedFieldRemoved, true, 'le seed ne doit plus être affiché');
   assert.equal(value.desktopDashboardVisible, true, 'le tableau de bord droit doit rester visible sur PC');
+  assert.equal(value.fiftyLinesScrollable, true, `50 lignes doivent rester consultables par défilement: ${JSON.stringify(value.fiftyLinesMetrics)}`);
   assert.equal(value.initialRoadsAfterRemove, value.initialRoadCount - 1, 'une route initiale doit pouvoir être supprimée');
   assert.equal(value.escaped, true, 'le journal doit échapper le HTML');
   assert.equal(value.executableImage, false, 'aucune balise img ne doit être créée');
