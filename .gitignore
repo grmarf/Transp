@@ -1,0 +1,12 @@
+# Ignorer les fichiers temporaires
+__pycache__/
+*.py[cod]
+*$py.class
+dist/
+tests/.vscode/
+tests/coverage/
+node_modules/
+.env
+.DS_Store
+.gitlab-ci.yml
+.github/workflows/run-tests.yml
