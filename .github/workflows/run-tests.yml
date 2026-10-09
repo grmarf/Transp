@@ -1,11 +1,15 @@
-#!/usr/bin/env node
-# Exécute les tests JavaScript dans le dossier 'tests'
+#!/bin/bash
+# Exécute les tests JavaScript dans le dépôt Transp
 name: Run Tests
+exclude:
+  - 'v2.3.md'
+  - 'smoke.md'
+  - 'v2.2.md'
 on:
   push:
     branches: [ "main" ]
   pull_request:
-    branches: [ "main"]
+    branches: [ "main" ]
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -22,4 +26,4 @@ jobs:
         working-directory: ./tests
       
       - name: Run all tests
-        run: node ./tests/run-all.mjs
+        run: bash .github/scripts/run-tests.sh
