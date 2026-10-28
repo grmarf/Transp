@@ -105,9 +105,6 @@ export function startContextualEvent(state, rng, log = () => {}, metrics = {}) {
   return type ? triggerEvent(state, type.id, type.durationDays, log, cause) : null;
 }
 
-// Kept as a compatibility alias for integrations written against V15.0.
-export const startDailyEvent = startContextualEvent;
-
 export function eventJournal(state) {
   return eventSummary(state).map(event => ({
     type: event.satisfactionDelta >= 0 ? "positive" : "warning",
@@ -118,3 +115,4 @@ export function eventJournal(state) {
 export function eventDemandMultiplier(state) { return eventEffects(state).demandMultiplier; }
 export function eventFareMultiplier(state) { return eventEffects(state).fareMultiplier; }
 export function eventSatisfactionDelta(state) { return eventEffects(state).satisfactionDelta; }
+

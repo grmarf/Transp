@@ -78,10 +78,6 @@ export function mulberry32(seed) {
   return rng;
 }
 
-function jitter(rng, amount) {
-  return (rng() - 0.5) * amount;
-}
-
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v));
 }
@@ -359,3 +355,4 @@ export function createSeedFromQuery() {
     return String(Math.floor(100000000 + Math.random() * 900000000));
   }
 }
+

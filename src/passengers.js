@@ -19,10 +19,6 @@ export function createPassenger({ id = null, originId, destinationId, createdAt 
 
 export function resetPassengerIds() { nextPassengerId = 1; }
 
-export function waitingPassengers(state, stopId) {
-  return state.passengers.filter(p => p.currentStopId === stopId && p.state === PASSENGER_STATES.WAITING);
-}
-
 export function passengerStats(state) {
   const counts = Object.fromEntries(Object.values(PASSENGER_STATES).map(s => [s, 0]));
   for (const p of state.passengers) counts[p.state] = (counts[p.state] || 0) + 1;
@@ -56,3 +52,4 @@ export function intermodalStats(state) {
     shareWithTransfer: arrived ? withTransfer / arrived : 0
   };
 }
+

@@ -126,10 +126,6 @@ export function findPassengerRoute(state, originId, destinationId) {
   return merged;
 }
 
-export function findPassengerRouteLegs(state, originId, destinationId) {
-  return findPassengerRoute(state, originId, destinationId);
-}
-
 export function routeLegs(route) {
   return Array.isArray(route) ? route : (route?.legs || []);
 }
@@ -153,3 +149,4 @@ export function routingStats(state) {
     avgTransfers: routablePairs ? totalTransfers / routablePairs : 0
   };
 }
+

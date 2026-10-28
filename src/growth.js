@@ -12,7 +12,6 @@ import { lineHeadwayMinutes } from "./vehicles.js";
 export const GROWTH_RATE_SERVED = 0.006;   // +0.6%/day for a well-served stop
 export const GROWTH_RATE_UNSERVED = 0.0005; // background growth even with no transit access
 export const SATELLITE_POP_THRESHOLD = 4000;
-export const SATELLITE_SERVICE_LEVEL = 0.4;
 
 /** 0 (no service) to 1 (very frequent service) for one stop.
  * Calibrated against this engine's actual headway scale, not an idealized
@@ -90,3 +89,4 @@ export function growCity(state, rng, log) {
   }
   maybeSpawnSatellite(state, rng, log, levels);
 }
+

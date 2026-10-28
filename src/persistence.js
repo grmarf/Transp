@@ -284,20 +284,12 @@ export function saveGame(state, rngState, storage = globalThis.localStorage) {
   return payload;
 }
 
-export function hasSavedGame(storage = globalThis.localStorage) {
-  return !!storage?.getItem(SAVE_KEY);
-}
-
 export function readSavedGame(storage = globalThis.localStorage) {
   if (!storage) return null;
   const raw = storage.getItem(SAVE_KEY);
   if (!raw) return null;
   try { return validateSavePayload(JSON.parse(raw)); }
   catch (error) { throw new Error(error.message.startsWith("Sauvegarde V20 invalide") ? error.message : "Sauvegarde V20 invalide : JSON illisible"); }
-}
-
-export function clearSavedGame(storage = globalThis.localStorage) {
-  storage?.removeItem(SAVE_KEY);
 }
 
 export function exportGameToFile(state, rngState = null) {
@@ -319,3 +311,4 @@ export async function importGameFromFile(file) {
   catch { throw new Error("Fichier de sauvegarde V20 illisible"); }
   return validateSavePayload(payload);
 }
+

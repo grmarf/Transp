@@ -13,7 +13,6 @@ import { fareAcceptance } from "./demographics.js";
 export const DEFAULT_VEHICLE_CAPACITY = 35;
 // V21.0 — vitesses accélérées pour rendre les trajets jouables. Les
 // sauvegardes historiques ne sont pas concernées : aucune n’existe encore.
-export const DEFAULT_VEHICLE_SPEED = 0.5;
 
 // V7.0 — transport modes.
 export const VEHICLE_MODES = {
@@ -411,3 +410,4 @@ export function vehiclePosition(state, vehicle) {
 }
 
 // === FIN DU FICHIER vehicles.js ===
+
