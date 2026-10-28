@@ -1,21 +1,21 @@
-// tests/browser-smoke.mjs â Smoke test navigateur pour Vie t'Lignes.
+// tests/browser-smoke.mjs — Smoke test navigateur pour Vie t'Lignes.
 //
-// VÃ©rifie en conditions rÃ©andinues (serveur HTTP + Chromium headless pilotÃ© via
-// le protocole CDP, sans dÃ©pendance externe) que :
-//   1. le jeu dÃ©marre et que la coquille HTML est saine ;
-//   2. le tableau de bord reste visible sur Ã©cran large et reste consultable
-//      avec 50 lignes (dÃ©filement interne) ;
-//   3. le parcours joueur de base fonctionne : crÃ©ation de ligne, construction
+// Vérifie en conditions réandinues (serveur HTTP + Chromium headless piloté via
+// le protocole CDP, sans dépendance externe) que :
+//   1. le jeu démarre et que la coquille HTML est saine ;
+//   2. le tableau de bord reste visible sur écran large et reste consultable
+//      avec 50 lignes (défilement interne) ;
+//   3. le parcours joueur de base fonctionne : création de ligne, construction
 //      et suppression de voirie, renommage de la ville, sauvegarde puis
 //      rechargement ;
-//   4. le rendu Ã©chappe le HTML issu de l'Ã©tat (pas d'injection de balise) ;
+//   4. le rendu échappe le HTML issu de l'état (pas d'injection de balise) ;
 //   5. la heatmap de congestion s'active depuis la barre d'outils.
 //
-// PrÃ©requis : `chromium` et `python3` installÃ©s localement.
+// Prérequis : `chromium` et `python3` installés localement.
 // Lancement : npm run test:browser
 //
-// Le test est dÃ©coupÃ© en Ã©tapes indÃ©pendantes Ã©valuÃ©es un% par une : en cas
-// d'Ã©chec, le message d'assertion indique l'Ã©tape fautive et son contexte
+// Le test est découpé en étapes indépendantes évaluées un% par une : en cas
+// d'échec, le message d'assertion indique l'étape fautive et son contexte
 // au lieu d'une exception monolithique.
 
 import assert from 'node:assert/strict';
@@ -49,7 +49,7 @@ async function waitFor(label, fetcher, timeout = 20000) {
       await sleep(150);
     }
   }
-  throw new Error(`DÃ©lai dÃ©passÃ© : ${label}${lastError ? ` (${lastError.message})` : ''}`);
+  throw new Error(`Délai dépassé : ${label}${lastError ? ` (${lastError.message})` : ''}`);
 }
 
 let socket = null;
@@ -75,8 +75,8 @@ async function evaluate(expression) {
 }
 
 try {
-  // --- DÃ©marrage : serveur HTTP, cible CDP, socket, navigation --------------
-  await waitFor('serveur HTTP prÃªt', async () => {
+  // --- Démarrage : serveur HTTP, cible CDP, socket, navigation --------------
+  await waitFor('serveur HTTP prêt', async () => {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`statut ${response.status}`);
     return response;
@@ -118,29 +118,29 @@ try {
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await cdp('Page.navigate', { url });
 
-  // Attente active du dÃ©marrage du jeu (plus de sleep arbitraire).
-  await waitFor('jeu initialisÃ©', () => evaluate(
+  // Attente active du démarrage du jeu (plus de sleep arbitraire).
+  await waitFor('jeu initialisé', () => evaluate(
     'Boolean(window.__vieTLignes && window.__vieTLignes.getState && document.querySelector("#map") && document.querySelector("#lines"))'
   ));
 
-  // Helper de clic en coordonnÃ©es monde, installÃ© une fois pour toutes les Ã©tapes.
+  // Helper de clic en coordonnées monde, installé une fois pour toutes les étapes.
   await evaluate('window.__worldClick = (x, y) => { const canvas = document.querySelector("#map"); const rect = canvas.getBoundingClientRect(); window.__vieTLignes.clickMap({ clientX: rect.left + x * rect.width / canvas.width, clientY: rect.top + y * rect.height / canvas.height }); }; true');
 
-  // --- Ãtape 1 : coquille saine, tableau de bord visible sur Ã©cran large ----
+  // --- Étape 1 : coquille saine, tableau de bord visible sur écran large ----
   const shell = await evaluate(`(() => {
     const dashboard = document.querySelector('.dashboard');
     const rect = dashboard.getBoundingClientRect();
     return {
       dashboardVisible: rect.width > 0 && rect.right <= window.innerWidth + 1,
       seedFieldRemoved: document.querySelector('#seedInput') === null,
-      cityName: window.__vietLignes.getState().city.name
+      cityName: window.__vieTLignes.getState().city.name
     };
   })()`);
   assert.equal(shell.dashboardVisible, true, 'le tableau de bord droit doit rester visible sur PC');
-  assert.equal(shell.seedFieldRemoved, true, 'le champ seed ne doit plus Ãªtre affichÃ©');
+  assert.equal(shell.seedFieldRemoved, true, 'le champ seed ne doit plus être affiché');
   assert.ok(typeof shell.cityName === 'string' && shell.cityName.length > 0, 'la ville doit avoir un nom initial');
 
-  // --- Ãtape 2 : 50 lignes restent consultables par dÃ©filement interne -----
+  // --- Étape 2 : 50 lignes restent consultables par défilement interne -----
   const scroll = await evaluate(`(() => {
     const linesTab = [...document.querySelectorAll('.dashboard-tab')].find((tab) => tab.querySelector('#lines'));
     document.querySelectorAll('.dashboard-tab').forEach((tab) => { tab.open = false; });
@@ -156,12 +156,12 @@ try {
         contentScrollHeight: content.scrollHeight,
         contentBottom: contentRect.bottom,
         viewportHeight: window.innerHeight
-    }
+      }
     };
   })()`);
-  assert.equal(scroll.scrollable, true, `50 lignes doivent rester consultables par dÃ©filement : ${JSON.stringify(scroll.metrics)}`);
+  assert.equal(scroll.scrollable, true, `50 lignes doivent rester consultables par défilement : ${JSON.stringify(scroll.metrics)}`);
 
-  // --- Ã©tape 3 : crÃ©ation d'une ligne sur les deux premiers arrÃªts -----------
+  // --- Étape 3 : création d'une ligne sur les deux premiers arrêts ----------
   const lineCreation = await evaluate(`(() => {
     document.querySelector('#newLineBtn').click();
     const canvas = document.querySelector('#map');
@@ -174,18 +174,18 @@ try {
     document.querySelector('#finishLineBtn').click();
     return { lines: window.__vieTLignes.getState().lines.length };
   })()`);
-  assert.equal(lineCreation.lines, 1, 'la crÃ©ation dâune ligne doit fonctionner');
+  assert.equal(lineCreation.lines, 1, 'la création d’une ligne doit fonctionner');
 
-  // --- Ã©tape 4 : construction d'une route libre -----------------------------
+  // --- Étape 4 : construction d'une route libre -----------------------------
   const roadBuild = await evaluate(`(() => {
     document.querySelector('#buildRoadBtn').click();
     window.__worldClick(120, 100);
     window.__worldClick(250, 180);
     return { built: window.__vieTLignes.getState().city.roads.filter((road) => road.built).length };
   })()`);
-  assert.equal(roadBuild.built, 1, 'une route libre doit pouvoir Ãªtre construitÃ©');
+  assert.equal(roadBuild.built, 1, 'une route libre doit pouvoir être construite');
 
-  // --- Ã©tape 5 : renommage de la ville sans Ã©crasement ------------------------
+  // --- Étape 5 : renommage de la ville sans écrasement ------------------------
   const renamed = await evaluate(`(() => {
     const input = document.querySelector('#cityNameInput');
     input.focus();
@@ -193,9 +193,9 @@ try {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     return window.__vieTLignes.getState().city.name;
   })()`);
-  assert.equal(renamed, 'Lyon-sur-Test', 'le nom de ville doit Ãªtre modifiable sans Ã©crasement');
+  assert.equal(renamed, 'Lyon-sur-Test', 'le nom de ville doit être modifiable sans écrasement');
 
-  // --- Ã©tape 6 : sauvegarde puis rechargement -------------------------------
+  // --- Étape 6 : sauvegarde puis rechargement -------------------------------
   const reloaded = await evaluate(`(() => {
     document.querySelector('#saveBtn').click();
     document.querySelector('#loadBtn').click();
@@ -207,10 +207,10 @@ try {
     };
   })()`);
   assert.equal(reloaded.lines, 1, 'le rechargement doit conserver la ligne');
-  assert.equal(reloaded.builtRoads, 1, 'une route libre construite doit Ãªtre sauvegardÃ©e puis rechargÃ©e');
-  assert.equal(reloaded.city, 'Lyon-sur-Test', 'le nom de ville doit surviver Ã  la sauvegarde/chargement');
+  assert.equal(reloaded.builtRoads, 1, 'une route libre construite doit être sauvegardée puis rechargée');
+  assert.equal(reloaded.city, 'Lyon-sur-Test', 'le nom de ville doit surviver à la sauvegarde/chargement');
 
-  // --- Ã©tape 7 : suppression d'une route initiale ------------------------------
+  // --- Étape 7 : suppression d'une route initiale ------------------------------
   const removal = await evaluate(`(() => {
     const state = window.__vieTLignes.getState();
     const initialRoads = state.city.roads.filter((road) => !road.built && road.a && road.b).length;
@@ -225,28 +225,28 @@ try {
     const after = window.__vieTLignes.getState().city.roads.filter((road) => !road.built && road.a && road.b).length;
     return { initialRoads, after, removeMode, clicked: Boolean(initialRoad) };
   })()`);
-  assert.equal(removal.removeMode, 'true', 'le mode suppression doit pouvoir Ãªtre activÃ©');
+  assert.equal(removal.removeMode, 'true', 'le mode suppression doit pouvoir être activé');
   if (removal.clicked) {
-    assert.equal(removal.after, removal.initialRoads - 1, 'une route initiale doit pouvoir Ãªtre supprimÃ©e');
+    assert.equal(removal.after, removal.initialRoads - 1, 'une route initiale doit pouvoir être supprimée');
   }
 
-  // --- Ã©tape 8 : Ã©chappement HTML, heatmap, budget ----------------------------
+  // --- étape 8 : échappement HTML, heatmap, budget ----------------------------
   await evaluate(`(() => {
     window.__vieTLignes.getState().logs.unshift('<img src=x onerror=alert(1)>');
     document.querySelector('#toggleHeatmapBtn').click();
     return true;
   })()`);
-  await sleep(300); // laisser un cycle de rendu s'exÃ©cuter
+  await sleep(300); // laisser un cycle de rendu s'exécuter
   const security = await evaluate(`(() => ({
     escaped: document.querySelector('#log').innerHTML.includes('&lt;img'),
     executableImage: Boolean(document.querySelector('#log img')),
     heatmapPressed: document.querySelector('#toggleHeatmapBtn').getAttribute('aria-pressed'),
     money: document.querySelector('#money').textContent
   }))()`);
-  assert.equal(security.escaped, true, 'le journal doit Ã©chapper le HTML issu de l. Ã©tat');
-  assert.equal(security.executableImage, false, 'aucune balise img ne doit Ãªtre crÃ©Ã©e depuis l. Ã©tat');
-  assert.equal(security.heatmapPressed, 'true', 'la heatmap doit pouvoir Ãªtre activÃ©e depuis la barre d. outils');
-  assert.match(security.money, /âêÐ¼/, 'le budget doit Ãªtre affichÃ© en euros');
+  assert.equal(security.escaped, true, 'le journal doit échapper le HTML issu de l. état');
+  assert.equal(security.executableImage, false, 'aucune balise img ne doit être créée depuis l. état');
+  assert.equal(security.heatmapPressed, 'true', 'la heatmap doit pouvoir être activée depuis la barre d. outils');
+  assert.match(security.money, /₪м/, 'le budget doit être affiché en euros');
 
   // --- Bilan final -------------------------------------------------------------
   assert.equal(consoleErrors.length, 0, `erreurs navigateur : ${consoleErrors.join(' ; ')}`);
