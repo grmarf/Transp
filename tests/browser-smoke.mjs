@@ -43,11 +43,16 @@ async function waitFor(label, fetcher, timeout = 20000) {
   let lastError = null;
   while (Date.now() < deadline) {
     try {
-      return await fetcher();
+      const value = await fetcher();
+      // Le résultat doit être truthy : une évaluation qui renvoie false sans
+      // lever d'exception (ex. page encore sur about:blank) doit continuer
+      // à être retentée, sinon les étapes s'exécutent avant le chargement.
+      if (value) return value;
+      lastError = new Error('condition non remplie');
     } catch (error) {
       lastError = error;
-      await sleep(150);
     }
+    await sleep(150);
   }
   throw new Error(`Délai dépassé : ${label}${lastError ? ` (${lastError.message})` : ''}`);
 }
