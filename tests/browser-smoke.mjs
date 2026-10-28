@@ -1,6 +1,6 @@
 // tests/browser-smoke.mjs — Smoke test navigateur pour Vie t'Lignes.
 //
-// Vérifie en conditions réandinues (serveur HTTP + Chromium headless piloté via
+// Vérifie en conditions réelles (serveur HTTP + Chromium headless piloté via
 // le protocole CDP, sans dépendance externe) que :
 //   1. le jeu démarre et que la coquille HTML est saine ;
 //   2. le tableau de bord reste visible sur écran large et reste consultable
@@ -14,7 +14,7 @@
 // Prérequis : `chromium` et `python3` installés localement.
 // Lancement : npm run test:browser
 //
-// Le test est découpé en étapes indépendantes évaluées un% par une : en cas
+// Le test est découpé en étapes indépendantes évaluées une par une : en cas
 // d'échec, le message d'assertion indique l'étape fautive et son contexte
 // au lieu d'une exception monolithique.
 
@@ -185,7 +185,7 @@ try {
   })()`);
   assert.equal(roadBuild.built, 1, 'une route libre doit pouvoir être construite');
 
-  // --- Étape 5 : renommage de la ville sans écrasement ------------------------
+  // --- Étape 5 : renommage de la ville sans écrasement -----------------------
   const renamed = await evaluate(`(() => {
     const input = document.querySelector('#cityNameInput');
     input.focus();
@@ -208,9 +208,9 @@ try {
   })()`);
   assert.equal(reloaded.lines, 1, 'le rechargement doit conserver la ligne');
   assert.equal(reloaded.builtRoads, 1, 'une route libre construite doit être sauvegardée puis rechargée');
-  assert.equal(reloaded.city, 'Lyon-sur-Test', 'le nom de ville doit surviver à la sauvegarde/chargement');
+  assert.equal(reloaded.city, 'Lyon-sur-Test', 'le nom de ville doit survivre à la sauvegarde/chargement');
 
-  // --- Étape 7 : suppression d'une route initiale ------------------------------
+  // --- Étape 7 : suppression d'une route initiale ----------------------------
   const removal = await evaluate(`(() => {
     const state = window.__vieTLignes.getState();
     const initialRoads = state.city.roads.filter((road) => !road.built && road.a && road.b).length;
@@ -230,7 +230,7 @@ try {
     assert.equal(removal.after, removal.initialRoads - 1, 'une route initiale doit pouvoir être supprimée');
   }
 
-  // --- étape 8 : échappement HTML, heatmap, budget ----------------------------
+  // --- Étape 8 : échappement HTML, heatmap, budget ---------------------------
   await evaluate(`(() => {
     window.__vieTLignes.getState().logs.unshift('<img src=x onerror=alert(1)>');
     document.querySelector('#toggleHeatmapBtn').click();
@@ -243,12 +243,12 @@ try {
     heatmapPressed: document.querySelector('#toggleHeatmapBtn').getAttribute('aria-pressed'),
     money: document.querySelector('#money').textContent
   }))()`);
-  assert.equal(security.escaped, true, 'le journal doit échapper le HTML issu de l. état');
-  assert.equal(security.executableImage, false, 'aucune balise img ne doit être créée depuis l. état');
-  assert.equal(security.heatmapPressed, 'true', 'la heatmap doit pouvoir être activée depuis la barre d. outils');
-  assert.match(security.money, /₪м/, 'le budget doit être affiché en euros');
+  assert.equal(security.escaped, true, 'le journal doit échapper le HTML issu de l’état');
+  assert.equal(security.executableImage, false, 'aucune balise img ne doit être créée depuis l’état');
+  assert.equal(security.heatmapPressed, 'true', 'la heatmap doit pouvoir être activée depuis la barre d’outils');
+  assert.match(security.money, /€/, 'le budget doit être affiché en euros');
 
-  // --- Bilan final -------------------------------------------------------------
+  // --- Bilan final ------------------------------------------------------------
   assert.equal(consoleErrors.length, 0, `erreurs navigateur : ${consoleErrors.join(' ; ')}`);
   console.log(JSON.stringify({
     ok: true,
@@ -262,7 +262,7 @@ try {
   const stopped = new Promise((resolve) => browser.once('exit', resolve));
   browser.kill('SIGTERM');
   server.kill('SIGTERM');
-  await Promise.race(stopped, sleep(1000));
+  await Promise.race([stopped, sleep(1000)]);
   if (browser.exitCode === null) browser.kill('SIGKILL');
   await Promise.race([stopped, sleep(500)]);
   for (let attempt = 0; attempt < 5; attempt++) {
