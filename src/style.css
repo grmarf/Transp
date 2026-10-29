@@ -958,9 +958,9 @@ footer {
 
   .app-shell {
     flex-direction: row;
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
-    height: calc(100vh - 124px);
+    height: auto;
     padding: 14px;
     gap: 14px;
     overflow: hidden;
@@ -1036,7 +1036,7 @@ footer {
     height: auto;
     min-height: 0;
     overflow-y: auto;
-    max-height: calc(100vh - 220px);
+    max-height: none;
     scrollbar-width: thin;
     scrollbar-color: var(--orange) transparent;
   }
