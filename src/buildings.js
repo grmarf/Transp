@@ -109,6 +109,12 @@ export function ensureBuildingsState(state) {
   if (!Array.isArray(city.buildings)) city.buildings = [];
   if (!Number.isInteger(city.nextZoneId)) city.nextZoneId = 1;
   if (!Number.isInteger(city.nextBuildingId)) city.nextBuildingId = 1;
+  // Une grille de valeur foncière rechargée depuis du JSON n'est plus un
+  // tableau typé : on la jette, le prochain cycle horaire la reconstruit.
+  const grid = city.landValueGrid;
+  if (grid && (!grid.values || typeof grid.values.length !== "number" || !Number.isInteger(grid.cols))) {
+    city.landValueGrid = null;
+  }
   return state;
 }
 

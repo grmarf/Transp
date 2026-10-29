@@ -7,6 +7,7 @@ import { createRenderer, clearRendererCaches, renderFleetPanel } from "./rendere
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
 import { invalidateRoutingCache } from "./routing.js";
+import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingStats, BUILDING_TYPES, ZONE_TYPES } from "./buildings.js";
 import { startCampaign } from "./advertising.js";
 
 const canvas = document.getElementById("map");
@@ -109,6 +110,14 @@ function updateToolbarVisibility() {
   }
   const modeGroup = document.getElementById("modeGroup");
   if (modeGroup && state) modeGroup.classList.toggle("is-active", state.lineMode === true);
+  // V27 — groupe urbanisme : actif tant qu'un outil de zonage est armé.
+  const urbanismeGroup = document.getElementById("urbanismeGroup");
+  if (urbanismeGroup && state) {
+    const active = state.zoneMode !== null || urbanismeGroup.dataset.open === "true";
+    urbanismeGroup.classList.toggle("is-active", active);
+    const button = document.getElementById("urbanismeBtn");
+    if (button) button.setAttribute("aria-expanded", String(active));
+  }
   const menu = document.getElementById("gameMenuDropdown");
   const menuButton = document.getElementById("gameMenuBtn");
   if (menuButton) menuButton.setAttribute("aria-expanded", String(!!(menu && menu.classList.contains("is-open"))));
@@ -137,6 +146,14 @@ function updateInstructions() {
     el.innerHTML = "Amélioration : clique une <b>route</b> pour la convertir vers le type sélectionné.";
   } else if (state.roadEditMode === "oneWay") {
     el.innerHTML = "Sens unique : clique une <b>route</b> pour inverser son sens de circulation.";
+  } else if (state.zoneMode === "zone") {
+    el.innerHTML = state.pendingZoneCorner
+      ? "Zonage : clique le <b>coin opposé</b> (la zone doit longer une route, sinon elle est refusée)."
+      : "Zonage : clique le <b>premier coin</b> de la zone à peindre.";
+  } else if (state.zoneMode === "unzone") {
+    el.innerHTML = "Dézonage : clique une <b>zone</b> pour la retirer (les bâtiments restent).";
+  } else if (state.zoneMode === "inspect") {
+    el.innerHTML = "Inspection : clique un <b>bâtiment</b> pour afficher ses statistiques.";
   } else if (state.lineMode) {
     if (extending) {
       const line = state.lines.find(function (l) { return l.id === state.extendingLineId; });
@@ -186,6 +203,16 @@ function updateInstructions() {
     upgradeRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "upgrade"));
   }
   const oneWayRoadBtn = document.getElementById("oneWayRoadBtn");
+  // V27 — boutons urbanisme : l'état armé se lit sur le bouton.
+  const zoneBtn = document.getElementById("zoneBtn");
+  const unzoneBtn = document.getElementById("unzoneBtn");
+  const inspectBtn = document.getElementById("inspectBtn");
+  if (zoneBtn) {
+    zoneBtn.textContent = state.zoneMode === "zone" ? "✕ Annuler le zonage" : "🖍️ Zoner";
+    zoneBtn.setAttribute("aria-pressed", String(state.zoneMode === "zone"));
+  }
+  if (unzoneBtn) unzoneBtn.setAttribute("aria-pressed", String(state.zoneMode === "unzone"));
+  if (inspectBtn) inspectBtn.setAttribute("aria-pressed", String(state.zoneMode === "inspect"));
   if (oneWayRoadBtn) {
     oneWayRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "oneWay"));
   }
@@ -498,6 +525,44 @@ function clickMap(e) {
     p = { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }
   if (!p || !state) return;
+
+  // V27 — outils d'urbanisme : zonage (deux coins), dézonage, inspection.
+  if (state.zoneMode === "zone") {
+    const corner = state.pendingZoneCorner;
+    if (!corner) {
+      state.pendingZoneCorner = p;
+      log("Premier coin posé. Clique le coin opposé pour peindre la zone.");
+    } else {
+      const zone = addZone(state, zoneTypeSelectValue(),
+        Math.min(corner.x, p.x), Math.min(corner.y, p.y),
+        Math.abs(p.x - corner.x), Math.abs(p.y - corner.y), log);
+      state.pendingZoneCorner = null;
+      if (zone) log("Zone peinte : les bâtiments émergeront au fil du temps le long de la voirie.");
+    }
+    updateInstructions();
+    refreshUI();
+    return;
+  }
+  if (state.zoneMode === "unzone") {
+    const zone = (state.city.zones || []).find(function (z) {
+      return p.x >= z.x && p.x <= z.x + z.w && p.y >= z.y && p.y <= z.y + z.h;
+    });
+    if (zone) {
+      removeZone(state, zone.id);
+      log("Zone retirée : les bâtiments existants restent en place.");
+    } else log("Aucune zone sous le curseur.");
+    updateInstructions();
+    refreshUI();
+    return;
+  }
+  if (state.zoneMode === "inspect") {
+    const building = buildingAtPoint(p);
+    state.selectedBuildingId = building ? building.id : null;
+    renderBuildingPanel();
+    updateInstructions();
+    refreshUI();
+    return;
+  }
 
   if (state.roadEditMode === "build") {
     // V27 — outil de tracé multi-points : chaque clic pose un point, chaque
@@ -942,6 +1007,9 @@ function refreshUI() {
     renderFleetPanel(state);
     renderMiniMap();
     updateScenarioBanner();
+    // V27 — HUD urbanisme : demande par type + panneau du bâtiment sélectionné.
+    updateDemandBars();
+    renderBuildingPanel();
   } catch (err) {
     console.error("[Vie t'Lignes] refreshUI :", err);
   }
@@ -1066,6 +1134,10 @@ function boot(seed, scenarioId, restoredPayload) {
   });
 
   state.demographicsEnabled = true;
+  // V27 — la génération OD depuis les bâtiments est active au boot
+  // navigateur ; les sauvegardes antérieures récupèrent des structures vides.
+  state.buildingsEnabled = true;
+  ensureBuildingsState(state);
   state.advertisingEnabled = true;
   state.staffCostsEnabled = true;
   const fareLevelSelect = document.getElementById("fareLevelSelect");
@@ -1226,12 +1298,124 @@ if (roadTypeSelectEl) roadTypeSelectEl.addEventListener("change", function () {
 function enterRoadMode(mode) {
   if (!state) return;
   if (state.lineMode) cancelLineMode(state);
+  // V27 — un outil d'urbanisme remplace l'outil de voirie armé.
+  state.zoneMode = null;
+  state.pendingZoneCorner = null;
   state.roadEditMode = state.roadEditMode === mode ? null : mode;
   state.pendingRoadPoint = null;
   state.pendingRoadStopId = null;
   state.roadTrace = null;
   updateInstructions();
   refreshUI();
+}
+
+// V27 — urbanisme -----------------------------------------------------------
+
+function zoneTypeSelectValue() {
+  const select = document.getElementById("zoneTypeSelect");
+  const value = select && select.value;
+  return ZONE_TYPES[value] ? value : "residential";
+}
+
+/** Outil de zonage armé : "zone", "unzone", "inspect" ; re-clic = désarme. */
+function enterZoneMode(mode) {
+  if (!state) return;
+  if (state.lineMode) cancelLineMode(state);
+  // Un outil de voirie remplace l'outil d'urbanisme armé.
+  state.roadEditMode = null;
+  state.pendingRoadPoint = null;
+  state.roadTrace = null;
+  state.zoneMode = state.zoneMode === mode ? null : mode;
+  state.pendingZoneCorner = null;
+  if (!state.zoneMode && state.selectedBuildingId) state.selectedBuildingId = null;
+  if (!state.zoneMode) renderBuildingPanel();
+  updateInstructions();
+  refreshUI();
+}
+
+/** Bâtiment sous le point (marge de tolérance 6 px). */
+function buildingAtPoint(p) {
+  const buildings = (state && state.city && state.city.buildings) || [];
+  for (const b of buildings) {
+    if (p.x >= b.x - 6 && p.x <= b.x + b.w + 6 && p.y >= b.y - 6 && p.y <= b.y + b.h + 6) return b;
+  }
+  return null;
+}
+
+/** Panneau latéral du bâtiment sélectionné (couverture, valeur, habitants…).
+ *  Ne reconstruit le DOM que si la sélection ou les stats changent. */
+let buildingPanelSignature = "";
+function renderBuildingPanel() {
+  const panel = document.getElementById("buildingPanel");
+  if (!panel || !state) return;
+  const building = ((state.city && state.city.buildings) || []).find(function (b) {
+    return b.id === state.selectedBuildingId;
+  });
+  if (!building) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    buildingPanelSignature = "";
+    return;
+  }
+  const signature = [building.id, building.residents, building.jobs, building.occupants,
+    building.landValue, building.abandoned, building.level, building.density].join("|");
+  if (signature === buildingPanelSignature && !panel.hidden) return;
+  buildingPanelSignature = signature;
+  const spec = BUILDING_TYPES[building.type] || BUILDING_TYPES.residential;
+  const zone = ((state.city && state.city.zones) || []).find(function (z) { return z.id === building.zoneId; });
+  const zoneLabel = zone ? (ZONE_TYPES[zone.type] || { label: zone.type }).label : "—";
+  const days = Math.floor((building.age || 0) / 24);
+  panel.hidden = false;
+  panel.innerHTML =
+    '<div class="building-panel-head"><span>' + (spec.icon || "🏠") + "</span><b>" + h(spec.label) + "</b>" +
+    '<button type="button" class="building-panel-close" data-building-close aria-label="Fermer le panneau du bâtiment">✕</button></div>' +
+    '<dl class="building-panel-stats">' +
+    "<dt>Densité</dt><dd>" + h(building.density || "low") + " · niveau " + (building.level || 1) + "</dd>" +
+    "<dt>Habitants</dt><dd>" + (building.residents || 0) + "</dd>" +
+    "<dt>Emplois</dt><dd>" + (building.jobs || 0) + "</dd>" +
+    "<dt>Occupation</dt><dd>" + Math.round((building.occupants || 0) * 100) + " %</dd>" +
+    "<dt>Valeur foncière</dt><dd>" + Math.round((building.landValue || 0) * 100) + " %</dd>" +
+    "<dt>Zone</dt><dd>" + h(zoneLabel) + "</dd>" +
+    "<dt>Âge</dt><dd>" + days + " jour" + (days > 1 ? "s" : "") + "</dd>" +
+    "</dl>" +
+    (building.abandoned ? '<p class="building-panel-warn">⚠️ Bâtiment abandonné : il ne génère plus de passagers.</p>' : "") +
+    '<button type="button" class="btn btn-warn" data-building-demolish="' + h(building.id) + '">🧨 Démolir</button>';
+}
+
+/** Démolition depuis le panneau : les résidents non relogés pèsent sur la satisfaction. */
+document.addEventListener("click", function (event) {
+  const target = event.target;
+  if (!target || !target.getAttribute) return;
+  if (target.getAttribute("data-building-close")) {
+    if (state) state.selectedBuildingId = null;
+    renderBuildingPanel();
+  } else if (target.getAttribute("data-building-demolish")) {
+    if (state) {
+      demolishBuilding(state, target.getAttribute("data-building-demolish"), log);
+      state.selectedBuildingId = null;
+      renderBuildingPanel();
+      refreshUI();
+    }
+  }
+});
+
+/** HUD — mini-barres verticales de demande par type de zone (0–100 %). */
+function updateDemandBars() {
+  const el = document.getElementById("demandBars");
+  if (!el || !state || !state.buildingsEnabled) return;
+  const stats = buildingStats(state);
+  const rows = [
+    { key: "residential", label: "Résidentiel", color: "#55b878" },
+    { key: "commercial", label: "Commercial", color: "#f4a261" },
+    { key: "industrial", label: "Industriel", color: "#8d6e63" },
+    { key: "service", label: "Services", color: "#4f8fc0" }
+  ];
+  el.innerHTML = rows.map(function (row) {
+    const pct = Math.round(Math.max(0, Math.min(1, (stats.demand && stats.demand[row.key]) || 0)) * 100);
+    return '<span class="demand-item" title="' + row.label + " : " + pct + ' %"><i class="demand-mini" aria-hidden="true">' +
+      '<b style="height:' + Math.max(4, pct * 0.16) + 'px;background:' + row.color + '"></b></i>' +
+      '<span class="demand-label">' + row.label + "</span></span>";
+  }).join("");
 }
 
 bindTap(document.getElementById("buildRoadBtn"), function () { enterRoadMode("build"); });
@@ -1241,6 +1425,30 @@ bindTap(document.getElementById("oneWayRoadBtn"), function () { enterRoadMode("o
 bindTap(document.getElementById("undoRoadBtn"), function () { undoRoadAction(); });
 bindTap(document.getElementById("redoRoadBtn"), function () { redoRoadAction(); });
 
+// V27 — urbanisme : zonage, dézonage, inspection, affichages.
+bindTap(document.getElementById("urbanismeBtn"), function () {
+  const group = document.getElementById("urbanismeGroup");
+  if (group) group.dataset.open = group.dataset.open === "true" ? "false" : "true";
+  updateToolbarVisibility();
+});
+bindTap(document.getElementById("zoneBtn"), function () { enterZoneMode("zone"); });
+bindTap(document.getElementById("unzoneBtn"), function () { enterZoneMode("unzone"); });
+bindTap(document.getElementById("inspectBtn"), function () { enterZoneMode("inspect"); });
+bindTap(document.getElementById("toggleLandValueBtn"), function () {
+  if (!state) return;
+  state.showLandValue = !state.showLandValue;
+  const button = document.getElementById("toggleLandValueBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showLandValue));
+  refreshUI();
+});
+bindTap(document.getElementById("toggleZonesBtn"), function () {
+  if (!state) return;
+  state.showZones = !state.showZones;
+  const button = document.getElementById("toggleZonesBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showZones));
+  refreshUI();
+});
+
 // V27 — clavier du tracé : Échap annule le tracé / le mode, Entrée termine la
 // chaîne de segments, Ctrl+Z / Ctrl+Shift+Z pilotent l'annulation voirie.
 document.addEventListener("keydown", function (e) {
@@ -1248,7 +1456,8 @@ document.addEventListener("keydown", function (e) {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName || "");
   if (e.key === "Escape") {
     if (state.pendingRoadPoint) { endRoadTrace(); e.preventDefault(); return; }
-    if (state.roadEditMode) { enterRoadMode(state.roadEditMode); e.preventDefault(); }
+    if (state.roadEditMode) { enterRoadMode(state.roadEditMode); e.preventDefault(); return; }
+    if (state.zoneMode) { enterZoneMode(state.zoneMode); e.preventDefault(); }
     return;
   }
   if (typing) return;

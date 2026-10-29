@@ -94,5 +94,11 @@ export function createState(city, scenario = null) {
     nextCampaignId: 1,
     campaignCooldownUntil: 0,
     showCoverage: false,
+    // V27 — urbanisme : outils de zonage et affichages de carte.
+    showLandValue: false,
+    showZones: false,
+    zoneMode: null,           // null | "zone" | "unzone" | "inspect"
+    pendingZoneCorner: null,  // premier coin posé pour peindre une zone
+    selectedBuildingId: null,
   };
 }

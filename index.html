@@ -36,7 +36,7 @@
       </div>
     </div>
   </div>
-  <div class="stats" aria-label="Statistiques principales"><span class="stat-chip" aria-label="Budget">💰 <b id="money">0 €</b></span><span class="stat-chip" aria-label="Passagers transportés">👥 <b id="passengers">0</b></span><span class="stat-chip" aria-label="Satisfaction">😊 <b id="satisfaction">0%</b></span><span class="stat-chip" aria-label="Heure de jeu">🕒 <b id="clock">08:00</b></span></div>
+  <div class="stats" aria-label="Statistiques principales"><span class="stat-chip" aria-label="Budget">💰 <b id="money">0 €</b></span><span class="stat-chip" aria-label="Passagers transportés">👥 <b id="passengers">0</b></span><span class="stat-chip" aria-label="Satisfaction">😊 <b id="satisfaction">0%</b></span><span class="stat-chip" aria-label="Heure de jeu">🕒 <b id="clock">08:00</b></span><span class="stat-chip" id="demandBars" aria-label="Demande par type de zone"></span></div>
 </header>
 
 <main class="app-shell">
@@ -54,6 +54,13 @@
         <button id="redoRoadBtn" type="button" class="btn" aria-label="Rétablir la dernière action de voirie">↪️ Rétablir</button>
         <label class="sr-only" for="roadTypeSelect">Type de route</label><select id="roadTypeSelect" aria-label="Type de route à construire"><option value="street">🏘️ Rue</option><option value="avenue" selected>🔗 Avenue</option><option value="boulevard">🛣️ Boulevard</option><option value="highway">🏎️ Voie rapide</option></select>
       </div>
+      <button id="urbanismeBtn" type="button" class="btn" aria-expanded="false" aria-controls="urbanismeGroup">🏙️ Urbanisme</button>
+      <div id="urbanismeGroup" class="tool-group" data-open="false">
+        <button id="zoneBtn" type="button" class="btn" aria-label="Peindre une zone urbanisée">🖍️ Zoner</button>
+        <label class="sr-only" for="zoneTypeSelect">Type de zone</label><select id="zoneTypeSelect" aria-label="Type de zone à peindre"><option value="residential">🏘️ Résidentiel</option><option value="commercial">🛍️ Commercial</option><option value="industrial">🏭 Industriel</option><option value="service">🏫 Services</option></select>
+        <button id="unzoneBtn" type="button" class="btn" aria-label="Retirer une zone">🚫 Dézoner</button>
+        <button id="inspectBtn" type="button" class="btn" aria-label="Inspecter un bâtiment">🔍 Inspecter</button>
+      </div>
       <div id="modeGroup" class="tool-group"><label class="sr-only" for="modeSelect">Mode de transport</label><select id="modeSelect" aria-label="Mode de transport"><option value="bus">🚌 Bus</option><option value="tram">🚊 Tramway</option><option value="metro">🚇 Métro</option></select></div>
       <button id="finishLineBtn" type="button" class="btn btn-success" aria-label="Terminer la ligne" hidden>✅ Terminer</button>
     </div>
@@ -64,7 +71,7 @@
       <canvas id="map" aria-label="Carte de la ville et du réseau de transport"></canvas>
       <div class="map-overlays" aria-label="Affichages de la carte">
         <button id="advertisingBtn" type="button" class="map-overlay-btn" aria-label="Ouvrir les campagnes publicitaires" title="Publicité">📣</button>
-        <div class="map-overlay-right"><button id="toggleHeatmapBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false" title="Congestion">🔥</button><button id="toggleCoverageBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la couverture du réseau" aria-pressed="false" title="Couverture">📍</button></div>
+        <div class="map-overlay-right"><button id="toggleHeatmapBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false" title="Congestion">🔥</button><button id="toggleCoverageBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la couverture du réseau" aria-pressed="false" title="Couverture">📍</button><button id="toggleLandValueBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la valeur foncière" aria-pressed="false" title="Valeur foncière">💰</button><button id="toggleZonesBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer les zones urbanisées" aria-pressed="false" title="Zones">🗺️</button></div>
       </div>
 
       <div id="heatmapLegend" class="heatmap-legend" hidden aria-hidden="true">
@@ -76,6 +83,8 @@
       <div id="miniMap" class="mini-map" aria-label="Mini-carte de la ville">
         <canvas id="miniMapCanvas" width="180" height="120"></canvas>
       </div>
+
+      <div id="buildingPanel" class="building-panel" hidden aria-live="polite"></div>
     </div>
   </section>
 

@@ -579,6 +579,77 @@ export function createRenderer(canvas, state) {
       });
     }
 
+    // V27 — valeur foncière : grille verte (cher) → rouge (délaissé).
+    if (state.showLandValue && state.city && state.city.landValueGrid && state.city.landValueGrid.values) {
+      const grid = state.city.landValueGrid;
+      for (let gy = 0; gy < grid.rows; gy++) {
+        for (let gx = 0; gx < grid.cols; gx++) {
+          const value = grid.values[gy * grid.cols + gx];
+          const cx = gx * grid.cell;
+          const cy = gy * grid.cell;
+          if (cx + grid.cell < left || cx > left + viewW || cy + grid.cell < top || cy > top + viewH) continue;
+          ctx.fillStyle = "hsla(" + Math.round(Math.max(0, Math.min(1, value)) * 120) + ", 65%, 45%, 0.30)";
+          ctx.fillRect(cx, cy, grid.cell + 1, grid.cell + 1);
+        }
+      }
+    }
+
+    // V27 — zones urbanisées peintes par le joueur.
+    if (state.showZones || state.zoneMode) {
+      const ZONE_COLORS = {
+        residential: "rgba(85, 184, 120, 0.20)",
+        commercial: "rgba(244, 162, 97, 0.22)",
+        industrial: "rgba(141, 110, 99, 0.24)",
+        service: "rgba(79, 143, 192, 0.22)"
+      };
+      const ZONE_BORDERS = {
+        residential: "rgba(85, 184, 120, 0.75)",
+        commercial: "rgba(244, 162, 97, 0.75)",
+        industrial: "rgba(141, 110, 99, 0.8)",
+        service: "rgba(79, 143, 192, 0.75)"
+      };
+      (state.city.zones || []).forEach(function (zone) {
+        ctx.fillStyle = ZONE_COLORS[zone.type] || ZONE_COLORS.residential;
+        ctx.strokeStyle = ZONE_BORDERS[zone.type] || ZONE_BORDERS.residential;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 5]);
+        ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
+        ctx.strokeRect(zone.x, zone.y, zone.w, zone.h);
+        ctx.setLineDash([]);
+      });
+      // Premier coin posé : un repère guide le second clic.
+      if (state.pendingZoneCorner) {
+        ctx.strokeStyle = "rgba(31, 35, 64, 0.8)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(state.pendingZoneCorner.x, state.pendingZoneCorner.y, 7, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // V27 — bâtiments émergents (les abandonnés sont grisés).
+    {
+      const BUILDING_COLORS = {
+        residential: "#55b878",
+        commercial: "#f4a261",
+        office: "#4f8fc0",
+        industrial: "#8d6e63",
+        service: "#9b5de5",
+        leisure: "#ef476f"
+      };
+      (state.city.buildings || []).forEach(function (building) {
+        ctx.fillStyle = building.abandoned
+          ? "rgba(120, 120, 120, 0.55)"
+          : (BUILDING_COLORS[building.type] || "#55b878");
+        ctx.fillRect(building.x, building.y, building.w || 18, building.h || 18);
+        if (building.id === state.selectedBuildingId) {
+          ctx.strokeStyle = "#1f2340";
+          ctx.lineWidth = 3;
+          ctx.strokeRect(building.x - 3, building.y - 3, (building.w || 18) + 6, (building.h || 18) + 6);
+        }
+      });
+    }
+
     if (state.lines) {
       state.lines.forEach(function (line) {
         const ids = (line.route && line.route.nodeIds) || [];
