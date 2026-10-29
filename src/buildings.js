@@ -408,3 +408,45 @@ export function buildingStats(state) {
     }
   };
 }
+
+/**
+ * V27 — amorçage d'une nouvelle partie : quelques zones collées à la voirie
+ * générée (mix majoritairement résidentiel) pour que des bâtiments émergent
+ * dès les premières heures simulées, sans attendre que le joueur découvre
+ * l'outil de zonage. Déterministe (rng seedé) et idempotent : ne fait rien
+ * si la ville a déjà des zones (sauvegarde rechargée, partie en cours).
+ */
+export function seedInitialZones(state, rng = Math.random, log = () => {}) {
+  ensureBuildingsState(state);
+  if (state.city.zones.length) return 0;
+  const segments = roadSegments(state.city);
+  if (!segments.length) return 0;
+  const mix = [
+    "residential", "residential", "commercial", "residential",
+    "service", "residential", "industrial", "residential",
+    "commercial", "residential", "service", "residential"
+  ];
+  const stride = Math.max(1, Math.floor(segments.length / mix.length));
+  let seeded = 0;
+  for (let i = 0; i < mix.length; i++) {
+    const seg = segments[Math.min(segments.length - 1, i * stride)];
+    const dx = seg.b.x - seg.a.x, dy = seg.b.y - seg.a.y;
+    const t = 0.25 + rng() * 0.5;
+    const px = seg.a.x + dx * t, py = seg.a.y + dy * t;
+    // Normale unitaire au segment : la bande est posée à 3 px du bord de
+    // voirie (adjacente au sens de ZONE_ROAD_ADJACENCY_PX), alternant de côté.
+    const len = Math.hypot(dy, dx) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const side = i % 2 === 0 ? 1 : -1;
+    const w = 84, h = 44;
+    const offset = h / 2 + 3;
+    const zone = addZone(state, mix[i],
+      Math.round(px - w / 2 + nx * side * offset),
+      Math.round(py - h / 2 + ny * side * offset),
+      w, h);
+    if (zone) seeded += 1;
+  }
+  if (seeded) log(`Urbanisme : ${seeded} zones d'amorçage le long de la voirie.`);
+  return seeded;
+}
+

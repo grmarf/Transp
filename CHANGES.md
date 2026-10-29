@@ -71,6 +71,24 @@ transport : bus / tram / métro inchangés.
   (zone le long d'une route), code plus simple et testable en Node pur.
 - **Dézoner** : les bâtiments existants restent (conforme au prompt).
 
+## Correctif post-livraison (23.0.1) — partie fraîche injouable
+
+Signalement joueur : au démarrage d'une nouvelle partie, aucun passager
+n'était jamais généré (population 0, lignes vides). Causes et correctifs :
+
+- `generateDemand` déléguait **tout** à la génération OD dès
+  `buildingsEnabled`, or une partie fraîche n'a ni zones ni bâtiments
+  pendant plusieurs heures simulées : plus aucune source de passagers.
+  **Correctif** : repli sur la génération historique aux arrêts tant que
+  l'OD n'a pas d'origines (`odHasOrigins()` — bâtiments peuplés).
+- Aucune zone au démarrage : le joueur devait deviner l'outil « Urbanisme »
+  et attendre 2–4 h simulées avant le moindre bâtiment.
+  **Correctif** : `seedInitialZones()` peint 12 zones d'amorçage le long de
+  la voirie générée au boot (déterministe, idempotent, mix majoritairement
+  résidentiel).
+- Nouveau test de non-régression : `tests/v27-playability.mjs` (repli
+  historique, amorçage adjacent à la voirie, croissance, bascule OD).
+
 ## Dette technique
 
 - Validation collision tracé↔bâtiment (voir ci-dessus).
@@ -90,3 +108,4 @@ transport : bus / tram / métro inchangés.
 - Tests : `tests/v27-roads.mjs`, `tests/v27-road-tools.mjs`,
   `tests/v27-buildings.mjs`, `tests/v27-od.mjs`, `tests/v27-buildings-ui.mjs`
   (Node pur, pas de navigateur).
+

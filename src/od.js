@@ -159,3 +159,13 @@ export function odMixForSlot(slot) {
 }
 
 export { BUILDING_TYPES };
+
+/** V27 — l'OD a-t-elle des origines (bâtiments peuplés : résidents ou emplois) ?
+ *  Tant que non, engine.generateDemand garde la génération historique aux
+ *  arrêts : sans ce repli, une partie fraîche (aucune zone peinte, donc
+ *  aucun bâtiment) ne générerait jamais un seul passager. */
+export function odHasOrigins(state) {
+  return (state?.city?.buildings || []).some(b =>
+    !b.abandoned && ((b.residents || 0) > 0 || (b.jobs || 0) > 0));
+}
+

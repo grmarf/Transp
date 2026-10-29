@@ -7,7 +7,7 @@ import { createRenderer, clearRendererCaches, renderFleetPanel } from "./rendere
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
 import { invalidateRoutingCache } from "./routing.js";
-import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingStats, BUILDING_TYPES, ZONE_TYPES } from "./buildings.js";
+import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingStats, BUILDING_TYPES, ZONE_TYPES, seedInitialZones } from "./buildings.js";
 import { startCampaign } from "./advertising.js";
 
 const canvas = document.getElementById("map");
@@ -1138,6 +1138,10 @@ function boot(seed, scenarioId, restoredPayload) {
   // navigateur ; les sauvegardes antérieures récupèrent des structures vides.
   state.buildingsEnabled = true;
   ensureBuildingsState(state);
+  // V27 — amorçage d'une nouvelle partie : quelques zones le long de la
+  // voirie générée pour que des bâtiments émergent dès les premières heures.
+  // Sans elles, la ville resterait grise et l'OD sans origines.
+  seedInitialZones(state, nextRng, log);
   state.advertisingEnabled = true;
   state.staffCostsEnabled = true;
   const fareLevelSelect = document.getElementById("fareLevelSelect");
@@ -1713,5 +1717,6 @@ const publicGameApi = {
 window.__vieTLignes = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
+
 
 

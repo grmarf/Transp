@@ -18,7 +18,7 @@ import {
 } from "./vehicles.js";
 import { growCity, serviceLevel } from "./growth.js";
 import { updateBuildings } from "./buildings.js";
-import { odSlot, originBuildings, expectedTrips, nearestCoveredStop, nearestStop, pickDestinationBuilding, odMixForSlot } from "./od.js";
+import { odSlot, originBuildings, expectedTrips, nearestCoveredStop, nearestStop, pickDestinationBuilding, odMixForSlot, odHasOrigins } from "./od.js";
 import { maybeStartRoadworks, maybeEndRoadworks } from "./disruptions.js";
 import { evaluateScenario } from "./scenarios.js";
 import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpiredEvents, startContextualEvent } from "./events.js";
@@ -320,9 +320,13 @@ export function deleteLine(state, lineId, log) {
 const TRIP_RATE = 0.00033; // tuned to keep overall trip volume close to V4.0's
 
 export function generateDemand(state, rng) {
-  // V27 — quand les bâtiments sont actifs, la génération aléatoire aux arrêts
-  // cède la place à un flux origine-destination issu des bâtiments.
-  if (state.buildingsEnabled) {
+  // V27 — quand les bâtiments sont actifs ET peuplés (résidents ou emplois),
+  // la génération aléatoire aux arrêts cède la place à un flux
+  // origine-destination issu des bâtiments. Tant qu'aucun bâtiment n'est
+  // sorti de terre (partie fraîche, zones à peine peintes), la génération
+  // historique garde le service : une ville sans un seul passager serait
+  // injouable.
+  if (state.buildingsEnabled && odHasOrigins(state)) {
     generateBuildingDemand(state, rng);
     return;
   }
@@ -686,4 +690,5 @@ export function step(state, rng, log) {
     log("Le budget est négatif : réduisez les dépenses pour éviter la faillite.");
   }
 }
+
 
