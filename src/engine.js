@@ -17,6 +17,7 @@ import {
   congestionHeatmap
 } from "./vehicles.js";
 import { growCity, serviceLevel } from "./growth.js";
+import { updateBuildings } from "./buildings.js";
 import { maybeStartRoadworks, maybeEndRoadworks } from "./disruptions.js";
 import { evaluateScenario } from "./scenarios.js";
 import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpiredEvents, startContextualEvent } from "./events.js";
@@ -535,6 +536,16 @@ export function step(state, rng, log) {
   // loops over every day actually crossed instead of assuming at most one.
   const newTime = state.time + TICK_MINUTES * state.speed;
   const daysCrossed = Math.floor(newTime / 1440);
+  // V27 — cycle horaire des bâtiments (opt-in via state.buildingsEnabled) :
+  // valeur foncière, croissance calibrée (2–4 h simulées), montée en densité,
+  // abandon. Un tick à très haute vitesse peut traverser plusieurs heures.
+  if (state.buildingsEnabled) {
+    const hoursBefore = Math.floor(state.time / 60);
+    const hoursAfter = Math.floor(newTime / 60);
+    for (let h = hoursBefore; h < hoursAfter; h++) {
+      updateBuildings(state, rng, (state.elapsedDays || 0) * 24 + h + 1, log);
+    }
+  }
   // Defensive default: a save from before V11.0 won't have this field.
   if (!state.dailyBaseline) state.dailyBaseline = { income: 0, expenses: 0 };
   for (let d = 0; d < daysCrossed; d++) {

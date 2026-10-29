@@ -5,6 +5,10 @@ export const SAVE_VERSION = SAVE_FORMAT_VERSION;
 export const SAVE_KEY = "vie-t-lignes-v20-save";
 const SAVE_FORMAT = "vie-t-lignes-save";
 const STATE_VERSION = "23.0";
+// V27 — catalogues de validation des zones et bâtiments.
+const ZONE_LIKE = { residential: true, commercial: true, industrial: true, service: true };
+const BUILDING_LIKE = { residential: true, commercial: true, office: true, industrial: true, service: true, leisure: true };
+const DENSITY_LIKE = { low: true, mid: true, high: true };
 const UINT32_MAX = 0xFFFFFFFF;
 const PASSENGER_STATES = new Set(["WAITING", "BOARDING", "ON_VEHICLE", "TRANSFERRING", "ARRIVED", "ABANDONED"]);
 const VEHICLE_MODES = new Set(["bus", "tram", "metro"]);
@@ -100,6 +104,28 @@ function validateCity(city) {
     object(district.center, "district.center");
     coordinate(district.center.x, "district.center.x"); coordinate(district.center.y, "district.center.y");
     finite(district.populationFactor, "district.populationFactor");
+  }
+  // V27 — zones et bâtiments (optionnels : absents des sauvegardes V<27).
+  if (city.zones !== undefined) {
+    const zones = array(city.zones, "ville.zones");
+    for (const zone of zones) {
+      if (!ZONE_LIKE[zone.type]) invalid("zone.type inconnu");
+      coordinate(zone.x, "zone.x"); coordinate(zone.y, "zone.y");
+      finite(zone.w, "zone.w"); finite(zone.h, "zone.h");
+      if (zone.w < 12 || zone.h < 12) invalid("zone trop petite");
+    }
+  }
+  if (city.buildings !== undefined) {
+    const buildings = array(city.buildings, "ville.buildings");
+    for (const building of buildings) {
+      if (!BUILDING_LIKE[building.type]) invalid("bâtiment.type inconnu");
+      if (!DENSITY_LIKE[building.density]) invalid("bâtiment.density inconnu");
+      coordinate(building.x, "bâtiment.x"); coordinate(building.y, "bâtiment.y");
+      finite(building.w, "bâtiment.w"); finite(building.h, "bâtiment.h");
+      if (building.residents !== undefined && !Number.isFinite(building.residents)) invalid("bâtiment.residents invalide");
+      if (building.jobs !== undefined && !Number.isFinite(building.jobs)) invalid("bâtiment.jobs invalide");
+      if (building.abandoned !== undefined && typeof building.abandoned !== "boolean") invalid("bâtiment.abandoned invalide");
+    }
   }
   return stopIds;
 }

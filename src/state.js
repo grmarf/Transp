@@ -77,6 +77,10 @@ export function createState(city, scenario = null) {
     // engine tests keep their exact money and demand trajectories; the
     // browser game enables them at boot.
     demographicsEnabled: false,
+    // V27 — bâtiments/zonage/valeur foncière : opt-in comme demographics,
+    // activé par le boot navigateur ; tous les tests antérieurs restent
+    // sur le chemin historique (aucune croissance de bâtiment).
+    buildingsEnabled: false,
     fareLevel: 1,
     wageLevel: 1,
     staffCostsEnabled: false,
