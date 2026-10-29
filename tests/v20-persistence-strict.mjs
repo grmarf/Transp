@@ -5,8 +5,8 @@ import { readSavedGame, SAVE_KEY, SAVE_VERSION, serializeState, validateSavePayl
 
 const state = createState(createCity('V20-STRICT'));
 const payload = serializeState(state, 123);
-assert.equal(SAVE_VERSION, 2);
-assert.equal(payload.state.version, '22.0');
+assert.equal(SAVE_VERSION, 3);
+assert.equal(payload.state.version, '23.0');
 assert.equal(state.wageLevel, 1);
 assert.equal(state.fareLevel, 1);
 assert.equal(state.activeCampaigns.length, 0);

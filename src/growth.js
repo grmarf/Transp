@@ -68,7 +68,7 @@ function maybeSpawnSatellite(state, rng, log, levels) {
   const newStop = addSatelliteStop(state.city, candidate, rng);
   const [primaryParentId, ...secondaryParentIds] = newStop.roadParentIds || [candidate.id];
   addNetworkNode(state.network, newStop.id, newStop.x, newStop.y, primaryParentId);
-  for (const parentId of secondaryParentIds) addNetworkEdge(state.network, parentId, newStop.id, "local");
+  for (const parentId of secondaryParentIds) addNetworkEdge(state.network, parentId, newStop.id, "street");
   // V13.0: the underground network is a complete graph over every stop, so
   // a new stop needs a fresh rebuild (cheap at this scale) rather than an
   // incremental patch — regenerating it here keeps metro tunnels reachable

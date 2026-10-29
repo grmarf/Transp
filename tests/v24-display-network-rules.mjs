@@ -20,7 +20,9 @@ for (let i = 0; i < 20; i++) {
   }
   assert.ok([...degree.values()].every(value => value <= 3), 'une carte initiale dépasse trois routes à un arrêt');
   const network = createNetwork(city);
-  assert.ok([...network.adjacency.values()].every(links => links.length <= 3), 'le réseau reconstruit dépasse trois routes à un arrêt');
+  // V27 : le plafond de 3 routes s'applique aux ARÊTS ; les jonctions
+  // géométriques (croisements de voirie) peuvent légitimement avoir 4 liens.
+  assert.ok(city.stops.every(stop => (network.adjacency.get(stop.id) || []).length <= 3), 'le réseau reconstruit dépasse trois routes à un arrêt');
   assert.match(city.name, /^Ville /);
   assert.equal(/\d{6,}/.test(city.name), false, 'le seed ne doit plus être injecté dans le nom de ville');
 }

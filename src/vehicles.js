@@ -8,6 +8,7 @@ import { eventFareMultiplier } from "./events.js";
 import { seasonFareMultiplier } from "./seasons.js";
 import { PASSENGER_STATES } from "./passengers.js";
 import { TICK_MINUTES } from "./constants.js";
+import { edgeBetween } from "./network.js";
 import { fareAcceptance } from "./demographics.js";
 
 export const DEFAULT_VEHICLE_CAPACITY = 35;
@@ -372,17 +373,22 @@ export function updateVehicles(state, rng = () => 1, log = () => {}) {
       const sharing = edgeLoad.get(edgeKey(a.id, b.id)) || 1;
       const roadCongestion = congestionFactor(sharing);
       vehicle.congestion = 1 - (1 - roadCongestion) * (1 - (vehicle.congestionResistance ?? 0));
+      // V27 — une voirie de catégorie supérieure se parcourt plus vite : le
+      // multiplicateur de vitesse de l'arête traversée s'applique au budget
+      // de déplacement courant (1 par défaut, comportement inchangé ailleurs).
+      const currentEdge = edgeBetween(state.network, a.id, b.id);
+      const edgeSpeed = currentEdge?.speed || 1;
 
       const dist = Math.max(50, distance(a, b));
       const remainingDist = (1 - vehicle.progress) * dist;
-      const coveredThisEdge = budget * vehicle.congestion;
+      const coveredThisEdge = budget * vehicle.congestion * edgeSpeed;
 
       if (coveredThisEdge < remainingDist) {
         vehicle.progress += coveredThisEdge / dist;
         break;
       }
 
-      budget -= remainingDist / vehicle.congestion;
+      budget -= remainingDist / (vehicle.congestion * edgeSpeed);
       vehicle.progress = 0;
       vehicle.routeIndex = next;
       hops++;

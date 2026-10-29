@@ -1,75 +1,267 @@
-/** V2.2 — Network Core
+/** V27 — Network Core
  * Builds a deterministic graph from the city's road infrastructure and provides
  * shortest-path routing between stops. The transport lines remain user-defined;
  * the network decides how vehicles travel between their consecutive stops.
+ *
+ * V27 — refonte « Construction de routes » :
+ *  - routes typées (street / avenue / boulevard / highway) avec capacité,
+ *    limitation de vitesse et coût de construction ;
+ *  - arêtes-polylignes : chaque route porte une liste de points (courbes V1 =
+ *    chaînes de segments droits) ;
+ *  - jonctions automatiques : deux routes qui se croisent géométriquement
+ *    obtiennent un nœud de jonction partagé, sans action du joueur — les
+ *    nœuds du graphe ne sont plus uniquement des arrêts ;
+ *  - sens unique : une arête oneWay n'est traversable que de from → to.
+ *
+ * Les ids historiques (local/secondary/arterial) restent acceptés en lecture
+ * (roadType() les mappe) : les anciens appels de test continuent de fonctionner.
  */
 
 import { distance } from "./constants.js";
 
 export const ROAD_TYPES = {
-  local:    { id: "local", name: "Route locale", lanes: 1, speed: 0.85, cost: 0.45, allowStops: true, color: "#87969b" },
-  secondary:{ id: "secondary", name: "Route secondaire", lanes: 1, speed: 1.1, cost: 0.7, allowStops: true, color: "#66747b" },
-  arterial: { id: "arterial", name: "Boulevard / artère", lanes: 2, speed: 1.35, cost: 1.15, allowStops: false, color: "#4b5962" }
+  street:    { id: "street",    name: "Rue",            lanes: 1, width: 8,  speed: 0.85, speedLimit: 40,  capacity: 400,  costPerPixel: 0.45, allowStops: true,  tramPossible: false, color: "#6B7889" },
+  avenue:    { id: "avenue",    name: "Avenue",         lanes: 1, width: 13, speed: 1.1,  speedLimit: 60,  capacity: 800,  costPerPixel: 0.7,  allowStops: true,  tramPossible: true,  color: "#5A6577" },
+  boulevard: { id: "boulevard", name: "Boulevard",      lanes: 2, width: 19, speed: 1.35, speedLimit: 70,  capacity: 1200, costPerPixel: 1.15, allowStops: false, tramPossible: true,  color: "#4A5568" },
+  highway:   { id: "highway",   name: "Voie rapide",    lanes: 2, width: 24, speed: 1.6,  speedLimit: 100, capacity: 2000, costPerPixel: 1.8,  allowStops: false, tramPossible: false, color: "#39424E" }
 };
 
+// Alias historiques V22 : les routes générées avant la V27 restent lisibles.
+const LEGACY_ROAD_TYPES = { local: "street", secondary: "avenue", arterial: "boulevard" };
+
 export function roadType(type) {
-  return ROAD_TYPES[type] || ROAD_TYPES.secondary;
+  if (ROAD_TYPES[type]) return ROAD_TYPES[type];
+  const mapped = LEGACY_ROAD_TYPES[type];
+  if (mapped) return ROAD_TYPES[mapped];
+  return ROAD_TYPES.street;
 }
 
+/** Coût de construction d'une route (€) pour une longueur de polyline donnée. */
+export function roadConstructionCost(type, lengthPx) {
+  return Math.max(25, Math.round((lengthPx || 0) * roadType(type).costPerPixel));
+}
+
+/** Longueur d'une polyline [{x,y}...]. */
+export function polylineLength(points) {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    total += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+  }
+  return total;
+}
+
+/**
+ * Points d'une route, normalisés. Une route peut être :
+ *  - reliée à deux arrêts (a/b ou startStopId/endStopId) ;
+ *  - libre (start/end) ;
+ *  - une polyline explicite (points) — V27.
+ * Les anciennes routes sans points recoivent la droite [départ, arrivée].
+ */
+export function roadPoints(road, stopsById = null) {
+  if (Array.isArray(road.points) && road.points.length >= 2) return road.points;
+  const a = stopsById && road.a ? stopsById.get(road.a) : null;
+  const b = stopsById && road.b ? stopsById.get(road.b) : null;
+  const start = a || road.start || (road.startStopId && stopsById ? stopsById.get(road.startStopId) : null);
+  const end = b || road.end || (road.endStopId && stopsById ? stopsById.get(road.endStopId) : null);
+  if (start && end) return [{ x: start.x, y: start.y }, { x: end.x, y: end.y }];
+  return null;
+}
+
+/** Intersection stricte de deux segments [p1,p2] × [p3,p4], ou null. */
+function segmentIntersection(p1, p2, p3, p4) {
+  const d1x = p2.x - p1.x, d1y = p2.y - p1.y;
+  const d2x = p4.x - p3.x, d2y = p4.y - p3.y;
+  const denominator = d1x * d2y - d1y * d2x;
+  if (Math.abs(denominator) < 1e-9) return null;
+  const t = ((p3.x - p1.x) * d2y - (p3.y - p1.y) * d2x) / denominator;
+  const u = ((p3.x - p1.x) * d1y - (p3.y - p1.y) * d1x) / denominator;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return { x: p1.x + d1x * t, y: p1.y + d1y * t };
+}
+
+function near(a, b, tolerance = 1) {
+  return Math.hypot(a.x - b.x, a.y - b.y) <= tolerance;
+}
+
+/**
+ * V27 — création du réseau : arrêts + jonctions géométriques + waypoints.
+ * Le graphe est reconstruit à partir de city.roads à chaque appel (le patron
+ * historique du dépôt) : supprimer une route supprime mécaniquement ses nœuds
+ * exclusifs, donc aucun nœud orphelin ne peut survivre.
+ */
 export function createNetwork(city) {
-  const nodes = new Map(city.stops.map(s => [s.id, {
-    id: s.id,
-    x: s.x,
-    y: s.y,
-    name: s.name
-  }]));
+  const stopsById = new Map(city.stops.map(s => [s.id, s]));
 
-  const edges = [];
-  const adjacency = new Map(city.stops.map(s => [s.id, []]));
-  const degree = new Map(city.stops.map(s => [s.id, 0]));
+  // --- 1. Polylines normalisées des routes ------------------------------
+  const roads = (city.roads || []).map(road => {
+    const points = roadPoints(road, stopsById);
+    return points ? { road, points } : null;
+  }).filter(Boolean);
 
-  for (const road of city.roads) {
-    const a = nodes.get(road.a || road.startStopId);
-    const b = nodes.get(road.b || road.endStopId);
-    if (!a || !b) continue;
-    // Une intersection ne peut jamais recevoir plus de trois routes.
-    if ((degree.get(a.id) || 0) >= 3 || (degree.get(b.id) || 0) >= 3) continue;
-    const spec = roadType(road.type);
-    const length = distance(a, b);
-    // Le coût de routage représente le temps de parcours : les artères sont
-    // donc naturellement attractives sans devenir des lignes de bus dédiées.
-    const weight = length / spec.speed;
-    const edge = {
-      id: road.id || `road-${edges.length + 1}`, a: a.id, b: b.id,
-      type: spec.id, lanes: road.lanes || spec.lanes, speed: road.speed || spec.speed,
-      allowStops: road.allowStops ?? spec.allowStops, weight, length,
-      corridorId: road.corridorId || null
-    };
-    edges.push(edge);
-    degree.set(a.id, (degree.get(a.id) || 0) + 1);
-    degree.set(b.id, (degree.get(b.id) || 0) + 1);
-    adjacency.get(a.id).push({ to: b.id, edge, weight });
-    adjacency.get(b.id).push({ to: a.id, edge, weight });
+  // --- 2. Nœuds : arrêts d'abord ------------------------------------------
+  const nodes = new Map();
+  const nodeAt = new Map(); // clé "x|y" arrondie → id, pour fusionner les nœuds confondus
+  const registerNode = (id, x, y, name, kind) => {
+    if (nodes.has(id)) return id;
+    const key = `${Math.round(x * 10)}|${Math.round(y * 10)}`;
+    const existing = nodeAt.get(key);
+    if (existing && near(nodes.get(existing), { x, y })) return existing;
+    nodes.set(id, { id, x, y, name: name || id, kind: kind || "waypoint" });
+    nodeAt.set(key, id);
+    return id;
+  };
+  for (const stop of city.stops) {
+    registerNode(stop.id, stop.x, stop.y, stop.name, "stop");
   }
 
+  let junctionCount = 0;
+  let waypointCount = 0;
+  const makeJunctionNode = (x, y) => {
+    const key = `${Math.round(x * 10)}|${Math.round(y * 10)}`;
+    const existing = nodeAt.get(key);
+    if (existing && near(nodes.get(existing), { x, y })) return existing;
+    junctionCount += 1;
+    return registerNode(`junction-${junctionCount}`, x, y, "Jonction", "junction");
+  };
+  const makeWaypointNode = (roadId, index, x, y) => {
+    waypointCount += 1;
+    return registerNode(`waypoint-${roadId}-${index}`, x, y, null, "waypoint");
+  };
+
+  // --- 3. Waypoints intérieurs des polylignes -----------------------------
+  // (un point intermédiaire devient un nœud du graphe : les arrêts/segments
+  // suivants peuvent s'y accrocher, et le rendu suit exactement la polyline.)
+  const roadNodeSequences = roads.map(({ road, points }) => {
+    const seq = points.map((point, index) => {
+      if (index === 0 || index === points.length - 1) return { point, interior: false };
+      return { point, interior: true };
+    });
+    return { road, points, seq };
+  });
+
+  // --- 4. Jonctions : intersections entre paires de routes ----------------
+  // Deux routes qui se croisent géométriquement partagent un nœud de jonction.
+  // Les croisements proches d'un nœud existant (arrêt, waypoint) fusionnent
+  // dans ce nœud plutôt que de créer un doublon.
+  const junctionsOnSegment = new Map(); // "roadIndex:segIndex" → [{x,y,t}]
+  for (let i = 0; i < roadNodeSequences.length; i++) {
+    for (let j = i + 1; j < roadNodeSequences.length; j++) {
+      const a = roadNodeSequences[i];
+      const b = roadNodeSequences[j];
+      for (let si = 0; si < a.points.length - 1; si++) {
+        for (let sj = 0; sj < b.points.length - 1; sj++) {
+          const hit = segmentIntersection(a.points[si], a.points[si + 1], b.points[sj], b.points[sj + 1]);
+          if (!hit) continue;
+          const keyA = `${i}:${si}`;
+          const keyB = `${j}:${sj}`;
+          if (!junctionsOnSegment.has(keyA)) junctionsOnSegment.set(keyA, []);
+          if (!junctionsOnSegment.has(keyB)) junctionsOnSegment.set(keyB, []);
+          junctionsOnSegment.get(keyA).push(hit);
+          junctionsOnSegment.get(keyB).push(hit);
+        }
+      }
+    }
+  }
+
+  // --- 5. Séquences de nœuds par route (points + jonctions + waypoints) ----
+  const roadEdgePlans = roadNodeSequences.map(({ road, points, seq }, index) => {
+    const nodeIds = [];
+    for (let s = 0; s < points.length; s++) {
+      const entry = seq[s];
+      if (entry.interior) {
+        nodeIds.push(makeWaypointNode(road.id, s, points[s].x, points[s].y));
+      } else {
+        // Extrémités : accrochées à l'arrêt si la route en désigne un.
+        const stopId = s === 0 ? (road.a || road.startStopId) : (road.b || road.endStopId);
+        if (stopId && stopsById.has(stopId) && near(stopsById.get(stopId), points[s], 1)) {
+          nodeIds.push(stopId);
+        } else {
+          const nodeId = makeWaypointNode(road.id, s, points[s].x, points[s].y);
+          nodeIds.push(nodeId);
+        }
+      }
+      // Jonctions tombant sur ce segment (entre s et s+1).
+      const hits = (junctionsOnSegment.get(`${index}:${s}`) || [])
+        .slice()
+        .sort((p, q) => Math.hypot(p.x - points[s].x, p.y - points[s].y) - Math.hypot(q.x - points[s].x, q.y - points[s].y));
+      for (const hit of hits) {
+        nodeIds.push(makeJunctionNode(hit.x, hit.y));
+      }
+    }
+    return { road, nodeIds };
+  });
+
+  // --- 6. Arêtes ------------------------------------------------------------
+  const edges = [];
+  const adjacency = new Map(city.stops.map(s => [s.id, []]));
+  const ensureAdjacency = (id) => { if (!adjacency.has(id)) adjacency.set(id, []); };
+  const degree = new Map(city.stops.map(s => [s.id, 0]));
+
+  for (const { road, nodeIds } of roadEdgePlans) {
+    const spec = roadType(road.type);
+    for (let i = 0; i < nodeIds.length - 1; i++) {
+      const aId = nodeIds[i];
+      const bId = nodeIds[i + 1];
+      if (aId === bId) continue;
+      const a = nodes.get(aId);
+      const b = nodes.get(bId);
+      if (!a || !b) continue;
+      // Règle historique préservée : un ARRET ne peut pas recevoir plus de
+      // trois routes (les jonctions libres n'ont pas de plafond).
+      const isStop = (id) => stopsById.has(id);
+      if (isStop(aId) && (degree.get(aId) || 0) >= 3) continue;
+      if (isStop(bId) && (degree.get(bId) || 0) >= 3) continue;
+      const length = distance(a, b);
+      const edge = {
+        id: `edge-${edges.length + 1}`,
+        roadId: road.id || null,
+        a: aId,
+        b: bId,
+        type: spec.id,
+        lanes: road.lanes || spec.lanes,
+        speed: spec.speed,
+        speedLimit: road.speedLimit || spec.speedLimit,
+        capacity: road.capacity || spec.capacity,
+        oneWay: road.oneWay === true,
+        allowStops: road.allowStops ?? spec.allowStops,
+        weight: length / spec.speed,
+        length
+      };
+      edges.push(edge);
+      if (isStop(aId)) degree.set(aId, (degree.get(aId) || 0) + 1);
+      if (isStop(bId)) degree.set(bId, (degree.get(bId) || 0) + 1);
+      ensureAdjacency(aId);
+      ensureAdjacency(bId);
+      adjacency.get(aId).push({ to: bId, edge, weight: edge.weight });
+      if (!edge.oneWay) adjacency.get(bId).push({ to: aId, edge, weight: edge.weight });
+    }
+  }
+
+  // --- 7. Jonctions dérivées (rendu des carrefours/feux) -------------------
   const junctions = [];
   for (const [nodeId, links] of adjacency) {
     if (links.length < 2) continue;
     const types = new Set(links.map(link => link.edge.type));
-    const arterialCount = links.filter(link => link.edge.type === "arterial").length;
-    const signal = arterialCount >= 2 || (arterialCount >= 1 && types.has("secondary"));
+    const majorCount = links.filter(link => link.edge.type === "boulevard" || link.edge.type === "highway").length;
+    const signal = majorCount >= 2 || (majorCount >= 1 && types.has("avenue"));
     junctions.push({ id: `junction-${nodeId}`, nodeId, roadTypes: [...types], signal, phase: "green-main" });
   }
   city.junctions = junctions;
 
   return {
-    version: "23.0",
+    version: "27.0",
     nodes,
     edges,
     adjacency,
     junctions,
     pathCache: new Map()
   };
+}
+
+/** V27 — arête entre deux nœuds adjacents (sens unique respecté). */
+export function edgeBetween(network, fromId, toId) {
+  const links = network.adjacency.get(fromId) || [];
+  return links.find(link => link.to === toId)?.edge || null;
 }
 
 // V8.0 — respected by shortestPath/routeLine (routeLine calls shortestPath,
@@ -132,21 +324,6 @@ export function shortestPath(network, fromId, toId) {
  * V21.0 — Route d'une ligne : ALLER-RETOUR.
  * Avant : [a, b, c] donnait une boucle fermée a→b→c→a (retour à vide).
  * Maintenant : [a, b, c] donne a→b→c→b→a (aller chargé, retour chargé).
- *
- * Concrètement, `nodeIds` contient l'aller complet (a→…→c) suivi du retour
- * miroir (c→…→a) moins le dernier nœud, puisque la boucle `% ids.length`
- * du moteur ramène naturellement au point de départ.
- *
- * Exemple : [a, x, b, y, c] → [a, x, b, y, c, y, b, x]
- *   Parcours du véhicule : a → x → b → y → c → y → b → x → (retour à a)
- *   Arrêts visités : a, b, c, b, a — chaque arrêt 2× par cycle sauf les
- *   terminus, ce qui multiplie mécaniquement les occasions de montée.
- *
- * Deux longueurs sont exposées :
- *   - `totalLength` : longueur du trajet simple (a→c), utilisée pour le
- *     calcul du coût de création de la ligne (inchangé pour le joueur).
- *   - `cycleLength` : longueur du cycle complet (aller + retour), utilisée
- *     par lineHeadwayMinutes() dans vehicles.js pour calculer l'intervalle.
  */
 export function routeLine(network, stopIds) {
   if (!Array.isArray(stopIds) || stopIds.length < 2) return null;
@@ -171,18 +348,11 @@ export function routeLine(network, stopIds) {
     }
   }
 
-  // --- 2. Retour miroir : c → b → a (sans dupliquer le point de départ) ---
-  // forward = [a, …, b, …, c]
-  // backward = [c, …, b, …, a]
-  // backward.slice(1, -1) = […, b, …] : on enlève c (déjà à la fin de
-  // forward) et a (atteint par la boucle du moteur, pas besoin de le
-  // répéter dans nodeIds).
+  // --- 2. Retour miroir : c → b → a ---
   const backward = forward.slice().reverse().slice(1, -1);
   const nodeIds = forward.concat(backward);
 
   // --- 3. Longueurs ---
-  // oneWayLength = a→c (aller simple, sert au coût de création de ligne)
-  // cycleLength = oneWayLength × 2 (aller + retour, sert à l'intervalle)
   const cycleLength = oneWayLength * 2;
 
   return {
@@ -198,7 +368,6 @@ export function routeLine(network, stopIds) {
 }
 
 // V23 — le tram peut disposer de voies indépendantes de la voirie.
-// Tant qu’aucune voie n’est posée, le moteur conserve le réseau de surface.
 export function createTramNetwork(city) {
   const tracks = city.tramTracks || [];
   const nodes = new Map(city.stops.map(s => [s.id, { id: s.id, x: s.x, y: s.y, name: s.name }]));
@@ -221,8 +390,8 @@ export function createTramNetwork(city) {
   return { version: "23.0-tram", nodes, edges, adjacency, pathCache: new Map(), independent: true };
 }
 
-// V6.0/V24 — helpers for extending the surface graph as the city grows.
-export function addNetworkEdge(network, aId, bId, type = "secondary") {
+// V6.0/V24/V27 — helpers for extending the surface graph as the city grows.
+export function addNetworkEdge(network, aId, bId, type = "avenue") {
   if (aId === bId || !network.nodes.has(aId) || !network.nodes.has(bId)) return null;
   const duplicate = network.edges.find(edge =>
     (edge.a === aId && edge.b === bId) || (edge.a === bId && edge.b === aId));
@@ -232,8 +401,9 @@ export function addNetworkEdge(network, aId, bId, type = "secondary") {
   const b = network.nodes.get(bId);
   const spec = roadType(type);
   const length = distance(a, b);
-  const edge = { id: `road-${network.edges.length + 1}`, a: aId, b: bId, type: spec.id,
-    lanes: spec.lanes, speed: spec.speed, allowStops: spec.allowStops, length,
+  const edge = { id: `edge-${network.edges.length + 1}`, roadId: null, a: aId, b: bId, type: spec.id,
+    lanes: spec.lanes, speed: spec.speed, speedLimit: spec.speedLimit, capacity: spec.capacity,
+    oneWay: false, allowStops: spec.allowStops, length,
     weight: length / spec.speed };
   network.edges.push(edge);
   network.adjacency.get(aId).push({ to: bId, edge, weight: edge.weight });
@@ -246,16 +416,10 @@ export function addNetworkNode(network, id, x, y, parentId) {
   if (!network.nodes.has(parentId)) return;
   network.nodes.set(id, { id, x, y, name: id });
   network.adjacency.set(id, []);
-  addNetworkEdge(network, parentId, id, "secondary");
+  addNetworkEdge(network, parentId, id, "avenue");
   network.junctions = network.junctions || [];
 }
-// V13.0 — underground network: a metro tunnel doesn't need existing roads,
-// so metro lines route through a fully independent, complete graph over
-// the city's stops (every pair of stops has a direct tunnel edge) instead
-// of the surface road graph above. A direct edge is always the shortest
-// path between any two nodes here (triangle inequality on straight-line
-// distances), so shortestPath/routeLine work on it completely unchanged —
-// no separate pathfinding code needed for tunnels.
+// V13.0 — underground network: a metro tunnel doesn't need existing roads.
 export function createUndergroundNetwork(city) {
   const nodes = new Map(city.stops.map(s => [s.id, { id: s.id, x: s.x, y: s.y, name: s.name }]));
   const adjacency = new Map(city.stops.map(s => [s.id, []]));
@@ -287,6 +451,11 @@ export function networkStats(network) {
   };
 }
 
+/**
+ * Composantes connexes, en ignorant le sens des arêtes : une ville coupée en
+ * deux l'est quel que soit le sens de circulation de ses rues, et les travaux
+ * (V8) se refusent à créer une coupure même en présence de sens uniques.
+ */
 export function countComponents(network) {
   const seen = new Set();
   let count = 0;
@@ -301,6 +470,17 @@ export function countComponents(network) {
         if (!seen.has(link.to) && !isEdgeClosed(network, link.edge)) {
           seen.add(link.to);
           stack.push(link.to);
+        }
+      }
+      // Traversée inverse : les voisins qui pointent vers id via un oneWay.
+      for (const [otherId, links] of network.adjacency) {
+        if (seen.has(otherId)) continue;
+        for (const link of links) {
+          if (link.to === id && !isEdgeClosed(network, link.edge)) {
+            seen.add(otherId);
+            stack.push(otherId);
+            break;
+          }
         }
       }
     }

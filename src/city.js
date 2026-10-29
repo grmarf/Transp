@@ -199,20 +199,18 @@ export function createCity(seedInput) {
   // devient jamais une opportunité de placement d’arrêt.
   const roads = [];
   const roadKeys = new Set();
-  const addRoad = (a, b, type = "local", extra = {}) => {
+  const addRoad = (a, b, type = "street", extra = {}) => {
     if (a === b) return;
     const key = [a, b].sort().join("|");
     if (key === [stops[1].id, stops[2].id].sort().join("|")) return;
     if (roadKeys.has(key)) return;
     if (roadDegree(roads, a) >= 3 || roadDegree(roads, b) >= 3) return;
     roadKeys.add(key);
-    roads.push({ a, b, type, lanes: type === "arterial" ? 2 : 1,
-      speed: type === "arterial" ? 1.35 : type === "secondary" ? 1.1 : 0.85,
-      allowStops: type !== "arterial", built: false, ...extra });
+    roads.push({ a, b, type, built: false, ...extra });
   };
   // Deux corridors continus autour du centre, prolongés par la croissance.
-  addRoad(stops[1].id, stops[0].id, "arterial", { corridorId: "north-south" });
-  addRoad(stops[0].id, stops[2].id, "arterial", { corridorId: "north-south" });
+  addRoad(stops[1].id, stops[0].id, "boulevard", { corridorId: "north-south" });
+  addRoad(stops[0].id, stops[2].id, "boulevard", { corridorId: "north-south" });
   // Chaque quartier se branche aléatoirement à l’un des trois arrêts les
   // plus proches. Une seconde liaison facultative reste limitée à ces trois
   // voisins, ce qui conserve la connectivité tout en réduisant les croisements.
@@ -220,7 +218,7 @@ export function createCity(seedInput) {
     const child = stops[i];
     const parents = chooseRoadParents(child, stops.slice(0, i), rng, roads);
     parents.forEach((parent, linkIndex) => {
-      addRoad(parent.id, child.id, linkIndex === 0 ? "secondary" : "local");
+      addRoad(parent.id, child.id, linkIndex === 0 ? "avenue" : "street");
     });
   }
 
@@ -235,7 +233,7 @@ export function createCity(seedInput) {
       .map(road => road.a === child.id ? road.b : road.a));
     const backupParent = nearestThreeStops(child, stops.slice(0, 3), roads)
       .find(candidate => !existingParents.has(candidate.id));
-    if (backupParent) addRoad(backupParent.id, child.id, "local");
+    if (backupParent) addRoad(backupParent.id, child.id, "street");
   }
 
   return {
@@ -255,7 +253,7 @@ export function createCity(seedInput) {
     tramTracks: [],
     junctions: [],
     corridors: [
-      { id: "north-south", type: "arterial", axis: "y", stopIds: [stops[1].id, stops[0].id, stops[2].id] }
+      { id: "north-south", type: "boulevard", axis: "y", stopIds: [stops[1].id, stops[0].id, stops[2].id] }
     ],
     generatedAt: new Date().toISOString()
   };
@@ -336,9 +334,8 @@ export function addSatelliteStop(city, parent, rng) {
     : (roadDegree(city.roads, parent.id) < 3 ? [parent] : []);
   roadParents.forEach((roadParent, linkIndex) => {
     if (roadDegree(city.roads, roadParent.id) >= 3) return;
-    city.roads.push({ a: roadParent.id, b: stop.id, type: linkIndex === 0 ? "secondary" : "local",
-      lanes: 1, speed: linkIndex === 0 ? 1.1 : 0.85, allowStops: true, built: false,
-      extensionOf: roadParent.id });
+    city.roads.push({ a: roadParent.id, b: stop.id, type: linkIndex === 0 ? "avenue" : "street",
+      built: false, extensionOf: roadParent.id });
   });
   stop.roadParentIds = roadParents.map(roadParent => roadParent.id);
   city.stops.push(stop);

@@ -2,7 +2,7 @@ export const INITIAL_MONEY = 50000;
 
 export function createState(city, scenario = null) {
   return {
-    version: "22.0",
+    version: "23.0",
     city,
     network: null,
     tramNetwork: null,
@@ -20,9 +20,15 @@ export function createState(city, scenario = null) {
     selectedStop: null,
     lineMode: false,
     pendingStops: [],
-    roadType: "local",
+    roadType: "street",
     pendingRoadPoint: null,
     roadEditMode: null,
+    // V27 — tracé multi-points en cours (outil « Construire route ») :
+    // { type, points: [{x,y}...], stopIds: [id|null...], totalCost }
+    roadTrace: null,
+    // V27 — pile d'annulation des actions de voirie (non persistée).
+    roadUndoStack: [],
+    roadRedoStack: [],
     // V12.0 — line editing: non-null while the player is choosing new stops
     // to append to an existing line (as opposed to building a brand new one).
     extendingLineId: null,

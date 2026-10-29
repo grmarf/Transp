@@ -1,4 +1,5 @@
 import { STOP_RADIUS, vehiclePosition, satisfaction, lineHeadwayMinutes, networkFinancials, lineOccupancyRate, serviceLevel, networkOpportunities, intermodalStats } from "./engine.js";
+import { ROAD_TYPES } from "./network.js";
 import { vehicleMode } from "./vehicles.js";
 import { eventSummary } from "./events.js";
 import { progressionSummary } from "./progression.js";
@@ -419,8 +420,9 @@ export function createRenderer(canvas, state) {
             })
           : null;
         const closed = edge && state.network.closedEdgeIds && state.network.closedEdgeIds.has(edge.id);
-        const width = road.type === "arterial" ? 19 : road.type === "secondary" ? 13 : 8;
-        const asphalt = road.type === "arterial" ? "#4A5568" : road.type === "secondary" ? "#5A6577" : "#6B7889";
+        const spec = ROAD_TYPES[road.type] || ROAD_TYPES.street;
+        const width = spec.width;
+        const asphalt = spec.color;
         const path = routeAroundBuildings(a, b);
         const roadKey = road.id || [road.a || road.startStopId, road.b || road.endStopId].sort().join("|");
         if (!roadAnimationStarts.has(roadKey)) roadAnimationStarts.set(roadKey, now);
@@ -447,13 +449,13 @@ export function createRenderer(canvas, state) {
         drawProgress();
         ctx.setLineDash([]);
         if (!closed) {
-          ctx.strokeStyle = road.type === "arterial" ? "#F4D35E" : "#F7F5EE";
-          ctx.lineWidth = road.type === "arterial" ? 2.2 : road.type === "secondary" ? 1.7 : 1;
-          ctx.setLineDash(road.type === "arterial" ? [13, 10] : road.type === "secondary" ? [8, 10] : [3, 11]);
+          ctx.strokeStyle = road.type === "boulevard" || road.type === "highway" ? "#F4D35E" : "#F7F5EE";
+          ctx.lineWidth = road.type === "highway" ? 2.6 : road.type === "boulevard" ? 2.2 : road.type === "avenue" ? 1.7 : 1;
+          ctx.setLineDash(road.type === "highway" ? [18, 12] : road.type === "boulevard" ? [13, 10] : road.type === "avenue" ? [8, 10] : [3, 11]);
           if (progress < 1) ctx.lineDashOffset = length * (1 - progress);
           strokePath(path);
           // Les artères ont une seconde ligne centrale discrète, comme une vraie voirie hiérarchisée.
-          if (road.type === "arterial") {
+          if (road.type === "boulevard" || road.type === "highway") {
             ctx.strokeStyle = "rgba(255,255,255,.72)";
             ctx.lineWidth = 1;
             ctx.lineDashOffset = length * (1 - progress) + 11;

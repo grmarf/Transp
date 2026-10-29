@@ -26,8 +26,13 @@ state.pendingStops = [nord.id, sud.id];
 assert.equal(finishLine(state, log, routeLine, 'bus'), true);
 const busLine = state.lines[0];
 const busStopsVisited = new Set(busLine.route.nodeIds);
-assert.ok(busStopsVisited.size > 2, 'le bus doit transiter par au moins un nœud intermédiaire (Centre)');
-assert.ok(busStopsVisited.has(city.stops[0].id), 'le détour du bus doit passer par Centre');
+assert.ok(busStopsVisited.size > 2, 'le bus doit transiter par au moins un nœud intermédiaire');
+// V27 : les jonctions automatiques connectent les voiries qui se croisent,
+// le détour surface peut donc passer par des nœuds de jonction sans plus
+// transiter obligatoirement par l'arrêt Centre. On vérifie seulement que le
+// détour reste réel (nœuds intermédiaires) et que le métro, lui, tunnelle.
+assert.ok([...busStopsVisited].some(id => id !== nord.id && id !== sud.id),
+  'le détour du bus passe par des nœuds intermédiaires du graphe surface');
 
 // --- Métro : tunnel direct, sans détour --------------------------------------
 createLine(state);

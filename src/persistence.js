@@ -1,10 +1,10 @@
 /** V20.0 — strict current-save persistence, no historical migrations. */
 
-export const SAVE_FORMAT_VERSION = 2;
+export const SAVE_FORMAT_VERSION = 3;
 export const SAVE_VERSION = SAVE_FORMAT_VERSION;
 export const SAVE_KEY = "vie-t-lignes-v20-save";
 const SAVE_FORMAT = "vie-t-lignes-save";
-const STATE_VERSION = "22.0";
+const STATE_VERSION = "23.0";
 const UINT32_MAX = 0xFFFFFFFF;
 const PASSENGER_STATES = new Set(["WAITING", "BOARDING", "ON_VEHICLE", "TRANSFERRING", "ARRIVED", "ABANDONED"]);
 const VEHICLE_MODES = new Set(["bus", "tram", "metro"]);
@@ -76,9 +76,22 @@ function validateCity(city) {
   for (const road of roads) {
     object(road, "ville.roads[]");
     string(road.type, "route.type");
+    if (road.oneWay !== undefined && typeof road.oneWay !== "boolean") invalid("route.oneWay invalide");
+    if (road.cost !== undefined && !Number.isFinite(road.cost)) invalid("route.cost invalide");
+    if (road.builtAtTick !== undefined && !Number.isFinite(road.builtAtTick)) invalid("route.builtAtTick invalide");
+    // V27 — polyline explicite : au moins deux points finis.
+    if (road.points !== undefined) {
+      const points = array(road.points, "route.points");
+      if (points.length < 2) invalid("route.points doit contenir au moins deux points");
+      for (const point of points) {
+        object(point, "route.points[]");
+        finite(point.x, "route.points[].x");
+        finite(point.y, "route.points[].y");
+      }
+    }
     const linked = typeof road.a === "string" && typeof road.b === "string" && stopIds.has(road.a) && stopIds.has(road.b) && road.a !== road.b;
     const free = road.start && road.end && Number.isFinite(road.start.x) && Number.isFinite(road.start.y) && Number.isFinite(road.end.x) && Number.isFinite(road.end.y);
-    if (!linked && !free) invalid("route invalide");
+    if (!linked && !free && !road.points) invalid("route invalide");
   }
   const districts = array(city.districts, "ville.districts");
   uniqueIds(districts, "ville.districts");
@@ -108,7 +121,7 @@ function validateSerializedNetwork(network, label) {
 
 function validateState(state) {
   object(state, "état");
-  if (state.version !== STATE_VERSION) invalid("version du jeu différente de V22.0");
+  if (state.version !== STATE_VERSION) invalid("version du jeu différente de V23.0");
   const stopIds = validateCity(state.city);
   for (const field of ["lines", "vehicles", "passengers", "dailyStats", "dailyReports", "activeEvents", "activeContracts", "activeCampaigns", "completedGoals"]) array(state[field], `état.${field}`);
   for (const field of ["money", "time", "elapsedDays", "nextLineId", "nextVehicleId", "nextPassengerId", "transported", "totalDemand", "totalGenerated", "totalBoarded", "totalArrived"]) finite(state[field], `état.${field}`);
