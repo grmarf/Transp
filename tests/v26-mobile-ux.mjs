@@ -20,6 +20,8 @@ assert.match(css, /min-height:\s*44px/, 'cibles tactiles d\'au moins 44 px');
 assert.match(css, /touch-action:\s*none/, 'la carte doit capter les gestes sans défilement de page');
 assert.match(css, /safe-area-inset-bottom/, 'zones sûres (encoche) respectées');
 assert.match(css, /prefers-reduced-motion/, 'mouvement réduit honoré');
+assert.match(css, /\.dashboard-body\s*\{[^}]*display:\s*flex/,
+  'le corps du tableau de bord reste un conteneur flex (défilement interne préservé)');
 
 // --- P2 : gestes ---------------------------------------------------------
 assert.match(main, /pinchState/, 'pincement à deux doigts suivi (pinch-zoom)');

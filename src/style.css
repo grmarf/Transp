@@ -1146,6 +1146,18 @@ eight:bold; color:#fff; }
 /* P1 — poignée du panneau coulissant : invisible sur desktop. */
 .sheet-handle { display: none; }
 
+/* V26 — correctif browser-smoke : l'enrobage #dashboardBody remplace les
+   <details> comme enfants directs de .dashboard (display:flex, column) ;
+   sans cette règle, la chaîne flex est cassée sur desktop et le défilement
+   interne de .tab-content ne fonctionne plus (50 lignes hors écran). */
+.dashboard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
 @media (max-width: 700px) {
   .sheet-handle {
     display: flex;
