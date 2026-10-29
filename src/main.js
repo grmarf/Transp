@@ -39,6 +39,21 @@ function formatTime() {
   return String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
 }
 
+// V26 — retour haptique discret (mobile). L'appel n'est émis que si le
+// navigateur reconnaît une interaction utilisateur active : sans
+// activation (clics synthétiques du smoke test, arrière-plan), Chromium
+// journalise une erreur « Blocked call to navigator.vibrate » et pollue
+// la console du jeu.
+function hapticFeedback(durationMs) {
+  try {
+    if (typeof navigator === "undefined" || !navigator.vibrate) return;
+    if (navigator.userActivation && !navigator.userActivation.isActive) return;
+    navigator.vibrate(durationMs);
+  } catch (error) {
+    /* le retour haptique ne doit jamais casser le jeu */
+  }
+}
+
 function syncCameraToRenderer() {
   const r = rendererState.current;
   if (!r || !r.camera) return;
@@ -420,7 +435,7 @@ function clickMap(e) {
   if (state.lineMode && state.pendingStops.indexOf(nearest.id) < 0) {
     state.pendingStops.push(nearest.id);
     // V26 — retour haptique discret à la pose d'un arrêt (mobile).
-    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(10);
+    hapticFeedback(10);
   }
   updateInstructions();
   refreshUI();
@@ -987,7 +1002,7 @@ bindTap(document.getElementById("finishLineBtn"), function () {
     ? finishExtendLine(state, log, routeLine)
     : finishLine(state, log, routeLine, (modeSelect && modeSelect.value) || "bus");
   // V26 — retour haptique à la validation d'une ligne (mobile).
-  if (created && typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(15);
+  if (created) hapticFeedback(15);
   updateInstructions();
   refreshUI();
 });
@@ -1211,4 +1226,5 @@ const publicGameApi = {
 window.__vieTLignes = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
+
 
