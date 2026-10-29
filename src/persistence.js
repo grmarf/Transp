@@ -200,8 +200,12 @@ function validateState(state) {
     finite(line.route.totalLength, "ligne.route.totalLength");
     finite(line.income, "ligne.income"); finite(line.expenses, "ligne.expenses"); finite(line.riders, "ligne.riders");
     // V25 — coût total investi dans la ligne ; optionnel pour rester
-    // compatible avec les sauvegardes antérieures à V25.
-    if (line.costEstimate !== undefined) finite(line.costEstimate, "ligne.costEstimate");
+    // compatible avec les sauvegardes antérieures à V25, mais toujours
+    // positif : un coût d'infrastructure négatif n'a pas de sens.
+    if (line.costEstimate !== undefined) {
+      finite(line.costEstimate, "ligne.costEstimate");
+      if (line.costEstimate < 0) invalid("ligne.costEstimate négatif");
+    }
   }
 
   const vehicleIds = new Set();

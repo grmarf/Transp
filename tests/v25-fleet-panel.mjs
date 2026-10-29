@@ -18,6 +18,7 @@ const estimated = estimateLineCost(state, [a, b], 'bus');
 assert.ok(Number.isFinite(estimated) && estimated >= 800,
   "l'estimation inclut la base de 800 €");
 const before = state.money;
+state.pendingStops = [a, b];
 assert.equal(finishLine(state, () => {}, routeLine, 'bus'), true, 'création de ligne bus');
 assert.equal(before - state.money, estimated,
   'le coût facturé par finishLine doit correspondre à l’estimation');
