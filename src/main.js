@@ -419,13 +419,64 @@ function clickMap(e) {
   state.selectedStop = nearest.id;
   if (state.lineMode && state.pendingStops.indexOf(nearest.id) < 0) {
     state.pendingStops.push(nearest.id);
+    // V26 — retour haptique discret à la pose d'un arrêt (mobile).
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(10);
   }
   updateInstructions();
   refreshUI();
 }
 
+// V26 — zoom autour d'un point écran (partagé molette / pincement /
+// double-tap) : la tuile située sous le doigt reste à sa place.
+function zoomAtScreenPoint(sx, sy, targetZoom) {
+  const newZoom = Math.max(cameraState.minZoom, Math.min(cameraState.maxZoom, targetZoom));
+  const oldZoom = cameraState.zoom;
+  if (newZoom === oldZoom) return false;
+  const size = getCanvasCssSize();
+  if (!size.W || !size.H) return false;
+  const wx = (sx - size.W / 2) / oldZoom + cameraState.x;
+  const wy = (sy - size.H / 2) / oldZoom + cameraState.y;
+  cameraState.zoom = newZoom;
+  cameraState.x = wx - (sx - size.W / 2) / newZoom;
+  cameraState.y = wy - (sy - size.H / 2) / newZoom;
+  syncCameraToRenderer();
+  refreshUI();
+  return true;
+}
+
 function bindMap() {
+  // V26 — pincement à deux doigts (pinch-zoom) : suivi multi-pointeurs.
+  const activePointers = new Map();
+  let pinchState = null;
+  const pinchUpdate = function () {
+    const pts = Array.from(activePointers.values());
+    if (pts.length < 2) { pinchState = null; return false; }
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    if (!pinchState || dist <= 0) {
+      pinchState = {
+        dist: dist,
+        zoom: cameraState.zoom,
+        sx: pts[0].x + (pts[1].x - pts[0].x) / 2,
+        sy: pts[0].y + (pts[1].y - pts[0].y) / 2
+      };
+      return true;
+    }
+    const size = getCanvasCssSize();
+    if (!size.W || !size.H) return true;
+    zoomAtScreenPoint(pinchState.sx - size.rect.left, pinchState.sy - size.rect.top, pinchState.zoom * dist / pinchState.dist);
+    return true;
+  };
+  // V26 — double-tap : zoom avant sur le point tapé (±320 ms, ±40 px).
+  let lastTap = null;
+
   const pointerDown = function (e) {
+    if (e.pointerId !== undefined) activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointers.size >= 2) {
+      cameraState.isDragging = false;
+      cameraState.moved = true; // un pincement ne doit jamais déclencher un clic
+      pinchUpdate();
+      return;
+    }
     cameraState.isDragging = true;
     cameraState.lastDragX = e.clientX;
     cameraState.lastDragY = e.clientY;
@@ -434,6 +485,10 @@ function bindMap() {
     cameraState.moved = false;
   };
   const pointerMove = function (e) {
+    if (e.pointerId !== undefined && activePointers.has(e.pointerId)) {
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
+    if (activePointers.size >= 2) { pinchUpdate(); return; }
     if (!cameraState.isDragging) return;
     if (!cameraState.moved) {
       if (Math.hypot(e.clientX - cameraState.downX, e.clientY - cameraState.downY) > 4) {
@@ -452,14 +507,29 @@ function bindMap() {
     refreshUI();
   };
   const pointerUp = function (e) {
+    if (e.pointerId !== undefined) activePointers.delete(e.pointerId);
+    if (activePointers.size < 2) pinchState = null;
     const wasDragging = cameraState.isDragging;
     cameraState.isDragging = false;
     if (!wasDragging) return;
     if (cameraState.moved) return;
     if (e.preventDefault) e.preventDefault();
+    // V26 — double-tap : zoom avant au lieu d'un second clic carte.
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (lastTap && now - lastTap.t <= 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) <= 40) {
+      const size = getCanvasCssSize();
+      lastTap = null;
+      if (size.W && size.H) {
+        zoomAtScreenPoint(e.clientX - size.rect.left, e.clientY - size.rect.top, cameraState.zoom * 1.6);
+      }
+      return;
+    }
+    lastTap = { x: e.clientX, y: e.clientY, t: now };
     clickMap(e);
   };
-  const pointerCancel = function () {
+  const pointerCancel = function (e) {
+    if (e && e.pointerId !== undefined) activePointers.delete(e.pointerId);
+    if (activePointers.size < 2) pinchState = null;
     cameraState.isDragging = false;
     cameraState.moved = false;
   };
@@ -479,19 +549,7 @@ function bindMap() {
     e.preventDefault();
     const size = getCanvasCssSize();
     if (!size.W || !size.H) return;
-    const sx = e.clientX - size.rect.left;
-    const sy = e.clientY - size.rect.top;
-    const oldZoom = cameraState.zoom;
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(cameraState.minZoom, Math.min(cameraState.maxZoom, oldZoom * delta));
-    if (newZoom === oldZoom) return;
-    const wx = (sx - size.W / 2) / oldZoom + cameraState.x;
-    const wy = (sy - size.H / 2) / oldZoom + cameraState.y;
-    cameraState.zoom = newZoom;
-    cameraState.x = wx - (sx - size.W / 2) / newZoom;
-    cameraState.y = wy - (sy - size.H / 2) / newZoom;
-    syncCameraToRenderer();
-    refreshUI();
+    zoomAtScreenPoint(e.clientX - size.rect.left, e.clientY - size.rect.top, cameraState.zoom * (e.deltaY > 0 ? 0.9 : 1.1));
   }, { passive: false });
   canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   canvas.addEventListener("dragstart", function (e) { e.preventDefault(); });
@@ -925,8 +983,11 @@ bindTap(document.getElementById("finishLineBtn"), function () {
   const minStops = state.extendingLineId ? 1 : 2;
   if (state.pendingStops.length < minStops) return;
   const modeSelect = document.getElementById("modeSelect");
-  if (state.extendingLineId) finishExtendLine(state, log, routeLine);
-  else finishLine(state, log, routeLine, (modeSelect && modeSelect.value) || "bus");
+  const created = state.extendingLineId
+    ? finishExtendLine(state, log, routeLine)
+    : finishLine(state, log, routeLine, (modeSelect && modeSelect.value) || "bus");
+  // V26 — retour haptique à la validation d'une ligne (mobile).
+  if (created && typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(15);
   updateInstructions();
   refreshUI();
 });
@@ -1104,6 +1165,40 @@ if (cityNameInputEl) {
     if (!cityNameInputEl.value.trim()) cityNameInputEl.value = state.city.name;
   });
 }
+// V26 — panneau coulissant mobile : replié par défaut, ouvert d'un tap au pouce.
+function bindSheet() {
+  const handle = document.getElementById("sheetHandle");
+  const dashboard = document.querySelector(".dashboard");
+  if (!handle || !dashboard) return;
+  handle.addEventListener("click", function () {
+    const open = dashboard.classList.toggle("sheet-open");
+    handle.setAttribute("aria-expanded", String(open));
+  });
+}
+
+// V26 — installation PWA quand le navigateur propose sa bannière native.
+function bindInstallPrompt() {
+  const btn = document.getElementById("installBtn");
+  if (!btn) return;
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    btn.hidden = false;
+  });
+  btn.addEventListener("click", function () {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function () {
+      deferredPrompt = null;
+      btn.hidden = true;
+    }).catch(function () { btn.hidden = true; });
+  });
+  window.addEventListener("appinstalled", function () { btn.hidden = true; });
+}
+
+bindSheet();
+bindInstallPrompt();
 populateScenarioSelect();
 boot(initialSeed, "sandbox");
 

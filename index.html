@@ -31,6 +31,7 @@
         <button id="saveBtn" type="button" role="menuitem" class="btn">💾 Sauvegarder</button>
         <button id="loadBtn" type="button" role="menuitem" class="btn">📂 Charger</button>
         <button id="exportBtn" type="button" role="menuitem" class="btn">📤 Exporter</button>
+        <button id="installBtn" type="button" role="menuitem" class="btn" hidden>📲 Installer l'app</button>
         <label role="menuitem" class="menu-file-label" for="importFile">📥 Importer</label><input id="importFile" type="file" accept="application/json" aria-label="Importer une sauvegarde JSON">
       </div>
     </div>
@@ -75,6 +76,8 @@
   </section>
 
   <aside class="dashboard" aria-label="Tableau de bord">
+    <button id="sheetHandle" type="button" class="sheet-handle" aria-expanded="false" aria-controls="dashboardBody"><span class="sheet-grip" aria-hidden="true"></span>📊 Tableau de bord</button>
+    <div id="dashboardBody" class="dashboard-body">
     <details class="dashboard-tab" open>
       <summary>📊 Vue d’ensemble</summary>
       <div class="tab-content">
@@ -133,6 +136,7 @@
         <section class="card log-card"><h2>🗒️ Journal technique</h2><div id="log" aria-live="polite"></div></section>
       </div>
     </details>
+    </div>
   </aside>
   <dialog id="lineEditorModal" class="game-modal" aria-labelledby="lineEditorTitle">
     <form method="dialog" class="modal-card" id="lineEditorForm">

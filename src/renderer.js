@@ -128,7 +128,7 @@ export function createRenderer(canvas, state) {
   const camera = { x: 0, y: 0, zoom: 1, minZoom: 0.5, maxZoom: 3 };
 
   function resizeCanvas() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     canvas.width = Math.round(rect.width * dpr);
@@ -364,7 +364,7 @@ export function createRenderer(canvas, state) {
   }
   function drawCity(heatmap) {
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const W = canvas.clientWidth || canvas.width / dpr;
@@ -1077,4 +1077,3 @@ export function createRenderer(canvas, state) {
 }
 
 // === FIN DU FICHIER renderer.js ===
-

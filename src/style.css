@@ -1131,3 +1131,86 @@ eight:bold; color:#fff; }
   .floating-toolbar { bottom:10px; gap:5px; padding:6px; }
   .floating-toolbar .btn, .floating-toolbar select { min-height:36px; padding:6px 8px; font-size:.72rem; }
 }
+
+
+/* =====================================================================
+   V26 — refonte mobile : panneau coulissant, gestes propres, finitions.
+   Le desktop (≥ 701 px) ne change pas d'un pixel : tout est derrière la
+   @media (max-width: 700px) déjà utilisée par le reste du jeu.
+   ===================================================================== */
+
+/* P2/P3 — la carte capte les gestes ; le navigateur ne doit pas interpréter
+   un pincement ou un glissé comme un zoom ou un défilement de page. */
+#map, .map-panel canvas { touch-action: none; }
+
+/* P1 — poignée du panneau coulissant : invisible sur desktop. */
+.sheet-handle { display: none; }
+
+@media (max-width: 700px) {
+  .sheet-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 56px;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 16px 16px 0 0;
+    cursor: pointer;
+    background: var(--paper-2);
+    color: var(--ink);
+    font: 900 0.85rem/1 "Nunito", "Quicksand", system-ui, sans-serif;
+    box-shadow: 0 -2px 10px rgba(31, 35, 64, 0.12);
+  }
+  .sheet-grip {
+    width: 44px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--ink);
+    opacity: 0.35;
+  }
+
+  /* P1 — le tableau de bord devient un bottom sheet : replié, il ne laisse
+     voir que sa poignée ; .sheet-open le déploie à hauteur de pouce. */
+  .dashboard {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 120;
+    display: flex;
+    flex-direction: column;
+    max-height: 72vh;
+    margin: 0;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-bottom: none;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgba(31, 35, 64, 0.25);
+    transform: translateY(calc(100% - 56px));
+    transition: transform 0.25s ease;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .dashboard.sheet-open { transform: translateY(0); }
+  .dashboard-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px;
+  }
+
+  /* P1 — laisser la poignée visible sans masquer le pied de page. */
+  body { padding-bottom: 64px; }
+
+  /* P1 — cibles tactiles confortables (≥ 44 px). */
+  .btn, .map-overlay-btn, .menu-dropdown .btn, .menu-file-label {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .map-overlay-btn { width: 46px; height: 46px; font-size: 20px; }
+}
+
+/* P3 — accessibilité : pas d'animation de panneau si l'utilisateur préfère. */
+@media (prefers-reduced-motion: reduce) {
+  .dashboard { transition: none; }
+}
