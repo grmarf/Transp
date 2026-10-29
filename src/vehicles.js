@@ -359,6 +359,21 @@ export function updateVehicles(state, rng = () => 1, log = () => {}) {
     }
 
     const ids = line.route.nodeIds;
+    // V27 — la congestion se calcule sur l'arête de DÉPART du tick, avant
+    // tout déplacement : deux véhicules partageant un tronçon sont ainsi
+    // ralentis symétriquement, même si l'un franchit plusieurs arêtes
+    // courtes (jonctions) pendant le tick.
+    {
+      const i0 = Math.min(vehicle.routeIndex, ids.length - 1);
+      const next0 = (i0 + 1) % ids.length;
+      const a0 = state.network.nodes.get(ids[i0]);
+      const b0 = state.network.nodes.get(ids[next0]);
+      if (a0 && b0) {
+        const sharing = edgeLoad.get(edgeKey(a0.id, b0.id)) || 1;
+        const roadCongestion = congestionFactor(sharing);
+        vehicle.congestion = 1 - (1 - roadCongestion) * (1 - (vehicle.congestionResistance ?? 0));
+      }
+    }
     let budget = vehicle.speed * 120 * state.speed;
     let hops = 0;
     const maxHops = ids.length * 2 + 2;
@@ -370,9 +385,6 @@ export function updateVehicles(state, rng = () => 1, log = () => {}) {
       const b = state.network.nodes.get(ids[next]);
       if (!a || !b) break;
 
-      const sharing = edgeLoad.get(edgeKey(a.id, b.id)) || 1;
-      const roadCongestion = congestionFactor(sharing);
-      vehicle.congestion = 1 - (1 - roadCongestion) * (1 - (vehicle.congestionResistance ?? 0));
       // V27 — une voirie de catégorie supérieure se parcourt plus vite : le
       // multiplicateur de vitesse de l'arête traversée s'applique au budget
       // de déplacement courant (1 par défaut, comportement inchangé ailleurs).

@@ -209,7 +209,11 @@ function validateState(state) {
     for (const vehicleId of line.vehicles) integer(vehicleId, "ligne.vehicles[]", { min: 1 });
     object(line.route, "ligne.route");
     array(line.route.nodeIds, "ligne.route.nodeIds");
-    if (line.route.nodeIds.some(id => !stopIds.has(id))) invalid("itinéraire de ligne avec nœud inconnu");
+    // V27 — l'itinéraire traverse aussi des nœuds de jonction et des waypoints
+    // de polyline (le réseau est reconstruit depuis la voirie au chargement) :
+    // on valide la forme plutôt que l'appartenance aux seuls arrêts.
+    if (line.route.nodeIds.some(id => !stopIds.has(id) && typeof id !== "string")) invalid("itinéraire de ligne avec nœud inconnu");
+    if (line.route.nodeIds.some(id => typeof id === "string" && !/^[A-Za-z0-9_-]+$/.test(id))) invalid("itinéraire de ligne avec nœud inconnu");
     finite(line.route.totalLength, "ligne.route.totalLength");
     finite(line.income, "ligne.income"); finite(line.expenses, "ligne.expenses"); finite(line.riders, "ligne.riders");
     // V25 — coût total investi dans la ligne ; optionnel pour rester

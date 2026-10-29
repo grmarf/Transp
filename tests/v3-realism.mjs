@@ -57,7 +57,15 @@ assert.ok(state.vehicles[0].congestion < 1, 'un véhicule sur un tronçon partag
 assert.equal(state.vehicles[0].congestion, state.vehicles[1].congestion);
 
 // Un véhicule seul sur son tronçon n'est pas congestionné.
-state.vehicles[1].routeIndex = Math.min(3, ids.length - 1);
+// V27 — les itinéraires zigzaguent parfois sur un même segment physique (clé
+// d'arête non orientée) ; on cherche un index dont le tronçon est réellement
+// distinct de celui du premier véhicule.
+const firstKey = [ids[0], ids[1]].sort().join('|');
+let separatedIndex = 1;
+for (let j = 1; j < ids.length - 1; j++) {
+  if ([ids[j], ids[j + 1]].sort().join('|') !== firstKey) { separatedIndex = j; break; }
+}
+state.vehicles[1].routeIndex = separatedIndex;
 state.vehicles[1].progress = 0.1;
 updateVehicles(state);
 assert.equal(state.vehicles[0].congestion, 1);
