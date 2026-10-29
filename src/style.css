@@ -1294,3 +1294,67 @@ eight:bold; color:#fff; }
 .demand-mini b { display: block; width: 100%; }
 
 .demand-label { font-size: 0.62rem; opacity: 0.8; }
+
+
+/* ── V27.1 · Ergonomie mobile — barre flottante compacte, rien de caché ────
+   Constat joueur (mobile ≤ 959 px) : les groupes Voirie/Urbanisme gonflent
+   la barre flottante en hauteur (flex-wrap) jusqu'à manger la moitié de
+   l'écran, et sur ≤ 700 px le bottom sheet V26 (z-index 120) recouvre la
+   barre (z-index 100, bottom 10 px) : « ✅ Terminer » devient invisible.
+   Correctifs :
+   - la barre reste UNE ligne défilable (nowrap + overflow-x) ;
+   - les groupes deviennent des panneaux contextuels au-dessus de la barre ;
+   - « ✅ Terminer » passe en tête (order -1) : jamais hors écran ;
+   - la barre passe au-dessus de la poignée du tableau de bord (z 130,
+     bottom 66 px) sur ≤ 700 px ;
+   - l'en-tête s'allège : tagline masquée, statistiques sur une ligne. */
+
+@media (max-width: 959px) {
+  .floating-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .floating-toolbar .btn,
+  .floating-toolbar select { flex: 0 0 auto; }
+
+  #finishLineBtn:not([hidden]) { order: -1; }
+
+  .floating-toolbar .tool-group {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 72px;
+    display: none;
+    align-items: stretch;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+    z-index: 129;
+  }
+  .floating-toolbar .tool-group.is-active { display: flex; }
+
+  .stats {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 6px;
+    scrollbar-width: none;
+  }
+  .stat-chip { flex: 0 0 auto; }
+  .tagline { display: none; }
+}
+
+@media (max-width: 700px) {
+  /* Au-dessus de la poignée du bottom sheet V26 (56 px) : la barre doit
+     rester visible ET cliquable, y compris « ✅ Terminer ». */
+  .floating-toolbar { bottom: 66px; z-index: 130; }
+  .floating-toolbar .tool-group { bottom: 122px; }
+}
+
