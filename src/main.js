@@ -1,9 +1,9 @@
 import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
-import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, editLineStops, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal } from "./engine.js";
+import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, editLineStops, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal, estimateLineCost } from "./engine.js";
 import { createNetwork, routeLine, createUndergroundNetwork, createTramNetwork, roadType } from "./network.js";
-import { createRenderer, clearRendererCaches } from "./renderer.js";
+import { createRenderer, clearRendererCaches, renderFleetPanel } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
 import { invalidateRoutingCache } from "./routing.js";
@@ -124,10 +124,18 @@ function updateInstructions() {
         ? "Extension de <b>" + name + "</b> : touche <b>✓ Terminer</b> pour valider."
         : "Extension de <b>" + name + "</b> : touche <b>1 ou plusieurs arrêts</b> à ajouter.";
     } else {
+      // V25 — estimation du coût de la ligne candidate pendant la sélection.
+      let costHint = "";
+      if (state.pendingStops.length >= 2) {
+        const modeSelect = document.getElementById("modeSelect");
+        const estimate = estimateLineCost(state, state.pendingStops, (modeSelect && modeSelect.value) || "bus");
+        const affordable = state.money >= estimate;
+        costHint = '<br>Coût estimé : <b' + (affordable ? "" : ' style="color:#ef476f"') + '>' +
+          estimate.toLocaleString("fr-FR") + ' €</b>' + (affordable ? "" : " (budget insuffisant)");
+      }
       el.innerHTML = ready
-        ? "Mode création : tu peux terminer la ligne !"
-
-        : "Mode création : touche <b>2 arrêts minimum</b> dans l'ordre pour créer la ligne.";
+        ? "Mode création : tu peux terminer la ligne !" + costHint
+        : "Mode création : touche <b>2 arrêts minimum</b> dans l'ordre pour créer la ligne." + costHint;
     }
   } else {
     el.textContent = "Crée des lignes, ajoute des véhicules, fais grandir ta ville !";
@@ -611,6 +619,7 @@ function refreshUI() {
       heatmap: state.showHeatmap ? congestionHeatmap(state) : null,
       camera: cameraState,
     });
+    renderFleetPanel(state);
     renderMiniMap();
     updateScenarioBanner();
   } catch (err) {
@@ -1107,3 +1116,4 @@ const publicGameApi = {
 window.__vieTLignes = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
+
