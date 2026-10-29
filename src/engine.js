@@ -27,6 +27,7 @@ import { applySeasonalGrowth, seasonDemandMultiplier, seasonSummary } from "./se
 import { pickDemographic, waitToleranceMinutes } from "./demographics.js";
 import { campaignDemandMultiplier, finishExpiredCampaigns } from "./advertising.js";
 import { coverageRatio } from "./coverage.js";
+import { routeLine } from "./network.js";
 
 export {
   TICK_MINUTES, STOP_RADIUS, distance, vehiclePosition, buyVehicleForLine,
@@ -57,6 +58,26 @@ export function lineLength(state, line) {
     d += distance(stopById(state, line.stopIds[i - 1]), stopById(state, line.stopIds[i]));
   }
   return d;
+}
+
+/** V25 — estimation du coût d'une ligne candidate, sans consommer d'argent
+ * ni modifier l'état. Réutilise exactement la formule de finishLine (base
+ * 800 € + longueur × 1,2 + infrastructure du mode) en recalculant l'itinéraire
+ * pour retrouver la longueur routée réelle — pas la distance à vol d'oiseau.
+ * Retombe sur la somme des distances entre arrêts quand aucun réseau n'est
+ * encore disponible (affichage hors partie, tests légers).
+ */
+export function estimateLineCost(state, stopIds, modeId = "bus") {
+  const mode = vehicleMode(modeId);
+  const network = mode.id === "metro" && state.undergroundNetwork
+    ? state.undergroundNetwork
+    : mode.id === "tram" && state.tramNetwork?.edges?.length
+      ? state.tramNetwork
+      : state.network;
+  const route = network ? routeLine(network, stopIds) : null;
+  const length = route?.totalLength ?? lineLength(state, { stopIds, route: null });
+  const infrastructureCost = Math.round(length * mode.trackCostPerPixel);
+  return 800 + Math.round(length * 1.2) + infrastructureCost;
 }
 
 export function createLine(state) {
@@ -126,6 +147,8 @@ export function finishExtendLine(state, log, routeLine) {
   }
 
   state.money -= cost;
+  // V25 — coût total investi dans la ligne (création puis extensions).
+  line.costEstimate = (line.costEstimate || 0) + cost;
   line.stopIds = newStopIds;
   line.route = route;
   invalidateRoutingCache(state);
@@ -170,7 +193,10 @@ export function editLineStops(state, lineId, stopIds, routeLine, log = () => {})
     log(`Modification impossible : ${infrastructureCost.toLocaleString("fr-FR")} € nécessaires.`);
     return false;
   }
-  if (infrastructureCost) state.money -= infrastructureCost;
+  if (infrastructureCost) {
+    state.money -= infrastructureCost;
+    line.costEstimate = (line.costEstimate || 0) + infrastructureCost;
+  }
   for (const vehicleId of line.vehicles) {
     const vehicle = state.vehicles.find(v => v.id === vehicleId);
     if (!vehicle) continue;
@@ -237,6 +263,8 @@ export function finishLine(state, log, routeLine, modeId = "bus") {
   }
 
   state.money -= cost;
+  // V25 — coût investi, exposé à l'UI et conservé dans les sauvegardes.
+  line.costEstimate = cost;
   state.lines.push(line);
   invalidateRoutingCache(state);
 
@@ -582,3 +610,4 @@ export function step(state, rng, log) {
     log("Le budget est négatif : réduisez les dépenses pour éviter la faillite.");
   }
 }
+

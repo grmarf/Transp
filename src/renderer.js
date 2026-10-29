@@ -74,6 +74,54 @@ function renderCityOverview(state) {
   return '<div class="overview-header"><span>Arrêt</span><span>Pop.</span><span>Service</span></div>' + rows;
 }
 
+/** V25 — Panneau Flotte : une ligne par véhicule du réseau, groupée par
+ * mode, avec occupation instantanée, vitesse et état (en service / plein /
+ * en panne). Fonction pure (HTML en sortie) pour rester testable sous Node ;
+ * renderFleetPanel se charge de l'effet de bord DOM.
+ */
+export function fleetPanelHtml(state) {
+  const vehicles = state.vehicles || [];
+  if (!vehicles.length) {
+    return '<div class="muted">Aucun véhicule : crée une première ligne !</div>';
+  }
+
+  const brokenCount = vehicles.filter(function (v) { return (v.brokenTicksLeft || 0) > 0; }).length;
+  const onboard = vehicles.reduce(function (a, v) { return a + (v.onboard ? v.onboard.length : 0); }, 0);
+  const capacity = vehicles.reduce(function (a, v) { return a + (v.capacity || 0); }, 0);
+  const summary = '<div class="muted" style="margin-bottom:6px">' + vehicles.length + ' véhicule' + (vehicles.length > 1 ? 's' : '') +
+    ' · ' + onboard + '/' + capacity + ' passagers à bord' +
+    (brokenCount ? ' · <span style="color:' + CORAL + ';font-weight:900">' + brokenCount + ' en panne</span>' : '') +
+    '</div>';
+
+  const rows = vehicles.map(function (vehicle) {
+    const line = state.lines.find(function (l) { return l.id === vehicle.lineId; });
+    const mode = vehicleMode(vehicle.mode);
+    const emoji = vehicle.mode === "metro" ? "🚇" : (vehicle.mode === "tram" ? "🚊" : "🚌");
+    const broken = (vehicle.brokenTicksLeft || 0) > 0;
+    const full = vehicle.onboard.length >= vehicle.capacity;
+    const status = broken
+      ? '<span style="color:' + CORAL + ';font-weight:900">🔧 En panne</span>'
+      : full
+        ? '<span style="color:' + ORANGE + ';font-weight:900">🧗 Plein</span>'
+        : '<span style="color:' + GRASS + '">✅ En service</span>';
+    const congestion = Math.round((vehicle.congestion == null ? 1 : vehicle.congestion) * 100);
+    return '<div class="line-row">' +
+      '<div class="line-head"><strong>' + emoji + ' ' + h(mode.name) + ' #' + h(String(vehicle.id)) + '</strong>' +
+      '<span class="badge" style="background:' + (broken ? CORAL : SUN) + ';color:' + INK + '">' + vehicle.onboard.length + '/' + vehicle.capacity + '</span></div>' +
+      '<div class="muted">' + h((line && line.name) || "Sans ligne") + ' · ' + Number(vehicle.speed).toFixed(1) + ' px/tick · fluidité ' + congestion + '%</div>' +
+      '<div>' + status + '</div>' +
+      '</div>';
+  }).join("");
+
+  return summary + rows;
+}
+
+/** V25 — point d'entrée DOM du panneau Flotte, appelé depuis refreshUI(). */
+export function renderFleetPanel(state) {
+  const el = document.getElementById("fleetPanel");
+  if (el) el.innerHTML = fleetPanelHtml(state);
+}
+
 export function createRenderer(canvas, state) {
   const ctx = canvas.getContext("2d");
 
@@ -1029,3 +1077,4 @@ export function createRenderer(canvas, state) {
 }
 
 // === FIN DU FICHIER renderer.js ===
+
