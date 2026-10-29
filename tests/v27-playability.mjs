@@ -9,7 +9,7 @@ import { createNetwork, routeLine } from '../src/network.js';
 import { generateDemand, finishLine } from '../src/engine.js';
 import { odHasOrigins } from '../src/od.js';
 import {
-  ensureBuildingsState, seedInitialZones, updateBuildings,
+  ensureBuildingsState, seedInitialZones, spawnInitialBuildings, updateBuildings,
   ZONE_ROAD_ADJACENCY_PX, zoneToRoadDistance
 } from '../src/buildings.js';
 
@@ -40,6 +40,13 @@ assert.ok(state.totalDemand > 0, 'la demande cumulée doit être positive');
 
 // --- 2. Amorçage : zones collées à la voirie, idempotent --------------------
 const seeded = seedInitialZones(state, mulberry32(7));
+spawnInitialBuildings(state, mulberry32(9));
+
+// V27.2 — des bâtiments existent dès t0, peuplés : l'OD a des origines
+// immédiatement et le HUD peut afficher une population cohérente.
+assert.ok(state.city.buildings.length >= 1, "au moins un bâtiment dès la fondation");
+assert.equal(odHasOrigins(state), true, "l'OD a des origines dès t0");
+assert.ok(state.city.buildings.every(b => (b.residents || 0) > 0 || (b.jobs || 0) > 0), "bâtiments initiaux peuplés");
 assert.ok(seeded >= 4, `des zones d'amorçage doivent être peintes (${seeded})`);
 assert.equal(seedInitialZones(state, mulberry32(7)), 0, 'l’amorçage est idempotent');
 for (const zone of state.city.zones) {
@@ -70,3 +77,6 @@ console.log(JSON.stringify({
   buildings: state.city.buildings.length,
   odSuppressed: state.odSuppressed || 0
 }));
+
+
+

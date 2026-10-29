@@ -450,3 +450,21 @@ export function seedInitialZones(state, rng = Math.random, log = () => {}) {
   return seeded;
 }
 
+
+
+/** V27.2 — bâtiments dès la fondation : une ville neuve ne doit pas rester
+ *  déserte pendant des heures simulées alors que les arrêts affichent déjà
+ *  des habitants. Chaque zone d'amorçage reçoit immédiatement un bâtiment
+ *  (résidents/emplois compris) : l'OD a des origines dès t0.
+ *  Idempotent : ne fait rien si des bâtiments existent déjà. */
+export function spawnInitialBuildings(state, rng = Math.random, log = () => {}) {
+  ensureBuildingsState(state);
+  if (state.city.buildings.length) return 0;
+  let spawned = 0;
+  for (const zone of state.city.zones) {
+    if (spawnBuilding(state, zone, 0, rng)) spawned += 1;
+  }
+  if (spawned) log("Urbanisme : " + spawned + " bâtiment" + (spawned > 1 ? "s" : "") + " sort" + (spawned > 1 ? "ent" : "") + " de terre dès la fondation.");
+  return spawned;
+}
+

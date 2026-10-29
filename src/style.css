@@ -1358,3 +1358,22 @@ eight:bold; color:#fff; }
   .floating-toolbar .tool-group { bottom: 122px; }
 }
 
+
+
+/* ── V27.2 · En-tête compact + tableau de bord exploitable ──────────────── */
+@media (max-width: 959px) {
+  .topbar { padding: 4px 6px; gap: 4px; }
+  .brand { gap: 5px; }
+  .brand h1 { font-size: 0.95rem; margin: 0; line-height: 1.1; }
+  .brand-bus { font-size: 1.1rem; }
+  .topbar-controls { gap: 4px; }
+  .topbar-controls .btn { min-height: 34px; padding: 3px 7px; font-size: 0.75rem; }
+  .topbar-controls select, .topbar-controls .city-name-input { font-size: 0.75rem; padding: 3px 5px; }
+  .city-name-input { max-width: 96px; }
+  .stat-chip { font-size: 0.7rem; padding: 2px 6px; border-width: 1.5px; }
+  .time-controls { gap: 3px; }
+}
+@media (max-width: 700px) {
+  .dashboard { max-height: 85vh; }
+}
+

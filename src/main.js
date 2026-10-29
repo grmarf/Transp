@@ -7,7 +7,7 @@ import { createRenderer, clearRendererCaches, renderFleetPanel } from "./rendere
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
 import { invalidateRoutingCache } from "./routing.js";
-import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingStats, BUILDING_TYPES, ZONE_TYPES, seedInitialZones } from "./buildings.js";
+import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingStats, BUILDING_TYPES, ZONE_TYPES, seedInitialZones, spawnInitialBuildings } from "./buildings.js";
 import { startCampaign } from "./advertising.js";
 
 const canvas = document.getElementById("map");
@@ -1142,6 +1142,7 @@ function boot(seed, scenarioId, restoredPayload) {
   // voirie générée pour que des bâtiments émergent dès les premières heures.
   // Sans elles, la ville resterait grise et l'OD sans origines.
   seedInitialZones(state, nextRng, log);
+  spawnInitialBuildings(state, nextRng, log);
   state.advertisingEnabled = true;
   state.staffCostsEnabled = true;
   const fareLevelSelect = document.getElementById("fareLevelSelect");
@@ -1679,6 +1680,13 @@ function bindSheet() {
   handle.addEventListener("click", function () {
     const open = dashboard.classList.toggle("sheet-open");
     handle.setAttribute("aria-expanded", String(open));
+    // V27.2 — à l'ouverture, déplier le premier onglet si aucun ne l'est :
+    // sinon le tableau de bord paraît vide et inutile.
+    if (open) {
+      const tabs = dashboard.querySelectorAll("details.dashboard-tab");
+      const anyOpen = Array.prototype.some.call(tabs, function (tab) { return tab.open; });
+      if (!anyOpen && tabs.length) tabs[0].open = true;
+    }
   });
 }
 
@@ -1717,6 +1725,8 @@ const publicGameApi = {
 window.__vieTLignes = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
+
+
 
 
 

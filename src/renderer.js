@@ -905,7 +905,16 @@ export function createRenderer(canvas, state) {
     }
 
     const passengersEl = document.getElementById("passengers");
-    if (passengersEl) passengersEl.textContent = state.transported.toLocaleString("fr-FR");
+    // V27.2 — la pastille 👥 affiche la population de la ville (somme des
+    // habitants des arrêts), pas les passagers transportés : le compteur de
+    // voyages reste disponible au survol et dans le tableau de bord.
+    if (passengersEl) {
+      const population = (state.city.stops || []).reduce(function (total, stop) {
+        return total + (stop.population || 0);
+      }, 0);
+      passengersEl.textContent = population.toLocaleString("fr-FR");
+      passengersEl.title = "Passagers transportés : " + Math.round(state.transported || 0).toLocaleString("fr-FR");
+    }
 
     const satisfactionValue = satisfaction(state);
     const satisfactionEl = document.getElementById("satisfaction");
@@ -1186,3 +1195,5 @@ export function createRenderer(canvas, state) {
 }
 
 // === FIN DU FICHIER renderer.js ===
+
+

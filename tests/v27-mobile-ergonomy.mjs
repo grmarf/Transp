@@ -28,5 +28,18 @@ assert.equal((css.match(/{/g) || []).length, (css.match(/}/g) || []).length, 'le
 assert.ok(css.includes('#toggleHeatmapBtn[aria-pressed="true"]'), 'la regle heatmap v14.2 est intacte');
 assert.ok(css.includes('.building-panel'), 'les styles du panneau bâtiment V27 sont intacts');
 
+
+// 6. V27.2 — en-tete compact et tableau de bord exploitable sur petits ecrans.
+const mainjs = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+const rendererjs = readFileSync(new URL('../src/renderer.js', import.meta.url), 'utf8');
+assert.ok(css.includes('.topbar-controls .btn { min-height: 34px;'), 'header compact : boutons topbar 34px (<= 959 px)');
+assert.ok(css.includes('.dashboard { max-height: 85vh; }'), 'dashboard : hauteur utile 85vh (<= 700 px)');
+assert.ok(mainjs.includes('tabs[0].open = true'), "dashboard : premier onglet deplie a l'ouverture");
+assert.ok(mainjs.includes('spawnInitialBuildings(state, nextRng, log);'), 'boot : batiments des la fondation');
+assert.ok(rendererjs.includes('population.toLocaleString("fr-FR")'), 'HUD : pastille population de la ville');
+
 console.log(JSON.stringify({ ok: true, suite: 'v27-mobile-ergonomy' }));
+
+
+
 
