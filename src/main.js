@@ -2,7 +2,7 @@ import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
 import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, editLineStops, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal, estimateLineCost } from "./engine.js";
-import { createNetwork, routeLine, createUndergroundNetwork, createTramNetwork, roadType } from "./network.js";
+import { createNetwork, routeLine, createUndergroundNetwork, createTramNetwork, roadType, roadConstructionCost, ROAD_TYPES } from "./network.js";
 import { createRenderer, clearRendererCaches, renderFleetPanel } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
@@ -128,9 +128,15 @@ function updateInstructions() {
   const minStops = extending ? 1 : 2;
   const ready = state.lineMode && state.pendingStops.length >= minStops;
   if (state.roadEditMode === "build") {
-    el.innerHTML = state.pendingRoadPoint ? "Construction : clique le <b>second point</b>." : "Construction : clique le <b>premier point</b>.";
+    el.innerHTML = state.pendingRoadPoint
+      ? "Construction : clique le <b>point suivant</b> (chaîne de segments, <b>Entrée</b> ou double-clic pour terminer, <b>Échap</b> pour annuler)."
+      : "Construction : clique le <b>premier point</b>.";
   } else if (state.roadEditMode === "remove") {
-    el.innerHTML = "Suppression : clique une <b>route</b>.";
+    el.innerHTML = "Suppression : clique une <b>route</b> (remboursement de 30&nbsp;%).";
+  } else if (state.roadEditMode === "upgrade") {
+    el.innerHTML = "Amélioration : clique une <b>route</b> pour la convertir vers le type sélectionné.";
+  } else if (state.roadEditMode === "oneWay") {
+    el.innerHTML = "Sens unique : clique une <b>route</b> pour inverser son sens de circulation.";
   } else if (state.lineMode) {
     if (extending) {
       const line = state.lines.find(function (l) { return l.id === state.extendingLineId; });
@@ -166,7 +172,7 @@ function updateInstructions() {
   const buildRoadBtn = document.getElementById("buildRoadBtn");
   const roadTypeSelect = document.getElementById("roadTypeSelect");
   const removeRoadBtn = document.getElementById("removeRoadBtn");
-  if (roadTypeSelect) roadTypeSelect.value = state.roadType || "local";
+  if (roadTypeSelect) roadTypeSelect.value = state.roadType || "street";
   if (buildRoadBtn) {
     buildRoadBtn.textContent = state.roadEditMode === "build" ? "✕ Annuler construction" : "🛣️ Construire une route";
     buildRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "build"));
@@ -175,6 +181,18 @@ function updateInstructions() {
     removeRoadBtn.textContent = state.roadEditMode === "remove" ? "✕ Annuler suppression" : "🧹 Supprimer une route";
     removeRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "remove"));
   }
+  const upgradeRoadBtn = document.getElementById("upgradeRoadBtn");
+  if (upgradeRoadBtn) {
+    upgradeRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "upgrade"));
+  }
+  const oneWayRoadBtn = document.getElementById("oneWayRoadBtn");
+  if (oneWayRoadBtn) {
+    oneWayRoadBtn.setAttribute("aria-pressed", String(state.roadEditMode === "oneWay"));
+  }
+  const undoRoadBtn = document.getElementById("undoRoadBtn");
+  if (undoRoadBtn) undoRoadBtn.disabled = !(state.roadUndoStack || []).length;
+  const redoRoadBtn = document.getElementById("redoRoadBtn");
+  if (redoRoadBtn) redoRoadBtn.disabled = !(state.roadRedoStack || []).length;
   updateToolbarVisibility();
 }
 
@@ -308,6 +326,166 @@ function roadEndpoints(road) {
     : null;
 }
 
+// === V27 — actions de voirie : reconstruction réseau + undo/redo ============
+
+function rebuildNetwork() {
+  const closedEdgeIds = state.network && state.network.closedEdgeIds;
+  const roadworksReopenDay = state.network && state.network.roadworksReopenDay;
+  state.network = createNetwork(state.city);
+  if (closedEdgeIds) state.network.closedEdgeIds = new Set(closedEdgeIds);
+  if (roadworksReopenDay) state.network.roadworksReopenDay = new Map(roadworksReopenDay);
+  state.network.pathCache.clear();
+  invalidateRoutingCache(state);
+  clearRendererCaches();
+}
+
+const ROAD_UNDO_MAX = 20;
+
+function roadTypeSelectValue() {
+  const select = document.getElementById("roadTypeSelect");
+  return roadType(select && select.value ? select.value : (state && state.roadType) || "street").id;
+}
+
+function pushRoadAction(action) {
+  if (!Array.isArray(state.roadUndoStack)) state.roadUndoStack = [];
+  state.roadUndoStack.push(action);
+  if (state.roadUndoStack.length > ROAD_UNDO_MAX) state.roadUndoStack.shift();
+  state.roadRedoStack = [];
+}
+
+function undoRoadAction() {
+  if (!state || !(state.roadUndoStack || []).length) return;
+  const action = state.roadUndoStack.pop();
+  if (action.kind === "build") {
+    state.city.roads = state.city.roads.filter(function (road) { return road.id !== action.roadId; });
+    state.money += action.cost;
+    rebuildNetwork();
+    log(`Construction annulée (remboursement ${action.cost.toLocaleString("fr-FR")} €).`);
+  } else if (action.kind === "remove") {
+    state.city.roads.push(action.road);
+    state.money -= action.refund;
+    rebuildNetwork();
+    log("Suppression annulée : la route est restaurée.");
+  } else if (action.kind === "upgrade") {
+    const road = state.city.roads.find(function (r) { return r.id === action.roadId; });
+    if (road) {
+      road.type = action.fromType;
+      if (action.fromOneWay !== undefined) road.oneWay = action.fromOneWay;
+      state.money += action.cost;
+      rebuildNetwork();
+      log("Amélioration annulée.");
+    }
+  } else if (action.kind === "oneWay") {
+    const road = state.city.roads.find(function (r) { return r.id === action.roadId; });
+    if (road) {
+      road.oneWay = action.fromOneWay;
+      rebuildNetwork();
+      log("Sens unique annulé.");
+    }
+  }
+  state.roadRedoStack.push(action);
+  refreshUI();
+}
+
+function redoRoadAction() {
+  if (!state || !(state.roadRedoStack || []).length) return;
+  const action = state.roadRedoStack.pop();
+  if (action.kind === "build") {
+    state.city.roads.push(action.road);
+    state.money -= action.cost;
+    rebuildNetwork();
+    log("Construction rétablie.");
+  } else if (action.kind === "remove") {
+    state.city.roads = state.city.roads.filter(function (road) { return road !== action.road; });
+    state.money += action.refund;
+    rebuildNetwork();
+    log("Suppression rétablie.");
+  } else if (action.kind === "upgrade") {
+    const road = state.city.roads.find(function (r) { return r.id === action.roadId; });
+    if (road) {
+      road.type = action.toType;
+      state.money -= action.cost;
+      rebuildNetwork();
+      log("Amélioration rétablie.");
+    }
+  } else if (action.kind === "oneWay") {
+    const road = state.city.roads.find(function (r) { return r.id === action.roadId; });
+    if (road) {
+      road.oneWay = !action.fromOneWay;
+      rebuildNetwork();
+      log("Sens unique rétabli.");
+    }
+  }
+  state.roadUndoStack.push(action);
+  refreshUI();
+}
+
+// V27 — snapping du tracé : arrêts (< 40 px), nœuds du graphe (< 8 px),
+// et maintien de Shift pour contraindre l'angle à des multiples de 45°.
+function snappedTracePoint(p, anchor, e) {
+  let point = { x: Math.round(p.x), y: Math.round(p.y) };
+  let stopId = null;
+  const snappedStop = findNearestStop(p, 40);
+  if (snappedStop) {
+    point = { x: snappedStop.x, y: snappedStop.y };
+    stopId = snappedStop.id;
+  } else if (state.network && state.network.nodes) {
+    let best = 8;
+    for (const node of state.network.nodes.values()) {
+      const d = Math.hypot(node.x - p.x, node.y - p.y);
+      if (d <= best) { best = d; point = { x: node.x, y: node.y }; }
+    }
+  }
+  if (anchor && e && (e.shiftKey || e.metaKey)) {
+    const dx = point.x - anchor.x;
+    const dy = point.y - anchor.y;
+    const angle = Math.atan2(dy, dx);
+    const step = Math.PI / 4;
+    const snappedAngle = Math.round(angle / step) * step;
+    const length = Math.hypot(dx, dy);
+    point = {
+      x: Math.round(anchor.x + Math.cos(snappedAngle) * length),
+      y: Math.round(anchor.y + Math.sin(snappedAngle) * length)
+    };
+  }
+  return { point, stopId };
+}
+
+function updateRoadTracePreview(e) {
+  if (!state || state.roadEditMode !== "build" || !state.pendingRoadPoint) {
+    if (state) state.roadTrace = null;
+    return;
+  }
+  const p = screenPoint(e);
+  if (!p) return;
+  const anchor = state.pendingRoadPoint;
+  const { point, stopId } = snappedTracePoint(p, anchor, e);
+  const length = Math.hypot(point.x - anchor.x, point.y - anchor.y);
+  const selectedType = roadType(state.roadType || "street");
+  const cost = roadConstructionCost(selectedType.id, length);
+  const tooShort = length < 24;
+  const tooExpensive = state.money < cost;
+  state.roadTrace = {
+    from: anchor,
+    to: point,
+    toStopId: stopId,
+    type: selectedType.id,
+    cost,
+    valid: !tooShort && !tooExpensive,
+    tooShort,
+    tooExpensive
+  };
+}
+
+function endRoadTrace() {
+  if (!state) return;
+  state.pendingRoadPoint = null;
+  state.pendingRoadStopId = null;
+  state.roadTrace = null;
+  updateInstructions();
+  refreshUI();
+}
+
 function clickMap(e) {
   // L’API publique historique reçoit des coordonnées dans le repère monde
   // du canvas (sans type d’événement). Les vrais pointer events passent par
@@ -322,28 +500,38 @@ function clickMap(e) {
   if (!p || !state) return;
 
   if (state.roadEditMode === "build") {
-    const snappedStop = findNearestStop(p, 40);
-    const targetPoint = snappedStop ? { x: snappedStop.x, y: snappedStop.y } : { x: Math.round(p.x), y: Math.round(p.y) };
-    if (!state.pendingRoadPoint) {
-      state.pendingRoadPoint = targetPoint;
-      state.pendingRoadStopId = snappedStop ? snappedStop.id : null;
-      if (snappedStop) log(`Départ accroché à « ${snappedStop.name} ».`);
-      log("Point de départ choisi. Clique un second point pour construire la route.");
+    // V27 — outil de tracé multi-points : chaque clic pose un point, chaque
+    // segment est construit et payé immédiatement (la chaîne continue depuis
+    // le point posé). Entrée / double-clic terminent, Échap annule.
+    const anchor = state.pendingRoadPoint;
+    const anchorStopId = state.pendingRoadStopId || null;
+    const { point, stopId } = snappedTracePoint(p, anchor, e);
+    if (!anchor) {
+      state.pendingRoadPoint = point;
+      state.pendingRoadStopId = stopId;
+      if (stopId) {
+        const stop = state.city.stops.find(function (s) { return s.id === stopId; });
+        if (stop) log(`Départ accroché à « ${stop.name} ».`);
+      }
+      log("Point de départ choisi. Chaîne les segments, Entrée pour terminer.");
     } else {
-      const start = state.pendingRoadPoint;
-      const end = targetPoint;
+      const start = anchor;
+      const end = point;
       const length = Math.hypot(end.x - start.x, end.y - start.y);
-      const selectedType = roadType(state.roadType || "local");
-      const cost = Math.max(25, Math.round(length * selectedType.cost));
-      if (length < 24) log("Route trop courte : éloigne le second point.");
+      const selectedType = roadType(state.roadType || "street");
+      const cost = roadConstructionCost(selectedType.id, length);
+      if (length < 24) log("Segment trop court : éloigne le point suivant.");
       else if (state.money < cost) log(`Construction impossible : il faut ${cost.toLocaleString("fr-FR")} €.`);
       else {
         if (!Number.isInteger(state.nextRoadId)) state.nextRoadId = 1;
         const road = { id: `built-road-${state.nextRoadId++}`, start, end,
+          points: [{ x: start.x, y: start.y }, { x: end.x, y: end.y }],
           type: selectedType.id, lanes: selectedType.lanes, speed: selectedType.speed,
-          allowStops: selectedType.allowStops, built: true };
-        if (state.pendingRoadStopId) road.startStopId = state.pendingRoadStopId;
-        if (snappedStop) road.endStopId = snappedStop.id;
+          speedLimit: selectedType.speedLimit, capacity: selectedType.capacity,
+          allowStops: selectedType.allowStops, built: true, cost,
+          builtAtTick: Math.round((state.time || 0) + (state.elapsedDays || 0) * 1440) };
+        if (anchorStopId) road.startStopId = anchorStopId;
+        if (stopId) road.endStopId = stopId;
         if (road.startStopId && road.endStopId) {
           road.a = road.startStopId;
           road.b = road.endStopId;
@@ -353,19 +541,13 @@ function clickMap(e) {
           log("Construction impossible : un arrêt ne peut pas être relié à plus de 3 routes.");
         } else {
           state.city.roads.push(road);
-        }
-        if (!overCapacity && road.a && road.b) {
-          const closedEdgeIds = state.network && state.network.closedEdgeIds;
-          const roadworksReopenDay = state.network && state.network.roadworksReopenDay;
-          state.network = createNetwork(state.city);
-          if (closedEdgeIds) state.network.closedEdgeIds = new Set(closedEdgeIds);
-          if (roadworksReopenDay) state.network.roadworksReopenDay = new Map(roadworksReopenDay);
-        }
-        if (!overCapacity) {
           state.money -= cost;
-          state.pendingRoadPoint = null;
-          state.pendingRoadStopId = null;
-          log(`Route construite (${cost.toLocaleString("fr-FR")} €).`);
+          pushRoadAction({ kind: "build", roadId: road.id, road, cost });
+          rebuildNetwork();
+          state.pendingRoadPoint = end;
+          state.pendingRoadStopId = stopId;
+          state.roadTrace = null;
+          log(`Segment construit (${cost.toLocaleString("fr-FR")} €). Continue, ou Entrée pour terminer.`);
         }
       }
     }
@@ -396,17 +578,80 @@ function clickMap(e) {
       }
     });
     if (nearestRoad) {
+      // V27 — refus si une ligne dépend de la voirie : on avertit, on ne
+      // bloque pas (le réseau est recalculé, la ligne se recalcule à la volée).
+      const usedByLine = (nearestRoad.a && nearestRoad.b && state.lines.some(function (line) {
+        return line.route && Array.isArray(line.route.nodeIds)
+          && line.route.nodeIds.includes(nearestRoad.a) && line.route.nodeIds.includes(nearestRoad.b);
+      })) || false;
+      const refund = Math.round((nearestRoad.cost || 0) * 0.3);
       state.city.roads = state.city.roads.filter(function (road) { return road !== nearestRoad; });
-      const closedEdgeIds = state.network && state.network.closedEdgeIds;
-      const roadworksReopenDay = state.network && state.network.roadworksReopenDay;
-      state.network = createNetwork(state.city);
-      if (closedEdgeIds) state.network.closedEdgeIds = new Set(closedEdgeIds);
-      if (roadworksReopenDay) state.network.roadworksReopenDay = new Map(roadworksReopenDay);
-      if (state.network && state.network.pathCache) state.network.pathCache.clear();
-      invalidateRoutingCache(state);
-      clearRendererCaches();
-      log("Route supprimée.");
+      rebuildNetwork();
+      pushRoadAction({ kind: "remove", road: nearestRoad, refund });
+      state.money += refund;
+      if (usedByLine) log("Attention : une ligne utilisait cette voirie, son itinéraire sera recalculé.");
+      log(refund > 0
+        ? `Route démolie (remboursement ${refund.toLocaleString("fr-FR")} €).`
+        : "Route démolie.");
     } else log("Aucune route sous le curseur.");
+    updateInstructions();
+    refreshUI();
+    return;
+  }
+
+  if (state.roadEditMode === "upgrade" || state.roadEditMode === "oneWay") {
+    // Réutilise la même détection de voirie que la démolition.
+    let nearestRoad = null;
+    let nearestDistance = 100 / cameraState.zoom;
+    state.city.roads.forEach(function (road) {
+      const endpoints = roadEndpoints(road);
+      if (!endpoints) return;
+      const dx = endpoints.end.x - endpoints.start.x;
+      const dy = endpoints.end.y - endpoints.start.y;
+      const lengthSquared = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((p.x - endpoints.start.x) * dx + (p.y - endpoints.start.y) * dy) / lengthSquared));
+      const distanceToRoad = Math.hypot(p.x - (endpoints.start.x + t * dx), p.y - (endpoints.start.y + t * dy));
+      if (distanceToRoad < nearestDistance) {
+        nearestDistance = distanceToRoad;
+        nearestRoad = road;
+      }
+    });
+    if (!nearestRoad) log("Aucune route sous le curseur.");
+    else if (state.roadEditMode === "oneWay") {
+      const fromOneWay = nearestRoad.oneWay === true;
+      nearestRoad.oneWay = !fromOneWay;
+      pushRoadAction({ kind: "oneWay", roadId: nearestRoad.id, fromOneWay });
+      rebuildNetwork();
+      log(fromOneWay ? "Sens unique retiré : la voirie redevient bidirectionnelle." : "Sens unique activé sur la voirie.");
+    } else {
+      const targetType = roadTypeSelectValue();
+      const fromType = nearestRoad.type;
+      if (fromType === targetType) log("Cette voirie est déjà de ce type.");
+      else {
+        const endpoints = roadEndpoints(nearestRoad);
+        const length = endpoints ? Math.hypot(endpoints.end.x - endpoints.start.x, endpoints.end.y - endpoints.start.y) : 0;
+        const diff = Math.round(length * (roadType(targetType).costPerPixel - roadType(fromType).costPerPixel));
+        if (diff > 0 && state.money < diff) {
+          log(`Amélioration impossible : il faut ${diff.toLocaleString("fr-FR")} €.`);
+        } else {
+          const fromOneWay = nearestRoad.oneWay === true;
+          nearestRoad.type = targetType;
+          const spec = roadType(targetType);
+          nearestRoad.lanes = spec.lanes;
+          nearestRoad.speed = spec.speed;
+          nearestRoad.speedLimit = spec.speedLimit;
+          nearestRoad.capacity = spec.capacity;
+          nearestRoad.allowStops = spec.allowStops;
+          if (diff > 0) state.money -= diff;
+          else state.money += Math.round(-diff * 0.5); // rétrogradation : remboursement partiel
+          pushRoadAction({ kind: "upgrade", roadId: nearestRoad.id, fromType, toType: targetType, fromOneWay, cost: diff });
+          rebuildNetwork();
+          log(diff > 0
+            ? `Voirie convertie en ${spec.name} (${diff.toLocaleString("fr-FR")} €).`
+            : `Voirie convertie en ${spec.name} (remboursement ${Math.round(-diff * 0.5).toLocaleString("fr-FR")} €).`);
+        }
+      }
+    }
     updateInstructions();
     refreshUI();
     return;
@@ -504,6 +749,8 @@ function bindMap() {
       activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     }
     if (activePointers.size >= 2) { pinchUpdate(); return; }
+    // V27 — aperçu du tracé de route en direct (coût + validité).
+    if (state && state.roadEditMode === "build") updateRoadTracePreview(e);
     if (!cameraState.isDragging) return;
     if (!cameraState.moved) {
       if (Math.hypot(e.clientX - cameraState.downX, e.clientY - cameraState.downY) > 4) {
@@ -792,7 +1039,9 @@ function boot(seed, scenarioId, restoredPayload) {
   nextState.latestReport = nextState.latestReport || null;
   nextState.seasonsEnabled = true;
   nextState.pendingStops = nextState.pendingStops || [];
-  nextState.roadType = nextState.roadType || "local";
+  nextState.roadType = roadType(nextState.roadType || "street").id;
+  nextState.roadUndoStack = [];
+  nextState.roadRedoStack = [];
   nextState.logs = nextState.logs || [];
 
   state = nextState;
@@ -969,28 +1218,57 @@ document.addEventListener("click", function (event) {
 const roadTypeSelectEl = document.getElementById("roadTypeSelect");
 if (roadTypeSelectEl) roadTypeSelectEl.addEventListener("change", function () {
   if (!state) return;
-  if (roadTypeSelectEl.value === "local" || roadTypeSelectEl.value === "secondary" || roadTypeSelectEl.value === "arterial") {
-    state.roadType = roadTypeSelectEl.value;
-    updateInstructions();
+  // V27 — les quatre types officiels, plus les alias historiques.
+  state.roadType = roadType(roadTypeSelectEl.value || "street").id;
+  updateInstructions();
+});
+
+function enterRoadMode(mode) {
+  if (!state) return;
+  if (state.lineMode) cancelLineMode(state);
+  state.roadEditMode = state.roadEditMode === mode ? null : mode;
+  state.pendingRoadPoint = null;
+  state.pendingRoadStopId = null;
+  state.roadTrace = null;
+  updateInstructions();
+  refreshUI();
+}
+
+bindTap(document.getElementById("buildRoadBtn"), function () { enterRoadMode("build"); });
+bindTap(document.getElementById("removeRoadBtn"), function () { enterRoadMode("remove"); });
+bindTap(document.getElementById("upgradeRoadBtn"), function () { enterRoadMode("upgrade"); });
+bindTap(document.getElementById("oneWayRoadBtn"), function () { enterRoadMode("oneWay"); });
+bindTap(document.getElementById("undoRoadBtn"), function () { undoRoadAction(); });
+bindTap(document.getElementById("redoRoadBtn"), function () { redoRoadAction(); });
+
+// V27 — clavier du tracé : Échap annule le tracé / le mode, Entrée termine la
+// chaîne de segments, Ctrl+Z / Ctrl+Shift+Z pilotent l'annulation voirie.
+document.addEventListener("keydown", function (e) {
+  if (!state) return;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName || "");
+  if (e.key === "Escape") {
+    if (state.pendingRoadPoint) { endRoadTrace(); e.preventDefault(); return; }
+    if (state.roadEditMode) { enterRoadMode(state.roadEditMode); e.preventDefault(); }
+    return;
+  }
+  if (typing) return;
+  if (e.key === "Enter" && state.roadEditMode === "build" && state.pendingRoadPoint) {
+    endRoadTrace();
+    e.preventDefault();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) {
+    if (e.shiftKey) redoRoadAction(); else undoRoadAction();
+    e.preventDefault();
   }
 });
 
-bindTap(document.getElementById("buildRoadBtn"), function () {
-  if (!state) return;
-  if (state.lineMode) cancelLineMode(state);
-  state.roadEditMode = state.roadEditMode === "build" ? null : "build";
-  state.pendingRoadPoint = null;
-  updateInstructions();
-  refreshUI();
-});
-
-bindTap(document.getElementById("removeRoadBtn"), function () {
-  if (!state) return;
-  if (state.lineMode) cancelLineMode(state);
-  state.roadEditMode = state.roadEditMode === "remove" ? null : "remove";
-  state.pendingRoadPoint = null;
-  updateInstructions();
-  refreshUI();
+// Double-clic : termine la chaîne de tracé de route.
+canvas.addEventListener("dblclick", function (e) {
+  if (state && state.roadEditMode === "build" && state.pendingRoadPoint) {
+    e.preventDefault();
+    endRoadTrace();
+  }
 });
 
 bindTap(document.getElementById("finishLineBtn"), function () {

@@ -48,7 +48,11 @@
       <div id="voirieGroup" class="tool-group" data-open="false">
         <button id="buildRoadBtn" type="button" class="btn" aria-label="Construire une route libre">🛣️ Construire</button>
         <button id="removeRoadBtn" type="button" class="btn" aria-label="Supprimer une route libre">🧹 Supprimer</button>
-        <label class="sr-only" for="roadTypeSelect">Type de route</label><select id="roadTypeSelect" aria-label="Type de route à construire"><option value="local">🏘️ Locale</option><option value="secondary">🔗 Secondaire</option><option value="arterial">🛣️ Artère</option></select>
+        <button id="upgradeRoadBtn" type="button" class="btn" aria-label="Améliorer une route">⬆️ Améliorer</button>
+        <button id="oneWayRoadBtn" type="button" class="btn" aria-label="Basculer le sens unique d'une route">➡️ Sens unique</button>
+        <button id="undoRoadBtn" type="button" class="btn" aria-label="Annuler la dernière action de voirie">↩️ Annuler</button>
+        <button id="redoRoadBtn" type="button" class="btn" aria-label="Rétablir la dernière action de voirie">↪️ Rétablir</button>
+        <label class="sr-only" for="roadTypeSelect">Type de route</label><select id="roadTypeSelect" aria-label="Type de route à construire"><option value="street">🏘️ Rue</option><option value="avenue" selected>🔗 Avenue</option><option value="boulevard">🛣️ Boulevard</option><option value="highway">🏎️ Voie rapide</option></select>
       </div>
       <div id="modeGroup" class="tool-group"><label class="sr-only" for="modeSelect">Mode de transport</label><select id="modeSelect" aria-label="Mode de transport"><option value="bus">🚌 Bus</option><option value="tram">🚊 Tramway</option><option value="metro">🚇 Métro</option></select></div>
       <button id="finishLineBtn" type="button" class="btn btn-success" aria-label="Terminer la ligne" hidden>✅ Terminer</button>

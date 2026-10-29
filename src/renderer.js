@@ -423,7 +423,12 @@ export function createRenderer(canvas, state) {
         const spec = ROAD_TYPES[road.type] || ROAD_TYPES.street;
         const width = spec.width;
         const asphalt = spec.color;
-        const path = routeAroundBuildings(a, b);
+        // V27 — une route-joueur avec polyline explicite suit exactement son tracé
+        // (le détour décoratif routeAroundBuildings ne s'applique qu'aux voiries
+        // d'arrêt à arrêt générées par la ville).
+        const path = Array.isArray(road.points) && road.points.length >= 2
+          ? road.points
+          : routeAroundBuildings(a, b);
         const roadKey = road.id || [road.a || road.startStopId, road.b || road.endStopId].sort().join("|");
         if (!roadAnimationStarts.has(roadKey)) roadAnimationStarts.set(roadKey, now);
         const progress = Math.min(1, Math.max(0, (now - roadAnimationStarts.get(roadKey)) / 850));
@@ -509,6 +514,37 @@ export function createRenderer(canvas, state) {
       ctx.arc(state.pendingRoadPoint.x, state.pendingRoadPoint.y, 9, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+    }
+
+    // V27 — aperçu du segment en cours : ligne vers le curseur, couleur
+    // selon la validité (budget), coût cumulé affiché près du curseur.
+    if (state.roadTrace && state.roadEditMode === "build" && state.pendingRoadPoint) {
+      const trace = state.roadTrace;
+      const spec = ROAD_TYPES[trace.type] || ROAD_TYPES.street;
+      ctx.strokeStyle = trace.valid ? spec.color : "#e63946";
+      ctx.lineWidth = spec.width;
+      ctx.setLineDash([12, 8]);
+      ctx.beginPath();
+      ctx.moveTo(trace.from.x, trace.from.y);
+      ctx.lineTo(trace.to.x, trace.to.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Pastille de coût à côté du curseur.
+      const label = trace.tooShort
+        ? "trop court"
+        : `${trace.cost.toLocaleString("fr-FR")} €${trace.tooExpensive ? " — budget insuffisant" : ""}`;
+      ctx.font = "600 13px 'Segoe UI', system-ui, sans-serif";
+      const metrics = ctx.measureText(label);
+      const bx = trace.to.x + 16;
+      const by = trace.to.y - 34;
+      ctx.fillStyle = trace.valid ? "rgba(31, 35, 64, .88)" : "rgba(230, 57, 70, .92)";
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(bx, by, metrics.width + 16, 24, 12) : ctx.rect(bx, by, metrics.width + 16, 24);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, bx + 8, by + 13);
+      ctx.textBaseline = "alphabetic";
     }
 
     if (Array.isArray(heatmap) && heatmap.length) {
