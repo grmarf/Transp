@@ -81,6 +81,9 @@ export function createState(city, scenario = null) {
     // activé par le boot navigateur ; tous les tests antérieurs restent
     // sur le chemin historique (aucune croissance de bâtiment).
     buildingsEnabled: false,
+    // V27 — demande OD perdue faute d'arrêt couvert à portée de marche.
+    odSuppressed: 0,
+    buildingHomeless: 0,
     fareLevel: 1,
     wageLevel: 1,
     staffCostsEnabled: false,

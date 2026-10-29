@@ -18,6 +18,7 @@ import {
 } from "./vehicles.js";
 import { growCity, serviceLevel } from "./growth.js";
 import { updateBuildings } from "./buildings.js";
+import { odSlot, originBuildings, expectedTrips, nearestCoveredStop, nearestStop, pickDestinationBuilding, odMixForSlot } from "./od.js";
 import { maybeStartRoadworks, maybeEndRoadworks } from "./disruptions.js";
 import { evaluateScenario } from "./scenarios.js";
 import { eventDemandMultiplier, eventJournal, eventSatisfactionDelta, finishExpiredEvents, startContextualEvent } from "./events.js";
@@ -319,6 +320,12 @@ export function deleteLine(state, lineId, log) {
 const TRIP_RATE = 0.00033; // tuned to keep overall trip volume close to V4.0's
 
 export function generateDemand(state, rng) {
+  // V27 — quand les bâtiments sont actifs, la génération aléatoire aux arrêts
+  // cède la place à un flux origine-destination issu des bâtiments.
+  if (state.buildingsEnabled) {
+    generateBuildingDemand(state, rng);
+    return;
+  }
   // Demand is generated over the actual simulated interval. At 1x this is
   // exactly one 10-minute slice; at 1000x we integrate all 1000 slices so
   // rush/off-peak demand remains coherent instead of being generated once
@@ -377,6 +384,64 @@ export function generateDemand(state, rng) {
           state.passengers.push(passenger);
         }
       });
+    }
+  }
+}
+
+// V27 — génération origine-destination depuis les bâtiments (spec §4.6) :
+// le matin les résidents partent vers bureaux/commerces/industries/services,
+// le soir les trajets s'inversent, hors pointe un flux réduit subsiste.
+// Un bâtiment d'origine sans arrêt couvert à portée de marche ne génère
+// rien : la demande est perdue et comptée (state.odSuppressed), ce qui
+// met la pression sur le joueur pour étendre la couverture.
+function generateBuildingDemand(state, rng) {
+  if (!(state.city.buildings || []).length) return;
+  const slices = Math.max(1, Math.ceil(state.speed));
+  const sliceMinutes = (TICK_MINUTES * state.speed) / slices;
+  const multiplier = (state.scenario?.demandMultiplier ?? 1) *
+    Math.min(2, eventDemandMultiplier(state) * seasonDemandMultiplier(state) * campaignDemandMultiplier(state));
+
+  for (let slice = 0; slice < slices; slice++) {
+    const minutes = state.time + slice * sliceMinutes;
+    const hour = (minutes / 60) % 24;
+    const slot = odSlot(hour);
+    const intervalFactor = sliceMinutes / TICK_MINUTES;
+
+    for (const origin of originBuildings(state, slot)) {
+      const expected = expectedTrips(origin, slot, sliceMinutes, intervalFactor) * multiplier;
+      if (expected <= 0) continue;
+      let count = Math.floor(expected);
+      if (rng() < expected - count) count += 1;
+      if (count <= 0) continue;
+
+      const originStop = nearestCoveredStop(state, origin);
+      if (!originStop) {
+        state.odSuppressed = (state.odSuppressed || 0) + count;
+        state.totalDemand = (state.totalDemand || 0) + count;
+        continue;
+      }
+      for (let n = 0; n < count; n++) {
+        const destination = pickDestinationBuilding(state, rng, origin, odMixForSlot(slot));
+        if (!destination) continue;
+        const destinationStop = nearestStop(state, destination);
+        if (!destinationStop || destinationStop.id === originStop.id) continue;
+        state.totalDemand += 1;
+        state.totalGenerated += 1;
+        const passenger = createPassenger({
+          id: state.nextPassengerId++,
+          originId: originStop.id,
+          destinationId: destinationStop.id,
+          createdAt: minutes % 1440
+        });
+        if (state.demographicsEnabled) passenger.demographic = pickDemographic(rng, hour);
+        passenger.itinerary = findPassengerRoute(state, originStop.id, destinationStop.id);
+        if (!passenger.itinerary) {
+          passenger.state = PASSENGER_STATES.ABANDONED;
+          passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
+          state.totalAbandoned = (state.totalAbandoned || 0) + 1;
+        }
+        state.passengers.push(passenger);
+      }
     }
   }
 }
