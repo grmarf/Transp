@@ -35,6 +35,14 @@ résume l'état courant du jeu et les derniers changements.
   est trouvée. `tests/v27-buildings.mjs` adapté : une zone à cheval sur un
   boulevard ne peut plus porter deux bâtiments sous la règle « jamais sur
   l'enrobé » (une seconde voirie fournit le second bâtiment du scénario).
+- **V28.2 — cascade réactive sur mobile** : le menu de la carte devient un
+  panneau plein largeur au-dessus de la barre (3 colonnes égales, croix sur
+  sa propre ligne, cibles ≥ 46 px — fini le défilement horizontal) ; une
+  action n'effondre plus la cascade sur la racine : on reste sur la page
+  pour changer d'outil en un tap et l'outil armé est surligné ; la barre
+  flottante vide se réduit à rien et l'état « hover collant » des
+  navigateurs tactiles est neutralisé. Desktop inchangé ; cache busting
+  `?v=29`.
 
 ## V27.6 — Cascades fiabilisées (cache + robustesse)
 

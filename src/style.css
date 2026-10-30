@@ -1433,3 +1433,60 @@ eight:bold; color:#fff; }
 /* V27.6 — retour visuel : branche racine armée surlignée ; cache busting. */
 .map-menu .btn.is-active { background: var(--sun); }
 
+
+
+/* ── V28.2 · Cascade réactive sur mobile ─────────────────────────────────
+   Constat joueur (mobile ≤ 959 px) : le trio de la cascade vivait dans la
+   barre flottante nowrap → débordement horizontal, petites cibles, et
+   toute action renvoyait à la racine (re-naviguer sans cesse). La cascade
+   devient un panneau plein largeur fixé au-dessus de la barre : 3 colonnes
+   égales, croix sur sa propre ligne, cibles ≥ 46 px. Quand « ✅ Terminer »
+   est visible (body.toolbar-busy), le panneau remonte au-dessus de la
+   barre ; barre vide (is-idle) elle se réduit à rien. Desktop ≥ 960 px :
+   le trio inline est inchangé. */
+@media (max-width: 959px) {
+  .floating-toolbar.is-idle {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    padding: 0;
+    gap: 0;
+  }
+  .map-menu {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 8px;
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+    z-index: 129;
+  }
+  body.toolbar-busy .map-menu { bottom: 88px; }
+  .map-menu .btn {
+    min-height: 46px;
+    white-space: normal;
+    line-height: 1.15;
+    font-size: .82rem;
+  }
+  .map-menu .btn-map-back { grid-column: 1 / -1; min-height: 40px; }
+}
+@media (max-width: 700px) {
+  .map-menu { bottom: calc(66px + env(safe-area-inset-bottom)); }
+  body.toolbar-busy .map-menu { bottom: calc(134px + env(safe-area-inset-bottom)); }
+}
+/* Tactile : l'état hover « collant » des navigateurs mobiles ne doit pas
+   laisser un bouton enfoncé après le tap. */
+@media (hover: none) {
+  .map-menu .btn:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+    background: var(--paper);
+  }
+  .map-menu .btn.is-active:hover { background: var(--sun); }
+}

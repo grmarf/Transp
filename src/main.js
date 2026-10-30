@@ -122,6 +122,18 @@ function updateToolbarVisibility() {
   const menu = document.getElementById("gameMenuDropdown");
   const menuButton = document.getElementById("gameMenuBtn");
   if (menuButton) menuButton.setAttribute("aria-expanded", String(!!(menu && menu.classList.contains("is-open"))));
+  // V28.2 — sur mobile la barre flottante ne porte plus que « Terminer » :
+  // vide elle se réduit à rien (is-idle) et la cascade occupe le bas de
+  // l'écran ; occupée, le panneau de cascade remonte au-dessus d'elle
+  // (body.toolbar-busy, règles V28.2 dans style.css).
+  const finishBtn = document.getElementById("finishLineBtn");
+  const toolbarBusy = !!(finishBtn && !finishBtn.hidden);
+  document.body.classList.toggle("toolbar-busy", toolbarBusy);
+  const floatingToolbar = document.querySelector(".floating-toolbar");
+  if (floatingToolbar) {
+    floatingToolbar.classList.toggle("is-idle",
+      !toolbarBusy && window.matchMedia("(max-width: 959px)").matches);
+  }
 }
 function toggleGameMenu(force) {
   const menu = document.getElementById("gameMenuDropdown");
@@ -1818,6 +1830,20 @@ const MAP_MENU = {
   ]
 };
 
+// V28.2 — un bouton d'action est surligné quand son outil est armé.
+function isMenuActArmed(act) {
+  if (!state) return false;
+  if (act === "buildRoadBtn") return state.roadEditMode === "build";
+  if (act === "removeRoadBtn") return state.roadEditMode === "remove";
+  if (act === "upgradeRoadBtn") return state.roadEditMode === "upgrade";
+  if (act === "oneWayRoadBtn") return state.roadEditMode === "oneWay";
+  if (act === "zoneBtn") return state.zoneMode === "zone";
+  if (act === "unzoneBtn") return state.zoneMode === "unzone";
+  if (act === "inspectBtn") return state.zoneMode === "inspect";
+  if (act === "newLineBtn") return !!state.lineMode;
+  return false;
+}
+
 let mapMenuLevel = "std";
 
 function setMapMenu(level) {
@@ -1847,6 +1873,8 @@ function setMapMenu(level) {
     btn.type = "button";
     btn.className = "btn";
     if (mapMenuLevel === "std" && armed && item.goto === armed) btn.classList.add("is-active");
+    // V28.2 — l'outil armé reste surligné sur sa propre page.
+    if (item.act && isMenuActArmed(item.act)) btn.classList.add("is-active");
     btn.textContent = item.label;
     if (item.goto) {
       bindTap(btn, function () { setMapMenu(item.goto); });
@@ -1858,8 +1886,10 @@ function setMapMenu(level) {
         }
         const target = item.act && document.getElementById(item.act);
         if (target) target.click();
-        // Après une action, retour à la racine : la carte reprend la main.
-        setMapMenu("std");
+        // V28.2 — on reste sur la page : changer de type de route ou de zone
+        // devient immédiat (l'outil armé est surligné). La croix ou Échap
+        // ramènent à la racine.
+        setMapMenu(mapMenuLevel);
       });
     }
     container.appendChild(btn);
