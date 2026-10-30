@@ -468,3 +468,62 @@ export function spawnInitialBuildings(state, rng = Math.random, log = () => {}) 
   return spawned;
 }
 
+
+
+/** V27.3 — dette §7 : contrôle de collision bâtiment↔route lors du tracé.
+ *  Un segment de voirie ne peut pas traverser un bâtiment occupé ; les
+ *  bâtiments abandonnés sont expropriés (ruines) pour laisser passer la voirie.
+ *  Module 100 % pur, réutilisable par les tests Node. */
+function segmentsIntersect(p1, p2, p3, p4) {
+  const d1x = p2.x - p1.x, d1y = p2.y - p1.y;
+  const d2x = p4.x - p3.x, d2y = p4.y - p3.y;
+  const denom = d1x * d2y - d1y * d2x;
+  if (Math.abs(denom) < 1e-12) return false;
+  const t = ((p3.x - p1.x) * d2y - (p3.y - p1.y) * d2x) / denom;
+  const u = ((p3.x - p1.x) * d1y - (p3.y - p1.y) * d1x) / denom;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+}
+
+/** Vrai si le segment [a, b] pénètre le rectangle { x, y, w, h } :
+ *  soit une extrémité est à l'intérieur, soit il franchit un bord. */
+export function segmentIntersectsRect(a, b, rect) {
+  const inside = function (p) {
+    return p.x >= rect.x && p.x <= rect.x + rect.w &&
+           p.y >= rect.y && p.y <= rect.y + rect.h;
+  };
+  if (inside(a) || inside(b)) return true;
+  const c1 = { x: rect.x, y: rect.y };
+  const c2 = { x: rect.x + rect.w, y: rect.y };
+  const c3 = { x: rect.x + rect.w, y: rect.y + rect.h };
+  const c4 = { x: rect.x, y: rect.y + rect.h };
+  return segmentsIntersect(a, b, c1, c2) || segmentsIntersect(a, b, c2, c3) ||
+         segmentsIntersect(a, b, c3, c4) || segmentsIntersect(a, b, c4, c1);
+}
+
+/** Bâtiments occupés que le segment [a, b] traverserait : ils bloquent
+ *  le tracé. Les abandonnés n'apparaissent pas ici (expropriation). */
+export function traceBlockedBuildings(state, a, b) {
+  ensureBuildingsState(state);
+  if (!state.buildingsEnabled) return [];
+  return (state.city.buildings || []).filter(function (bld2) {
+    return !bld2.abandoned && segmentIntersectsRect(a, b, bld2);
+  });
+}
+
+/** Ruines abandonnées traversées par [a, b] : expropriées par la voirie
+ *  (disparaissent sans créer de sans-abri). Renvoie le nombre démolies. */
+export function expropriateAbandonedAlongTrace(state, a, b, log = () => {}) {
+  ensureBuildingsState(state);
+  if (!state.buildingsEnabled) return 0;
+  const doomed = (state.city.buildings || []).filter(function (bld2) {
+    return bld2.abandoned && segmentIntersectsRect(a, b, bld2);
+  });
+  if (doomed.length) {
+    state.city.buildings = state.city.buildings.filter(function (bld2) {
+      return !doomed.includes(bld2);
+    });
+    log("Voirie : " + doomed.length + " ruine" + (doomed.length > 1 ? "s" : "") + " abandonnée" + (doomed.length > 1 ? "s" : "") + " expropriée" + (doomed.length > 1 ? "s" : "") + " sur le tracé.");
+  }
+  return doomed.length;
+}
+

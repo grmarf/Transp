@@ -301,13 +301,20 @@ export function congestionHeatmap(state) {
     const [aId, bId] = key.split("|");
     const a = stopById(state, aId), b = stopById(state, bId);
     if (!a || !b) continue;
-    heat.push({ a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, load: count, congestion: Math.max(0, 1 - congestionFactor(count)) });
+    const heatEdge = edgeBetween(state.network, aId, bId);
+    heat.push({ a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, load: count, congestion: Math.max(0, 1 - congestionFactor(count, heatEdge?.capacity)) });
   }
   return heat;
 }
 
-function congestionFactor(sharing) {
-  return 1 / (1 + Math.max(0, sharing - 1) * CONGESTION_SLOWDOWN_PER_VEHICLE);
+// V27.3 — dette §7 « embouteillages/capacité » : le ralentissement dépend
+// désormais de la capacité de la voirie traversée. La rue (400 veh/h) reste
+// la référence historique ; une voie rapide (2000) sature quatre fois moins
+// vite à trafic égal.
+export function congestionFactor(sharing, capacity) {
+  const refCapacity = 400;
+  const scale = refCapacity / Math.max(1, capacity || refCapacity);
+  return 1 / (1 + Math.max(0, sharing - 1) * CONGESTION_SLOWDOWN_PER_VEHICLE * scale);
 }
 
 export const BREAKDOWN_CHANCE_PER_TICK = 0.0006;
@@ -370,7 +377,8 @@ export function updateVehicles(state, rng = () => 1, log = () => {}) {
       const b0 = state.network.nodes.get(ids[next0]);
       if (a0 && b0) {
         const sharing = edgeLoad.get(edgeKey(a0.id, b0.id)) || 1;
-        const roadCongestion = congestionFactor(sharing);
+        const traceEdge = edgeBetween(state.network, a0.id, b0.id);
+        const roadCongestion = congestionFactor(sharing, traceEdge?.capacity);
         vehicle.congestion = 1 - (1 - roadCongestion) * (1 - (vehicle.congestionResistance ?? 0));
       }
     }
@@ -428,4 +436,6 @@ export function vehiclePosition(state, vehicle) {
 }
 
 // === FIN DU FICHIER vehicles.js ===
+
+
 

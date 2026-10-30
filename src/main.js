@@ -7,7 +7,7 @@ import { createRenderer, clearRendererCaches, renderFleetPanel } from "./rendere
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
 import { invalidateRoutingCache } from "./routing.js";
-import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingStats, BUILDING_TYPES, ZONE_TYPES, seedInitialZones, spawnInitialBuildings } from "./buildings.js";
+import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingStats, BUILDING_TYPES, ZONE_TYPES, seedInitialZones, traceBlockedBuildings, expropriateAbandonedAlongTrace, spawnInitialBuildings } from "./buildings.js";
 import { startCampaign } from "./advertising.js";
 
 const canvas = document.getElementById("map");
@@ -602,9 +602,14 @@ function clickMap(e) {
           road.b = road.endStopId;
         }
         const overCapacity = (road.a && roadDegree(road.a) >= 3) || (road.b && roadDegree(road.b) >= 3);
+        const blockers = traceBlockedBuildings(state, start, end);
         if (overCapacity) {
           log("Construction impossible : un arrêt ne peut pas être relié à plus de 3 routes.");
+        } else if (blockers.length) {
+          // V27.3 — dette §7 : une voirie ne traverse pas un bâtiment occupé.
+          log("Tracé impossible : il traverse " + blockers.length + " bâtiment" + (blockers.length > 1 ? "s" : "") + " — démolis-le" + (blockers.length > 1 ? "s" : "") + " ou contourne-le" + (blockers.length > 1 ? "s" : "") + ".");
         } else {
+          expropriateAbandonedAlongTrace(state, start, end, log);
           state.city.roads.push(road);
           state.money -= cost;
           pushRoadAction({ kind: "build", roadId: road.id, road, cost });
@@ -1725,6 +1730,8 @@ const publicGameApi = {
 window.__vieTLignes = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
+
+
 
 
 
