@@ -171,6 +171,7 @@ export function createRenderer(canvas, state) {
   let roadPathCacheCityKey = null;
   const roadPathCache = new Map();
   const roadAnimationStarts = new Map();
+  const buildingPopAt = new Map();
   activeRendererCacheReset = function () {
     cityBlocksCache = null;
     urbanObstaclesCache = null;
@@ -293,8 +294,8 @@ export function createRenderer(canvas, state) {
 
   function drawOrganicPark(block, seed) {
     ctx.save();
-    ctx.fillStyle = "#A8C99A";
-    ctx.strokeStyle = "rgba(42, 92, 70, .35)";
+    ctx.fillStyle = "#8ed465";
+    ctx.strokeStyle = "rgba(42, 92, 70, .4)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     const cx = block.x + block.w / 2;
@@ -317,7 +318,9 @@ export function createRenderer(canvas, state) {
     const blocks = ensureCityGeometry();
     const city = state.city || {};
     const seed = Number(city.numericSeed) || 0;
-    ctx.fillStyle = "#E6DCC4";
+    // V28 — sol « cartoon » : herbe douce, îlots crème qui laissent les
+    // bâtiments colorés et les voiries ressortir nettement.
+    ctx.fillStyle = "#cde8a8";
     ctx.fillRect(left, top, viewW, viewH);
     ctx.save();
     ctx.beginPath();
@@ -332,7 +335,7 @@ export function createRenderer(canvas, state) {
       ctx.fillStyle = "rgba(31, 35, 64, 0.2)";
       roundRect(block.x + 3, block.y + 3, block.w, block.h, 10);
       ctx.fill();
-      ctx.fillStyle = "#D4C5A9";
+      ctx.fillStyle = "#f2e8cf";
       roundRect(block.x, block.y, block.w, block.h, 10);
       ctx.fill();
       ctx.strokeStyle = "rgba(31, 35, 64, .18)";
@@ -469,6 +472,35 @@ export function createRenderer(canvas, state) {
           ctx.setLineDash([]);
           ctx.lineDashOffset = 0;
         }
+      });
+    }
+
+    // V28 — carrefours : plaque claire et passages piétons aux croisements
+    // (nœuds de jonction et arrêts de carrefour uniquement).
+    {
+      const jns = state.network?.junctions || state.city?.junctions || [];
+      jns.forEach(function (junction) {
+        const node = state.network?.nodes?.get(junction.nodeId) ||
+          state.city.stops.find(function (stop) { return stop.id === junction.nodeId; });
+        if (!node) return;
+        const id = String(node.id || "");
+        if (!id.startsWith("junction-") && !id.startsWith("carrefour-")) return;
+        const s = 15;
+        ctx.fillStyle = ROAD_LIGHT;
+        ctx.strokeStyle = "rgba(31,35,64,.7)";
+        ctx.lineWidth = 2;
+        roundRect(node.x - s / 2, node.y - s / 2, s, s, 4);
+        ctx.fill();
+        ctx.stroke();
+        // Passages piétons aux quatre abords.
+        ctx.fillStyle = "rgba(255,255,255,.85)";
+        [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (dir) {
+          for (let k = -1; k <= 1; k++) {
+            const px = node.x + dir[0] * (s / 2 + 3) + (dir[0] === 0 ? k * 4 : 0);
+            const py = node.y + dir[1] * (s / 2 + 3) + (dir[1] === 0 ? k * 4 : 0);
+            ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
+          }
+        });
       });
     }
 
@@ -627,7 +659,9 @@ export function createRenderer(canvas, state) {
       }
     }
 
-    // V27 — bâtiments émergents (les abandonnés sont grisés).
+    // V28 — bâtiments « cartoon tycoon » : corps arrondi, toit coloré,
+    // fenêtres allumées, ombre portée et animation pop à l'émergence.
+    // Les abandonnés sont grisés, fenêtres condamnées.
     {
       const BUILDING_COLORS = {
         residential: "#55b878",
@@ -637,15 +671,103 @@ export function createRenderer(canvas, state) {
         service: "#9b5de5",
         leisure: "#ef476f"
       };
+      const ROOF_COLORS = {
+        residential: "#ef476f",
+        commercial: "#d97b3f",
+        office: "#2d6a9f",
+        industrial: "#5d4a42",
+        service: "#7b3fbf",
+        leisure: "#d63c63"
+      };
+      const INK_STROKE = "rgba(31,35,64,.85)";
+      const easeOutBack = function (t) {
+        const c1 = 1.70158, c3 = c1 + 1;
+        return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+      };
       (state.city.buildings || []).forEach(function (building) {
-        ctx.fillStyle = building.abandoned
-          ? "rgba(120, 120, 120, 0.55)"
-          : (BUILDING_COLORS[building.type] || "#55b878");
-        ctx.fillRect(building.x, building.y, building.w || 18, building.h || 18);
+        const w = building.w || 18, h = building.h || 18;
+        const bx = building.x, by = building.y;
+        const cx = bx + w / 2;
+        // Animation pop : premier rendu = naissance du bâtiment.
+        let popStart = buildingPopAt.get(building.id);
+        if (popStart === undefined) { popStart = now; buildingPopAt.set(building.id, now); }
+        const pop = Math.min(1, Math.max(0, (now - popStart) / 450));
+        const scale = pop < 1 ? Math.max(0.05, easeOutBack(pop)) : 1;
+        ctx.save();
+        ctx.translate(cx, by + h / 2);
+        ctx.scale(scale, scale);
+        ctx.translate(-cx, -(by + h / 2));
+        ctx.globalAlpha = Math.min(1, 0.3 + pop * 1.1);
+        // Ombre portée « cartoon ».
+        ctx.fillStyle = "rgba(31,35,64,.20)";
+        roundRect(bx + 2.5, by + 3.5, w, h, 4);
+        ctx.fill();
+        const body = building.abandoned ? "#a6abb5" : (BUILDING_COLORS[building.type] || "#55b878");
+        const roof = building.abandoned ? "#8b909a" : (ROOF_COLORS[building.type] || "#ef476f");
+        ctx.strokeStyle = INK_STROKE;
+        ctx.lineWidth = 1.6;
+        ctx.fillStyle = body;
+        roundRect(bx, by, w, h, Math.min(5, Math.min(w, h) / 4));
+        ctx.fill();
+        ctx.stroke();
+        if (building.density === "low") {
+          // Maison : toit à deux pentes.
+          ctx.fillStyle = roof;
+          ctx.beginPath();
+          ctx.moveTo(bx - 2.5, by + 1.5);
+          ctx.lineTo(cx, by - 7);
+          ctx.lineTo(bx + w + 2.5, by + 1.5);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        } else if (building.density === "mid") {
+          // Immeuble : toit terrasse avec acrotère.
+          ctx.fillStyle = roof;
+          roundRect(bx - 1.5, by - 3.5, w + 3, 6, 2);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          // Tour : couronnement et antenne.
+          ctx.fillStyle = roof;
+          roundRect(bx + 2, by - 4, w - 4, 7, 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(cx, by - 4);
+          ctx.lineTo(cx, by - 11);
+          ctx.stroke();
+          ctx.fillStyle = SUN;
+          ctx.beginPath();
+          ctx.arc(cx, by - 12, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // Fenêtres : grille déterministe, certaines allumées.
+        const top = by + (building.density === "low" ? 5 : 8);
+        const rows = Math.max(1, Math.floor((by + h - top - 4) / 8));
+        const cols = Math.max(1, Math.floor((w - 6) / 8));
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const lit = !building.abandoned && urbanNoise(bx + c * 8.5, by + r * 8.5, 7) > 0.45;
+            ctx.fillStyle = building.abandoned ? "rgba(31,35,64,.30)" : (lit ? "#ffe9a3" : "rgba(31,35,64,.45)");
+            ctx.fillRect(bx + 4 + c * 8 + 1, top + r * 8 + 1, 4, 4);
+          }
+        }
+        if (building.abandoned) {
+          // Fissure « ruine ».
+          ctx.strokeStyle = "rgba(31,35,64,.5)";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(bx + w * 0.3, by + h - 2);
+          ctx.lineTo(bx + w * 0.45, by + h * 0.55);
+          ctx.lineTo(bx + w * 0.35, by + h * 0.3);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.restore();
         if (building.id === state.selectedBuildingId) {
           ctx.strokeStyle = "#1f2340";
           ctx.lineWidth = 3;
-          ctx.strokeRect(building.x - 3, building.y - 3, (building.w || 18) + 6, (building.h || 18) + 6);
+          ctx.strokeRect(bx - 3, by - 3, w + 6, h + 6);
         }
       });
     }
@@ -1195,5 +1317,6 @@ export function createRenderer(canvas, state) {
 }
 
 // === FIN DU FICHIER renderer.js ===
+
 
 

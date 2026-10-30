@@ -3,6 +3,33 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V28 — Carrefours à 90°, arrêts de croisement & bâtiments qui pop
+
+- **Bâtiments « cartoon tycoon »** : fini les carrés plats — corps arrondi
+  avec liseré encré, toit à deux pentes (maisons), terrasse à acrotère
+  (immeubles) ou couronnement à antenne (tours), fenêtres allumées au gré
+  d'un bruit déterministe, ombre portée, et **animation pop** (rebond
+  450 ms) à chaque émergence. Les ruines sont grisées avec fissure.
+- **Fond de carte rafraîchi** : herbe douce et îlots crème remplacent le
+  beige uniforme — les voiries et les bâtiments colorés ressortent ; les
+  parcs sont plus verts.
+- **Carrefours à 90°** : deux voiries qui se croisent loin de l'angle droit
+  forment désormais un vrai carrefour — la route la plus récente est pliée
+  en coude pour traverser l'autre perpendiculairement (module pur
+  `carrefours.js`, valable pour la génération comme pour les tracés
+  joueur, sauf bâtiment occupé sur le pli). Une plaque claire avec
+  passages piétons marque chaque croisement.
+- **Arrêt sur chaque carrefour** : un arrêt supplémentaire est posé sur
+  chaque croisement desservable (jamais sur voie rapide), raccordé au
+  réseau par fusion de jonction — il capte la demande des alentours et
+  peut recevoir des feux. Un carrefour n'essime pas de nouveau quartier.
+- **Anti-superposition stricte** : un bâtiment ne peut plus ni chevaucher
+  un voisin ni déborder sur l'enrobé d'une voirie (gabarit =
+  demi-épaisseur + liseré). L'émergence essaie plusieurs emplacements ;
+  la montée en densité est reportée si l'agrandissement débordait.
+- Test : `tests/v28-carrefours.mjs` (géométrie 90°, arrêts de carrefour,
+  fusion réseau, non-superposition bâtiments/voirie, câblage UI).
+
 ## V27.6 — Cascades fiabilisées (cache + robustesse)
 
 - **Anti-cache des assets** : `main.js` et `style.css` chargés avec `?v=27.6`
@@ -77,6 +104,7 @@ ergonomie mobile (barre flottante, cibles tactiles 44 px).
 - Sauvegardes compatibles ; constructions abandonnées conservées ;
 - Les dettes §7 (collision au tracé, embouteillages/capacité) sont **traitées
   en V27.3**.
+
 
 
 

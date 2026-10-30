@@ -15,6 +15,7 @@
  */
 
 import { distance } from "./constants.js";
+import { ROAD_TYPES } from "./network.js";
 
 export const BUILDING_TYPES = Object.freeze({
   residential: {
@@ -65,6 +66,59 @@ export const AUTO_DEMOLISH_HOURS = 168;     // abandonné depuis 7 jours → dis
 export const UPGRADE_OCCUPANTS = 0.9;
 export const UPGRADE_LAND_VALUE = 0.6;
 const BUILDING_FOOTPRINTS = { low: { w: 18, h: 18 }, mid: { w: 26, h: 26 }, high: { w: 38, h: 38 } };
+
+// V28 — anti-superposition : un bâtiment ne chevauche jamais ni un voisin
+// ni l'enrobé d'une voirie. Nombre de tirages de placement par émergence.
+const PLACEMENT_ATTEMPTS = 16;
+const BUILDING_GAP_PX = 2;      // gabarit minimal entre deux bâtiments
+const ROAD_MARGIN_PX = 0.5;     // demi-épaisseur d'enrobé + liseré de sécurité
+
+/** Bruit déterministe : décorrèle les tirages même avec un rng constant. */
+function hash01(n) {
+  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+/** Chevauchement de deux rectangles { x, y, w, h }, marge comprise. */
+export function rectsOverlap(a, b, margin = 0) {
+  return a.x - margin < b.x + b.w && a.x + a.w + margin > b.x &&
+         a.y - margin < b.y + b.h && a.y + a.h + margin > b.y;
+}
+
+/** Vrai si le rectangle garde ses distances avec toute la voirie :
+ *  aucun segment ne pénètre son gabarit (demi-épaisseur + liseré). */
+export function rectClearOfRoads(state, rect) {
+  for (const seg of roadSegments(state.city)) {
+    const half = ((ROAD_TYPES[seg.road.type] || {}).width || 8) / 2 + ROAD_MARGIN_PX;
+    if (segmentIntersectsRect(seg.a, seg.b, {
+      x: rect.x - half, y: rect.y - half, w: rect.w + 2 * half, h: rect.h + 2 * half
+    })) return false;
+  }
+  return true;
+}
+
+/** Placement sans chevauchement : bâtiments et voirie exclus du gabarit.
+ *  Renvoie { x, y } ou null après PLACEMENT_ATTEMPTS tirages infructueux. */
+function findClearSpot(state, zone, footprint, rng) {
+  const margin = 4;
+  const usableW = Math.max(1, zone.w - footprint.w - 2 * margin);
+  const usableH = Math.max(1, zone.h - footprint.h - 2 * margin);
+  const city = state.city;
+  for (let attempt = 0; attempt < PLACEMENT_ATTEMPTS; attempt++) {
+    const jx = attempt === 0 ? 0 : hash01(zone.x + zone.w * attempt * 7.3 + zone.createdAtHour);
+    const jy = attempt === 0 ? 0 : hash01(zone.y + zone.h * attempt * 3.1 + zone.id.length * 17);
+    const x = zone.x + margin + ((rng() + jx) % 1) * usableW;
+    const y = zone.y + margin + ((rng() + jy) % 1) * usableH;
+    const candidate = { x: Math.round(x), y: Math.round(y), w: footprint.w, h: footprint.h };
+    if (candidate.x < zone.x || candidate.y < zone.y ||
+        candidate.x + candidate.w > zone.x + zone.w ||
+        candidate.h + candidate.y > zone.y + zone.h) continue;
+    if (!rectClearOfRoads(state, candidate)) continue;
+    if ((city.buildings || []).some(b => !b.demolished && rectsOverlap(candidate, b, BUILDING_GAP_PX))) continue;
+    return { x: candidate.x, y: candidate.y };
+  }
+  return null;
+}
 
 function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
@@ -260,19 +314,26 @@ function spawnBuilding(state, zone, hour, rng) {
   const landValue = landValueAt(state, zone.x + zone.w / 2, zone.y + zone.h / 2);
   let density = densityForLandValue(landValue);
   const margin = 4;
-  // Une zone trop petite pour la densité visée accueille la densité
-  // inférieure suivante plutôt que de rester à jamais stérile.
-  for (const candidate of [density, "mid", "low"]) {
-    const f = BUILDING_FOOTPRINTS[candidate];
-    if (zone.w >= f.w + margin && zone.h >= f.h + margin) { density = candidate; break; }
-  }
-  const footprint = BUILDING_FOOTPRINTS[density];
   // Saturation : au plus ~1 bâtiment par 26×26 px de zone.
   const inZone = city.buildings.filter(b => b.zoneId === zone.id && !b.abandoned).length;
   if (inZone >= Math.max(1, Math.floor((zone.w * zone.h) / (26 * 26)))) return null;
   const spec = BUILDING_TYPES[emergingType(zone, landValue, rng)];
-  const x = zone.x + margin + rng() * Math.max(1, zone.w - footprint.w - margin);
-  const y = zone.y + margin + rng() * Math.max(1, zone.h - footprint.h - margin);
+  // V28 — le bâtiment émerge au bord de la voirie sans jamais la recouvrir
+  // ni chevaucher un voisin. Plusieurs tirages cherchent une place nette ;
+  // si la densité visée ne tient pas (zone collée à une voirie large, voisins
+  // déjà en place), la densité inférieure est tentée plutôt que de laisser
+  // la zone stérile — une zone trop petite accueillait déjà la plus petite.
+  let footprint = null;
+  let spot = null;
+  for (const candidate of [density, "mid", "low"]) {
+    const f = BUILDING_FOOTPRINTS[candidate];
+    if (zone.w < f.w + margin || zone.h < f.h + margin) continue;
+    const found = findClearSpot(state, zone, f, rng);
+    if (found) { density = candidate; footprint = f; spot = found; break; }
+  }
+  if (!spot) return null;
+  const x = spot.x;
+  const y = spot.y;
   const building = {
     id: `bld-${city.nextBuildingId++}`,
     type: spec.id,
@@ -347,14 +408,22 @@ export function updateBuildings(state, rng = Math.random, hour = null, log = () 
     building.occupants = clamp01(building.occupants + (occupancyTarget - building.occupants) * 0.08 + (rng() - 0.5) * 0.02);
     // Montée en densité : un bâtiment plein sur un terrain cher s'agrandit.
     if (building.occupants > UPGRADE_OCCUPANTS && building.landValue > UPGRADE_LAND_VALUE && building.level < 3) {
-      building.level += 1;
-      building.density = building.level === 2 ? "mid" : "high";
-      const spec = BUILDING_TYPES[building.type];
-      const footprint = BUILDING_FOOTPRINTS[building.density];
-      building.residents = spec.residents[building.density] || 0;
-      building.jobs = spec.jobs[building.density] || 0;
-      building.w = footprint.w; building.h = footprint.h;
-      log(`${spec.icon} Un ${spec.label.toLowerCase()} passe en densité ${building.density}.`);
+      const nextDensity = building.level === 1 ? "mid" : "high";
+      const footprint = BUILDING_FOOTPRINTS[nextDensity];
+      const grown = { x: building.x, y: building.y, w: footprint.w, h: footprint.h };
+      // V28 — pas d'agrandissement qui déborderait sur la voirie ou un voisin :
+      // la montée en densité est reportée au prochain cycle convenable.
+      const clear = rectClearOfRoads(state, grown) &&
+        !city.buildings.some(b => b !== building && !b.demolished && rectsOverlap(grown, b, BUILDING_GAP_PX));
+      if (clear) {
+        building.level += 1;
+        building.density = nextDensity;
+        const spec = BUILDING_TYPES[building.type];
+        building.residents = spec.residents[building.density] || 0;
+        building.jobs = spec.jobs[building.density] || 0;
+        building.w = footprint.w; building.h = footprint.h;
+        log(`${spec.icon} Un ${spec.label.toLowerCase()} passe en densité ${building.density}.`);
+      }
     }
     // Abandon : valeur trop basse ou inoccupation prolongée.
     const distressed = building.landValue < ABANDON_LAND_VALUE || building.occupants < ABANDON_OCCUPANTS;
@@ -526,4 +595,5 @@ export function expropriateAbandonedAlongTrace(state, a, b, log = () => {}) {
   }
   return doomed.length;
 }
+
 

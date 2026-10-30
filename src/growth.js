@@ -63,6 +63,8 @@ function maybeSpawnSatellite(state, rng, log, levels) {
     .sort((a, b) => b.frontier - a.frontier || b.stop.population - a.stop.population);
   const candidate = candidates[0]?.stop;
   if (!candidate) return;
+  // V28 — un carrefour est un arrêt de traversée, pas un quartier qui essime.
+  if (String(candidate.id).startsWith("carrefour-")) return;
   const service = levels.get(candidate.id) || 0;
 
   const newStop = addSatelliteStop(state.city, candidate, rng);
@@ -89,4 +91,5 @@ export function growCity(state, rng, log) {
   }
   maybeSpawnSatellite(state, rng, log, levels);
 }
+
 

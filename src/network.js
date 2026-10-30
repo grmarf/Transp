@@ -208,7 +208,9 @@ export function createNetwork(city) {
       if (!a || !b) continue;
       // Règle historique préservée : un ARRET ne peut pas recevoir plus de
       // trois routes (les jonctions libres n'ont pas de plafond).
-      const isStop = (id) => stopsById.has(id);
+      // V28 — un arrêt de carrefour porte les 4 demi-arêtes de son croisement :
+      // il échappe au plafond (ce n'est pas un arrêt de quartier).
+      const isStop = (id) => stopsById.has(id) && !String(id).startsWith("carrefour-");
       if (isStop(aId) && (degree.get(aId) || 0) >= 3) continue;
       if (isStop(bId) && (degree.get(bId) || 0) >= 3) continue;
       const length = distance(a, b);
@@ -489,3 +491,4 @@ export function countComponents(network) {
 }
 
 // === FIN DU FICHIER network.js ===
+

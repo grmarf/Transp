@@ -8,6 +8,7 @@ import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile
 import { escapeHtml as h } from "./html.js";
 import { invalidateRoutingCache } from "./routing.js";
 import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingStats, BUILDING_TYPES, ZONE_TYPES, seedInitialZones, traceBlockedBuildings, expropriateAbandonedAlongTrace, spawnInitialBuildings } from "./buildings.js";
+import { developCityCarrefours } from "./carrefours.js";
 import { startCampaign } from "./advertising.js";
 
 const canvas = document.getElementById("map");
@@ -613,6 +614,13 @@ function clickMap(e) {
         } else {
           expropriateAbandonedAlongTrace(state, start, end, log);
           state.city.roads.push(road);
+          // V28 — le nouveau segment qui croise une voirie existante se plie
+          // en carrefour à 90° (sauf bâtiment occupé sur le pli), et un arrêt
+          // de carrefour est posé au croisement. Avant rebuildNetwork : la
+          // jonction fusionne alors dans l'arrêt (patron near() de network.js).
+          developCityCarrefours(state.city, rng, { road }, function (a, b) {
+            return traceBlockedBuildings(state, a, b).length > 0;
+          }, log);
           state.money -= cost;
           pushRoadAction({ kind: "build", roadId: road.id, road, cost });
           rebuildNetwork();
@@ -1067,6 +1075,7 @@ function boot(seed, scenarioId, restoredPayload) {
   clearRendererCaches();
   let nextState;
   let nextRng;
+  let carrefourReport = null;
 
   if (restoredPayload) {
     nextState = restoredPayload.state;
@@ -1092,6 +1101,10 @@ function boot(seed, scenarioId, restoredPayload) {
   } else {
     const scenario = findScenario(scenarioId || "sandbox");
     const city = createCity(seed);
+    // V28 — carrefours : les voiries générées qui se croisent loin de
+    // l'angle droit sont pliées à 90°, et un arrêt est posé sur chaque
+    // carrefour (avant createNetwork : la jonction fusionne dans l'arrêt).
+    carrefourReport = developCityCarrefours(city, mulberry32(city.numericSeed ^ 0xCA2E), {}, null, () => {});
     nextState = createState(city, scenario);
     nextState.network = createNetwork(city);
     nextState.undergroundNetwork = createUndergroundNetwork(city);
@@ -1132,6 +1145,11 @@ function boot(seed, scenarioId, restoredPayload) {
       log("Scénario : " + state.scenario.name + " — " + state.scenario.objective.label + ".");
     }
     log("Touche la carte pour sélectionner un arrêt !");
+    if (carrefourReport && (carrefourReport.bends > 0 || carrefourReport.stops > 0)) {
+      log("Voirie : " + carrefourReport.bends + " carrefour" + (carrefourReport.bends > 1 ? "s" : "") +
+        " redressé" + (carrefourReport.bends > 1 ? "s" : "") + " à 90°, " +
+        carrefourReport.stops + " arrêt" + (carrefourReport.stops > 1 ? "s" : "") + " de carrefour.");
+    }
   }
 
   recenterCameraOnCity();
@@ -1883,6 +1901,7 @@ const publicGameApi = {
 window.__vieTLignes = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
+
 
 
 
