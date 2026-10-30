@@ -3,6 +3,17 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V27.5 — Menu en cascade dans la carte
+
+- **3 boutons par niveau** (std → n1 → n2) : chaque clic remplace le trio
+  affiché ; bouton **✕** pour revenir au menu racine (Échap aussi).
+- Racine : 🛣️ Voirie · 🏙️ Urbanisme · 🚌 Ligne. Sous-niveaux : construction
+  par type de voirie, éditions (améliorer, sens unique, historique),
+  zonage par type, modes de transport, recentrage.
+- Les contrôles historiques restent dans le DOM (branchés, testables) mais
+  cèdent la place au menu ; « ✅ Terminer » garde sa logique propre.
+- Test : `tests/v27-map-menu.mjs` (3 boutons/menu, navigation, cibles DOM).
+
 ## V27.4 — Tableau de bord utilisable sur smartphone
 
 - **Vue plein écran dédiée** : ouvert, le tableau de bord occupe tout l'écran
@@ -53,6 +64,8 @@ ergonomie mobile (barre flottante, cibles tactiles 44 px).
 - Sauvegardes compatibles ; constructions abandonnées conservées ;
 - Les dettes §7 (collision au tracé, embouteillages/capacité) sont **traitées
   en V27.3**.
+
+
 
 
 

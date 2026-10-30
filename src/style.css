@@ -1414,3 +1414,17 @@ eight:bold; color:#fff; }
   .dashboard.sheet-open .dashboard-body { padding: 8px 8px 32px; }
 }
 
+
+
+/* ── V27.5 · Menu en cascade dans la carte : 3 boutons par niveau ───────── */
+.map-menu {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.map-menu .btn { white-space: nowrap; }
+.btn-map-back { background: var(--coral); color: #fff; min-width: 44px; }
+/* Les contrôles historiques de la barre restent dans le DOM mais cachés. */
+.floating-toolbar [hidden] { display: none !important; }
+

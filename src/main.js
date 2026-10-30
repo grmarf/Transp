@@ -1465,6 +1465,7 @@ document.addEventListener("keydown", function (e) {
   if (!state) return;
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName || "");
   if (e.key === "Escape") {
+    setMapMenu("std");
     if (state.pendingRoadPoint) { endRoadTrace(); e.preventDefault(); return; }
     if (state.roadEditMode) { enterRoadMode(state.roadEditMode); e.preventDefault(); return; }
     if (state.zoneMode) { enterZoneMode(state.zoneMode); e.preventDefault(); }
@@ -1734,6 +1735,118 @@ function bindInstallPrompt() {
   window.addEventListener("appinstalled", function () { btn.hidden = true; });
 }
 
+
+// === V27.5 — Menu en cascade dans la carte : 3 boutons par niveau =========
+// std affiche 3 boutons ; chaque clic remplace le trio affiché (n1, n2,
+// pages annexes) ; ✕ revient à std. Les actions pilotent les contrôles
+// historiques, cachés mais présents (tests statiques + smoke test).
+const MAP_MENU = {
+  "std": [
+    { label: "🛣️ Voirie", goto: "voirie" },
+    { label: "🏙️ Urbanisme", goto: "urbanisme" },
+    { label: "🚌 Ligne", goto: "ligne" }
+  ],
+  "voirie": [
+    { label: "🛣️ Construire ▸", goto: "voirie-types" },
+    { label: "🧹 Supprimer", act: "removeRoadBtn" },
+    { label: "🧰 Éditer ▸", goto: "voirie-edits" }
+  ],
+  "voirie-types": [
+    { label: "🏘️ Rue", select: "roadTypeSelect", value: "street", act: "buildRoadBtn" },
+    { label: "🔗 Avenue", select: "roadTypeSelect", value: "avenue", act: "buildRoadBtn" },
+    { label: "▸ Autres types", goto: "voirie-types-2" }
+  ],
+  "voirie-types-2": [
+    { label: "🛣️ Boulevard", select: "roadTypeSelect", value: "boulevard", act: "buildRoadBtn" },
+    { label: "🏎️ Voie rapide", select: "roadTypeSelect", value: "highway", act: "buildRoadBtn" },
+    { label: "◂ Retour", goto: "voirie-types" }
+  ],
+  "voirie-edits": [
+    { label: "⬆️ Améliorer", act: "upgradeRoadBtn" },
+    { label: "➡️ Sens unique", act: "oneWayRoadBtn" },
+    { label: "↩️ Historique ▸", goto: "voirie-history" }
+  ],
+  "voirie-history": [
+    { label: "↩️ Annuler", act: "undoRoadBtn" },
+    { label: "↪️ Rétablir", act: "redoRoadBtn" },
+    { label: "◂ Retour", goto: "voirie-edits" }
+  ],
+  "urbanisme": [
+    { label: "🖍️ Zoner ▸", goto: "urbanisme-zones" },
+    { label: "🚫 Dézoner", act: "unzoneBtn" },
+    { label: "🔍 Inspecter", act: "inspectBtn" }
+  ],
+  "urbanisme-zones": [
+    { label: "🏘️ Résidentiel", select: "zoneTypeSelect", value: "residential", act: "zoneBtn" },
+    { label: "🛍️ Commercial", select: "zoneTypeSelect", value: "commercial", act: "zoneBtn" },
+    { label: "▸ Autres zones", goto: "urbanisme-zones-2" }
+  ],
+  "urbanisme-zones-2": [
+    { label: "🏭 Industriel", select: "zoneTypeSelect", value: "industrial", act: "zoneBtn" },
+    { label: "🏫 Services", select: "zoneTypeSelect", value: "service", act: "zoneBtn" },
+    { label: "◂ Retour", goto: "urbanisme-zones" }
+  ],
+  "ligne": [
+    { label: "✏️ Nouvelle ligne", act: "newLineBtn" },
+    { label: "🚊 Mode ▸", goto: "ligne-modes" },
+    { label: "🎯 Recentrer", act: "resetZoomBtn" }
+  ],
+  "ligne-modes": [
+    { label: "🚌 Bus", select: "modeSelect", value: "bus" },
+    { label: "🚊 Tramway", select: "modeSelect", value: "tram" },
+    { label: "🚇 Métro", select: "modeSelect", value: "metro" }
+  ]
+};
+
+let mapMenuLevel = "std";
+
+function setMapMenu(level) {
+  const container = document.getElementById("mapMenu");
+  if (!container) return;
+  mapMenuLevel = MAP_MENU[level] ? level : "std";
+  container.textContent = "";
+  const items = MAP_MENU[mapMenuLevel];
+  // ✕ uniquement hors niveau std : revient au menu racine.
+  if (mapMenuLevel !== "std") {
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "btn btn-map-back";
+    back.setAttribute("aria-label", "Revenir au menu principal de la carte");
+    back.textContent = "✕";
+    bindTap(back, function () { setMapMenu("std"); });
+    container.appendChild(back);
+  }
+  for (const item of items) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = item.label;
+    if (item.goto) {
+      bindTap(btn, function () { setMapMenu(item.goto); });
+    } else {
+      bindTap(btn, function () {
+        if (item.select) {
+          const sel = document.getElementById(item.select);
+          if (sel) { sel.value = item.value; sel.dispatchEvent(new Event("change")); }
+        }
+        const target = item.act && document.getElementById(item.act);
+        if (target) target.click();
+        // Après une action, retour à la racine : la carte reprend la main.
+        setMapMenu("std");
+      });
+    }
+    container.appendChild(btn);
+  }
+}
+
+// Les contrôles historiques restent dans le DOM (branchés et testables) mais
+// cèdent la place au menu en cascade. « Terminer » garde sa logique propre.
+(function initMapMenu() {
+  const legacy = document.querySelectorAll(".floating-toolbar > button:not(#finishLineBtn), .floating-toolbar > .tool-group");
+  Array.prototype.forEach.call(legacy, function (el) { el.hidden = true; });
+  setMapMenu("std");
+})();
+
 bindSheet();
 bindInstallPrompt();
 populateScenarioSelect();
@@ -1748,6 +1861,8 @@ const publicGameApi = {
 window.__vieTLignes = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
+
+
 
 
 
