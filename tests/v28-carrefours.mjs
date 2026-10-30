@@ -134,7 +134,14 @@ assert.ok(mainjs.includes('developCityCarrefours(state.city, rng, { road }'), 'l
 assert.ok(rendererjs.includes('buildingPopAt'), 'les bâtiments ont une animation pop au rendu');
 assert.ok(rendererjs.includes('carrefour-'), 'les plaques de carrefour sont dessinées');
 assert.ok(rendererjs.includes('easeOutBack'), 'le rebond pop est implémenté');
-assert.ok(html.includes('src/main.js?v=28') && html.includes('src/style.css?v=28'), 'anti-cache des assets V28');
+// V28.2 — l'anti-cache est versionné mais ne fige plus le numéro : chaque
+// bump (?v=29, ?v=30…) reste valide tant que les deux assets portent une
+// version explicite et identique.
+const vMain = (html.match(/src\/main\.js\?v=(\d+)/g) || []).join('');
+const vCss = (html.match(/src\/style\.css\?v=(\d+)/g) || []).join('');
+assert.ok(vMain.length >= 1 && vCss.length >= 1, 'anti-cache des assets versionné');
+assert.ok(new Set([vMain.match(/\d+/)[0], vCss.match(/\d+/)[0]]).size === 1,
+  'main.js et style.css partagent le même numéro de version');
 
 console.log(JSON.stringify({
   ok: true,
