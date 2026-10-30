@@ -90,6 +90,28 @@ const stats = buildingStats(state);
 assert.equal(stats.buildings, state.city.buildings.length);
 assert.ok(stats.residents > 0, 'les résidentiels abritent des habitants');
 
+// --- 5bis. V28 — gabarit anti-enrobé : une zone posée à cheval sur un
+// boulevard ne laisse qu'une seule place nette (interdiction de déborder
+// sur l'enrobé), donc un seul bâtiment. Une seconde zone sur une autre
+// voirie garantit qu'il reste un bâtiment après l'abandon du premier
+// (prérequis des sections 6 et 7).
+if (state.city.buildings.length < 2) {
+  for (const other of city.roads) {
+    if (other === road || !other.a || !other.b) continue;
+    const oa = city.stops.find(s => s.id === other.a);
+    const ob = city.stops.find(s => s.id === other.b);
+    if (!oa || !ob) continue;
+    const z2 = addZone(state, 'residential', (oa.x + ob.x) / 2 - 30, (oa.y + ob.y) / 2 - 34, 60, 30, log);
+    if (!z2) continue;
+    for (let h2 = 25; state.city.buildings.length < 2 && h2 < 40; h2++) {
+      updateBuildings(state, rng, h2, log);
+    }
+    if (state.city.buildings.length >= 2) break;
+  }
+}
+assert.ok(state.city.buildings.length >= 2,
+  'deux voiries doivent héberger deux bâtiments (V28 : gabarit anti-enrobé)');
+
 // --- 6. Abandon : inoccupation prolongée → abandon puis démolition auto ----
 const victim = state.city.buildings[0];
 // On force un cycle de vie dégradé : occupants à 0 depuis 23 h déjà.

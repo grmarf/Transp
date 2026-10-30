@@ -29,6 +29,12 @@ résume l'état courant du jeu et les derniers changements.
   la montée en densité est reportée si l'agrandissement débordait.
 - Test : `tests/v28-carrefours.mjs` (géométrie 90°, arrêts de carrefour,
   fusion réseau, non-superposition bâtiments/voirie, câblage UI).
+- **V28.1 — placement robuste** : l'émergence tente d'abord le coin de zone
+  (front de rue aligné, la place voisine reste libre), puis les tirages
+  jitter, puis un balayage systématique — si une place nette existe, elle
+  est trouvée. `tests/v27-buildings.mjs` adapté : une zone à cheval sur un
+  boulevard ne peut plus porter deux bâtiments sous la règle « jamais sur
+  l'enrobé » (une seconde voirie fournit le second bâtiment du scénario).
 
 ## V27.6 — Cascades fiabilisées (cache + robustesse)
 

@@ -104,18 +104,34 @@ function findClearSpot(state, zone, footprint, rng) {
   const usableW = Math.max(1, zone.w - footprint.w - 2 * margin);
   const usableH = Math.max(1, zone.h - footprint.h - 2 * margin);
   const city = state.city;
-  for (let attempt = 0; attempt < PLACEMENT_ATTEMPTS; attempt++) {
-    const jx = attempt === 0 ? 0 : hash01(zone.x + zone.w * attempt * 7.3 + zone.createdAtHour);
-    const jy = attempt === 0 ? 0 : hash01(zone.y + zone.h * attempt * 3.1 + zone.id.length * 17);
-    const x = zone.x + margin + ((rng() + jx) % 1) * usableW;
-    const y = zone.y + margin + ((rng() + jy) % 1) * usableH;
+  const fits = function (x, y) {
     const candidate = { x: Math.round(x), y: Math.round(y), w: footprint.w, h: footprint.h };
     if (candidate.x < zone.x || candidate.y < zone.y ||
         candidate.x + candidate.w > zone.x + zone.w ||
-        candidate.h + candidate.y > zone.y + zone.h) continue;
-    if (!rectClearOfRoads(state, candidate)) continue;
-    if ((city.buildings || []).some(b => !b.demolished && rectsOverlap(candidate, b, BUILDING_GAP_PX))) continue;
+        candidate.h + candidate.y > zone.y + zone.h) return null;
+    if (!rectClearOfRoads(state, candidate)) return null;
+    if ((city.buildings || []).some(b => !b.demolished && rectsOverlap(candidate, b, BUILDING_GAP_PX))) return null;
     return { x: candidate.x, y: candidate.y };
+  };
+  // V28.1 — premier essai déterministe au coin de la zone : les bâtiments
+  // alignent le front de rue et le reste de la zone reste disponible pour
+  // un voisin (un unique bâtiment centré stérilisait les petites zones).
+  const corner = fits(zone.x + margin, zone.y + margin);
+  if (corner) return corner;
+  for (let attempt = 0; attempt < PLACEMENT_ATTEMPTS; attempt++) {
+    const jx = attempt === 0 ? 0 : hash01(zone.x + zone.w * attempt * 7.3 + zone.createdAtHour);
+    const jy = attempt === 0 ? 0 : hash01(zone.y + zone.h * attempt * 3.1 + zone.id.length * 17);
+    const found = fits(zone.x + margin + ((rng() + jx) % 1) * usableW,
+                       zone.y + margin + ((rng() + jy) % 1) * usableH);
+    if (found) return found;
+  }
+  // V28.1 — balayage de dernier recours : si une place nette existe dans la
+  // zone, elle est trouvée (le seul tirage aléatoire pouvait la manquer).
+  for (let ys = 0; ys <= usableH; ys += 3) {
+    for (let xs = 0; xs <= usableW; xs += 3) {
+      const found = fits(zone.x + margin + xs, zone.y + margin + ys);
+      if (found) return found;
+    }
   }
   return null;
 }
