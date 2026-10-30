@@ -3,6 +3,19 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V27.6 — Cascades fiabilisées (cache + robustesse)
+
+- **Anti-cache des assets** : `main.js` et `style.css` chargés avec `?v=27.6`
+  (balise script et vérificateur d'imports alignés) — après les poussées
+  rapprochées V27.2→V27.5, un navigateur pouvait mêler un index.html ancien
+  (sans conteneur menu) à un main.js neuf : la barre restait vide.
+- **Conteneur de secours** : si `#mapMenu` manque dans le HTML, il est créé
+  au démarrage — le menu s'affiche quel que soit l'état du shell.
+- **Retour visuel** : la branche racine liée à l'outil armé (voirie /
+  urbanisme / ligne) est surlignée ; le surlignage se rafraîchit à chaque
+  changement de mode.
+- Test : `tests/v27-map-menu.mjs` étendu (sections 7).
+
 ## V27.5 — Menu en cascade dans la carte
 
 - **3 boutons par niveau** (std → n1 → n2) : chaque clic remplace le trio
@@ -64,6 +77,8 @@ ergonomie mobile (barre flottante, cibles tactiles 44 px).
 - Sauvegardes compatibles ; constructions abandonnées conservées ;
 - Les dettes §7 (collision au tracé, embouteillages/capacité) sont **traitées
   en V27.3**.
+
+
 
 
 

@@ -1428,3 +1428,8 @@ eight:bold; color:#fff; }
 /* Les contrôles historiques de la barre restent dans le DOM mais cachés. */
 .floating-toolbar [hidden] { display: none !important; }
 
+
+
+/* V27.6 — retour visuel : branche racine armée surlignée ; cache busting. */
+.map-menu .btn.is-active { background: var(--sun); }
+

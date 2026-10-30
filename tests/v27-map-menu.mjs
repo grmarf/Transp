@@ -55,6 +55,17 @@ for (const id of ['newLineBtn', 'resetZoomBtn', 'voirieBtn', 'urbanismeBtn', 'bu
 assert.ok(mainjs.includes('.floating-toolbar > button:not(#finishLineBtn)'), '« Terminer » garde sa visibilité propre');
 assert.ok(css.includes('.floating-toolbar [hidden] { display: none !important; }'), 'les contrôles cachés le restent');
 
+
+// 7. V27.6 — robustesse cache : conteneur créé au besoin + anti-cache assets.
+assert.ok(mainjs.includes('container.id = "mapMenu";'), "le conteneur manquant est reconstruit (index.html périmé toléré)");
+assert.ok(html.includes('src/main.js?v=') && html.includes('style.css?v='), 'les assets sont chargés avec un anti-cache de version');
+assert.ok(html.includes('./src/main.js?v=') , "le vérificateur d'imports pointe la même URL que la balise script");
+assert.ok(mainjs.includes('setMapMenu(mapMenuLevel);'), "le surlignage du niveau armé se rafraîchit");
+assert.ok(css.includes('.map-menu .btn.is-active'), 'le bouton racine armé est surligné');
+
 console.log(JSON.stringify({ ok: true, suite: 'v27-map-menu', levels: levels.length }));
+
+
+
 
 

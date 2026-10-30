@@ -221,6 +221,8 @@ function updateInstructions() {
   const redoRoadBtn = document.getElementById("redoRoadBtn");
   if (redoRoadBtn) redoRoadBtn.disabled = !(state.roadRedoStack || []).length;
   updateToolbarVisibility();
+  // V27.6 — le menu reflète l'état armé (surlignage du trio racine).
+  setMapMenu(mapMenuLevel);
 }
 
 function findNearestStop(point, threshold = 40) {
@@ -1816,10 +1818,17 @@ function setMapMenu(level) {
     bindTap(back, function () { setMapMenu("std"); });
     container.appendChild(back);
   }
+  // V27.6 — retour visuel : la branche racine liée à l'outil armé
+  // (voirie / urbanisme / ligne) reste surlignée sur le trio std.
+  const armed = state && state.roadEditMode ? "voirie"
+    : state && state.zoneMode ? "urbanisme"
+    : state && (state.lineMode || (state.pendingStops && state.pendingStops.length)) ? "ligne"
+    : null;
   for (const item of items) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "btn";
+    if (mapMenuLevel === "std" && armed && item.goto === armed) btn.classList.add("is-active");
     btn.textContent = item.label;
     if (item.goto) {
       bindTap(btn, function () { setMapMenu(item.goto); });
@@ -1842,6 +1851,19 @@ function setMapMenu(level) {
 // Les contrôles historiques restent dans le DOM (branchés et testables) mais
 // cèdent la place au menu en cascade. « Terminer » garde sa logique propre.
 (function initMapMenu() {
+  // Robustesse cache : si le shell HTML vient d'une version antérieure sans
+  // conteneur #mapMenu, on le crée — sinon les boutons historiques seraient
+  // cachés sans aucun menu pour les remplacer (barre vide).
+  let container = document.getElementById("mapMenu");
+  if (!container) {
+    const toolbar = document.querySelector(".floating-toolbar");
+    if (!toolbar) return;
+    container = document.createElement("div");
+    container.id = "mapMenu";
+    container.className = "map-menu";
+    container.setAttribute("aria-label", "Menu de la carte");
+    toolbar.insertBefore(container, toolbar.firstChild);
+  }
   const legacy = document.querySelectorAll(".floating-toolbar > button:not(#finishLineBtn), .floating-toolbar > .tool-group");
   Array.prototype.forEach.call(legacy, function (el) { el.hidden = true; });
   setMapMenu("std");
@@ -1861,6 +1883,8 @@ const publicGameApi = {
 window.__vieTLignes = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
+
+
 
 
 
