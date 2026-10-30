@@ -1685,6 +1685,12 @@ function bindSheet() {
   handle.addEventListener("click", function () {
     const open = dashboard.classList.toggle("sheet-open");
     handle.setAttribute("aria-expanded", String(open));
+    // V27.4 — le panneau ouvert devient une vue plein écran : la classe
+    // body.sheet-open retire la barre d'outils flottante (elle recouvrait
+    // le bas du tableau de bord, z-index 130 > 120) et libère l'écran.
+    document.body.classList.toggle("sheet-open", open);
+    const label = document.getElementById("sheetHandleLabel");
+    if (label) label.textContent = open ? "✕ Fermer" : "📊 Tableau de bord";
     // V27.2 — à l'ouverture, déplier le premier onglet si aucun ne l'est :
     // sinon le tableau de bord paraît vide et inutile.
     if (open) {
@@ -1692,6 +1698,18 @@ function bindSheet() {
       const anyOpen = Array.prototype.some.call(tabs, function (tab) { return tab.open; });
       if (!anyOpen && tabs.length) tabs[0].open = true;
     }
+  });
+  // V27.4 — accordéon exclusif sur smartphone : ouvrir un onglet referme
+  // les autres (une pile de 6 onglets dépliés est illisible sur petit
+  // écran). Sur desktop, le comportement multi-onglets est inchangé.
+  const sheetTabs = dashboard.querySelectorAll("details.dashboard-tab");
+  Array.prototype.forEach.call(sheetTabs, function (tab) {
+    tab.addEventListener("toggle", function () {
+      if (!tab.open || !window.matchMedia("(max-width: 700px)").matches) return;
+      Array.prototype.forEach.call(sheetTabs, function (other) {
+        if (other !== tab) other.open = false;
+      });
+    });
   });
 }
 
@@ -1730,6 +1748,8 @@ const publicGameApi = {
 window.__vieTLignes = publicGameApi;
 
 // === FIN DU FICHIER main.js ===
+
+
 
 
 

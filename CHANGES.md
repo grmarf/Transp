@@ -3,6 +3,17 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V27.4 — Tableau de bord utilisable sur smartphone
+
+- **Vue plein écran dédiée** : ouvert, le tableau de bord occupe tout l'écran
+  (100dvh, repli vh) au lieu d'un coin de carte ; la poignée devient un en-tête
+  collant « ✕ Fermer ».
+- **Barre d'outils retirée** pendant la consultation : elle recouvrait le bas
+  du panneau (z-index 130 > 120).
+- **Accordéon exclusif** sur mobile : ouvrir un onglet referme les autres
+  (comportement desktop inchangé).
+- Test : `tests/v27-dashboard-mobile.mjs`.
+
 ## V27.3 — Dette traitée : collision au tracé & congestion par capacité
 
 - **Collision bâtiment↔route au tracé** (dette §7 reportée) : un segment de
@@ -42,4 +53,6 @@ ergonomie mobile (barre flottante, cibles tactiles 44 px).
 - Sauvegardes compatibles ; constructions abandonnées conservées ;
 - Les dettes §7 (collision au tracé, embouteillages/capacité) sont **traitées
   en V27.3**.
+
+
 

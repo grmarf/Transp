@@ -1377,3 +1377,40 @@ eight:bold; color:#fff; }
   .dashboard { max-height: 85vh; }
 }
 
+
+
+/* ── V27.4 · Tableau de bord utilisable sur smartphone ──────────────────── */
+@media (max-width: 700px) {
+  /* Ouvert = panneau plein écran : on est sur une vue dédiée, pas un coin
+     de carte. dvh gère la barre d'URL iOS/Android ; vh en repli. */
+  .dashboard.sheet-open {
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    border-top: 3px solid var(--ink);
+    box-shadow: none;
+  }
+  /* La poignée devient un en-tête collant avec bouton Fermer. */
+  .dashboard.sheet-open .sheet-handle {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    min-height: 52px;
+    border-bottom: 2px solid var(--ink);
+    border-radius: 0;
+    justify-content: center;
+  }
+  /* La barre d'outils flottante se retire pendant la consultation :
+     elle recouvrait le bas du panneau (z-index 130 > 120). */
+  body.sheet-open .floating-toolbar {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  /* Onglets exclusifs : une pile de 6 onglets ouverts est illisible. */
+  .dashboard.sheet-open .dashboard-tab { margin-bottom: 8px; }
+  .dashboard.sheet-open .dashboard-body { padding: 8px 8px 32px; }
+}
+
