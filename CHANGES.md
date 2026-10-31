@@ -21,6 +21,15 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V29.2 — Déssaimage de la voirie & ceinture du menu
+
+- **Trop de carrefours** : la génération urbaine (secondes liaisons, boucles de secours) finissait par croiser inutilement ses voiries — chaque croisement devenait un carrefour redressé à 90° et la carte se couvrait de nœuds. Nouveau module `src/pruning.js` :
+  - `pruneRedundantRoads(city)` : retire au boot les tronçons **redondants** (dont le retrait ne déconnecte aucun arrêt — union-find, les ponts ne sont jamais retirés), en priorisant les voiries qui créent le plus de croisements puis les plus longues. Les voiries du joueur (construites, corridors, tracés libres) ne sont jamais candidates.
+  - `pruneOrphanCarrefourStops(city, protectedIds)` : fait disparaître les arrêts de carrefour devenus orphelins (plus aucune voirie à ≤ 16 px), sauf s'ils servent une ligne, sont en sélection en cours ou chargés de passagers.
+  - `main.js` journalise « 🧹 Voirie rationalisée : … » et reconstruit le réseau (itinéraires recalculés par `rebuildNetwork`).
+- **Ceinture du menu** : après chaque boot, si `#mapMenu` s'avérait vide, il est repeuplé immédiatement.
+- Anti-cache bumpé `?v=31` ; nouveau test `tests/v29.2-road-pruning.mjs` (corde redondante retirée, pont conservé, voiries joueur protégées, orphelins de carrefour, idempotence, ville générée saine après déssaimage).
+
 ## V29 — Réseau : identité géométrique des nœuds + garde-fou d'invariants
 
 - **Identité = géométrie** : l'identité d'un nœud du graphe est sa position
