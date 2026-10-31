@@ -423,8 +423,16 @@ export function updateBuildings(state, rng = Math.random, hour = null, log = () 
     const occupancyTarget = clamp01(building.landValue * (0.5 + 0.5 * zoneDemand(state, BUILDING_TYPES[building.type].zoneType)));
     building.occupants = clamp01(building.occupants + (occupancyTarget - building.occupants) * 0.08 + (rng() - 0.5) * 0.02);
     // Montée en densité : un bâtiment plein sur un terrain cher s'agrandit.
-    if (building.occupants > UPGRADE_OCCUPANTS && building.landValue > UPGRADE_LAND_VALUE && building.level < 3) {
-      const nextDensity = building.level === 1 ? "mid" : "high";
+    // Correction : la densité de départ dépend de la valeur foncière (un
+    // bâtiment peut émerger directement en « mid » ou « high »). Piloter
+    // l'agrandissement par le seul « level » rétrogradait silencieusement un
+    // bâtiment « high » en « mid » (perte de résidents/emplois) ou laissait un
+    // bâtiment « mid » redevenir « mid » (fausse montée en densité). On suit
+    // désormais la densité réelle.
+    const densityRank = { low: 0, mid: 1, high: 2 };
+    if (building.occupants > UPGRADE_OCCUPANTS && building.landValue > UPGRADE_LAND_VALUE &&
+        (densityRank[building.density] ?? 0) < 2 && building.level < 3) {
+      const nextDensity = (densityRank[building.density] ?? 0) === 0 ? "mid" : "high";
       const footprint = BUILDING_FOOTPRINTS[nextDensity];
       const grown = { x: building.x, y: building.y, w: footprint.w, h: footprint.h };
       // V28 — pas d'agrandissement qui déborderait sur la voirie ou un voisin :
