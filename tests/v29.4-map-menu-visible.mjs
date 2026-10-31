@@ -113,7 +113,8 @@ try {
   const desktop = await evaluate(DIAG_JS);
   assert.ok(/btn=([3-9]|[1-9]\d)/.test(desktop), 'DESKTOP menu sans boutons : ' + desktop);
   assert.ok(!/vis=hidden/.test(desktop), 'DESKTOP menu caché : ' + desktop);
-  assert.ok(!/rect=0x0/.test(desktop), 'DESKTOP menu de taille nulle : ' + desktop);
+  const dw = Number((desktop.match(/rect=(\d+)x/) || [0, 0])[1]);
+  assert.ok(dw >= 200, 'DESKTOP menu trop étroit (' + dw + 'px) : ' + desktop);
   console.log('desktop: ' + desktop);
 
   // --- Mobile 412×915 (media query ≤ 959 px : menu fixé en bas) -------------
@@ -123,7 +124,8 @@ try {
   assert.ok(/btn=([3-9]|[1-9]\d)/.test(mobile), 'MOBILE menu sans boutons : ' + mobile);
   assert.ok(!/vis=hidden/.test(mobile), 'MOBILE menu caché : ' + mobile);
   assert.ok(!/disp=none/.test(mobile), 'MOBILE menu display:none : ' + mobile);
-  assert.ok(!/rect=0x0/.test(mobile), 'MOBILE menu de taille nulle : ' + mobile);
+  const mw = Number((mobile.match(/rect=(\d+)x/) || [0, 0])[1]);
+  assert.ok(mw >= 300, 'MOBILE menu trop étroit (' + mw + 'px, viewport 412) : ' + mobile);
   assert.ok(!/op=0(?![.\d])/.test(mobile), 'MOBILE menu transparent : ' + mobile);
   assert.ok(/contains=true/.test(mobile), 'MOBILE menu recouvert par un autre élément : ' + mobile);
   console.log('mobile: ' + mobile);

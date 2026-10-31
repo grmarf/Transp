@@ -1112,7 +1112,11 @@ select { min-height:38px; max-width:180px; }
 .menu-dropdown.is-open { display:grid; gap:6px; }
 .menu-dropdown input[type="file"] { display:none; }
 .menu-dropdown .btn, .menu-file-label { width:100%; text-align:left; min-height:36px; padding:7px 10px; cursor:pointer; font-weight:800; border:2px solid var(--ink); border-radius:8px; background:var(--paper-2); }
-.floating-toolbar { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); display:flex; align-items:center; flex-wrap:wrap; justify-content:center; gap:8px; padding:8px 12px; background:rgba(255,248,236,.95); border:2px solid rgba(31,35,64,.22); border-radius:12px; box-shadow:0 4px 20px rgba(31,35,64,.2); z-index:100; max-width:calc(100vw - 20px); }
+/* V29.4 — centrage SANS transform : un ancêtre transformé devient le
+   bloc conteneur des descendants position:fixed — #map-menu (fixé en bas de
+   l'écran sur mobile) se retrouvait calé sur la barre réduite à rien : un
+   menu de 20 px de large, invisible. Le centrage passe par margin auto. */
+.floating-toolbar { position:fixed; bottom:20px; left:0; right:0; margin:0 auto; width:fit-content; display:flex; align-items:center; flex-wrap:wrap; justify-content:center; gap:8px; padding:8px 12px; background:rgba(255,248,236,.95); border:2px solid rgba(31,35,64,.22); border-radius:12px; box-shadow:0 4px 20px rgba(31,35,64,.2); z-index:100; max-width:calc(100vw - 20px); }
 .tool-group { display:none; align-items:center; flex-wrap:wrap; gap:6px; }
 .tool-group.is-active { display:flex; }
 .map-overlays { position:absolute; inset:8px; z-index:50; pointer-events:none; }

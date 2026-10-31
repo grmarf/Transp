@@ -21,6 +21,24 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V29.4 — Le menu en cascade enfin VISIBLE sur mobile (cause racine)
+
+- **Cause racine** : `transform: translateX(-50%)` sur `.floating-toolbar` —
+  un ancêtre transformé devient le bloc conteneur de ses descendants
+  `position: fixed`. Le `#mapMenu` (fixé `left:10px; right:10px; bottom:10px`
+  sur mobile) était donc calé sur la **barre flottante réduite à presque
+  rien** (boutons historiques cachés) : un menu de **20 px de large**, hors
+  champ, recouvert. Cassé depuis la V28.2, invisible pour la CI qui ne
+  testait la visibilité ni en viewport mobile.
+- **Correctif** : la barre est centrée par `margin: 0 auto; width:
+  fit-content` (sans transform) — le menu redevient relatif à l'écran.
+- **Sonde CI permanente** : `tests/v29.4-map-menu-visible.mjs` charge le jeu
+  en conditions réelles (HTTP + Chromium CDP) en desktop 1280×900 **puis en
+  mobile 412×915**, et vérifie existence, boutons ≥ 3, styles, largeur
+  (≥ 300 px en mobile) et non-recouvrement (`elementFromPoint`) — avec un
+  diagnostic compact dans l'annotation en cas d'échec.
+- Anti-cache bumpé `?v=33`.
+
 ## V29.3 — Carrefours lisibles (plaques giratoires)
 
 - **La « route étrange » en Y** : trois voiries convergeant au même point
