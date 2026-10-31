@@ -362,7 +362,7 @@ export function generateDemand(state, rng) {
       });
 
       candidates.forEach((destination, i) => {
-        const generated = base * (weights[i] / totalWeight);
+        const generated = totalWeight > 0 ? base * (weights[i] / totalWeight) : 0;
         if (!origin.waitingByDestination) origin.waitingByDestination = {};
         state.totalDemand += generated;
         state.totalGenerated += generated;

@@ -18,8 +18,14 @@ export const ROADWORKS_DURATION_DAYS_MAX = 5;
  */
 export function refreshAllLineRoutes(state, log) {
   for (const line of state.lines) {
-    const routeNetwork = vehicleMode(line.mode).id === "metro" && state.undergroundNetwork
-      ? state.undergroundNetwork : state.network;
+    const modeId = vehicleMode(line.mode).id;
+    // Correction : une ligne de tramway sur voies independantes reste sur son
+    // propre reseau (aligne sur finishLine), au lieu d'etre rabattue sur la voirie.
+    const routeNetwork = modeId === "metro" && state.undergroundNetwork
+      ? state.undergroundNetwork
+      : modeId === "tram" && state.tramNetwork && state.tramNetwork.edges && state.tramNetwork.edges.length
+        ? state.tramNetwork
+        : state.network;
     const newRoute = routeLine(routeNetwork, line.stopIds);
     if (!newRoute) {
       log(`${line.name} : plus aucun itinéraire disponible tant que les travaux durent.`);
@@ -56,12 +62,16 @@ export function maybeStartRoadworks(state, rng, log) {
   // tentatively close each candidate, starting at the random position, and
   // skip bridges. This keeps roadworks active even when the first random
   // edge happens to be the only connection to a district.
+  // Correction : une ville deja en plusieurs composantes (routes libres non
+  // raccordees, demolitions) doit pouvoir avoir des travaux : on refuse seulement
+  // une fermeture qui *augmente* le nombre de composantes.
+  const componentsBefore = countComponents(network);
   const startIndex = Math.floor(rng() * openEdges.length);
   let edge = null;
   for (let offset = 0; offset < openEdges.length; offset++) {
     const candidate = openEdges[(startIndex + offset) % openEdges.length];
     network.closedEdgeIds.add(candidate.id);
-    if (countComponents(network) === 1) {
+    if (countComponents(network) === componentsBefore) {
       edge = candidate;
       break;
     }

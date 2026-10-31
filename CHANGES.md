@@ -3,6 +3,26 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V28.3 — Correctifs de bugs silencieux (véhicules gelés, tramway, travaux, NaN)
+
+- **Véhicules gelés après édition de voirie** : `rebuildNetwork()` recalcule
+  désormais les itinéraires de toutes les lignes (`refreshAllLineRoutes`) —
+  auparavant, construire/démolir/améliorer une route ou annuler/rétablir
+  laissait les lignes sur des nœuds disparus du graphe reconstruit : véhicules
+  figés sans message, passagers jamais descendus, recettes à zéro.
+- **Tramway rerouté sur ses propres voies** : `refreshAllLineRoutes` utilise
+  le réseau tram indépendant quand il existe (aligné sur `finishLine`),
+  au lieu de rabattre les lignes de tram sur la voirie.
+- **Travaux possibles sur un réseau multi-composantes** : une fermeture n'est
+  refusée que si elle *augmente* le nombre de composantes ; l'exigence
+  « réseau en une seule composante » taisait tous les travaux dès qu'une
+  route libre non raccordée existait.
+- **NaN dans la génération de demande** : garde sur `totalWeight` nul (ville
+  sans emplois ni commerces) — le NaN polluait `totalDemand`, la satisfaction
+  et rendait la sauvegarde impossible (validation stricte V20).
+- **Chargement de sauvegarde** : itinéraires recalculés une fois les fermetures
+  pour travaux restaurées.
+
 ## V28 — Carrefours à 90°, arrêts de croisement & bâtiments qui pop
 
 - **Bâtiments « cartoon tycoon »** : fini les carrés plats — corps arrondi
