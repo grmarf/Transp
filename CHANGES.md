@@ -21,6 +21,17 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V29.3 — Carrefours lisibles (plaques giratoires)
+
+- **La « route étrange » en Y** : trois voiries convergeant au même point
+  ne ressemblaient à rien. Chaque croisement réel (géométrique, via
+  `computeCarrefours` mis en cache jusqu'à la prochaine invalidation du
+  réseau, ou nœud de jonction) est désormais matérialisé par une **plaque
+  giratoire** : disque clair bordé d'encre, îlot central pointillé,
+  passages piétons aux quatre abords. Les convergences deviennent un
+  aménagement assumé, plus un accident de tracé.
+- Anti-cache bumpé `?v=32` ; test `tests/v29.3-carrefour-render.mjs`.
+
 ## V29.2 — Déssaimage de la voirie & ceinture du menu
 
 - **Trop de carrefours** : la génération urbaine (secondes liaisons, boucles de secours) finissait par croiser inutilement ses voiries — chaque croisement devenait un carrefour redressé à 90° et la carte se couvrait de nœuds. Nouveau module `src/pruning.js` :
