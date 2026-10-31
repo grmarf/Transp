@@ -30,7 +30,7 @@ check("voirie fine : boulevard ≤ 13 px", ROAD_TYPES.boulevard.width <= 13);
 check("voirie fine : voie rapide ≤ 16 px", ROAD_TYPES.highway.width <= 16);
 
 const index = read("index.html");
-check("anti-cache bumpé v35 (plus de v34)", !index.includes("?v=34") && (index.match(/\?v=35/g) || []).length >= 3);
+check("anti-cache bumpé v36 (plus de v35)", !index.includes("?v=35") && (index.match(/\?v=36/g) || []).length >= 3);
 
 const changes = read("CHANGES.md");
 check("CHANGES documente la V29.6", changes.includes("## V29.6"));
