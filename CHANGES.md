@@ -3,6 +3,24 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V29.1 — Fond de carte naturel, voiries directes, menu auto-réparant
+
+- **Fond de carte** : les îlots carrés décoratifs ont disparu — générés par
+  bruit, ils ne correspondaient à rien (ni zones, ni bâtiments réels, ni
+  voirie) et « quadrillaient » la carte pour rien. Le fond reste une herbe
+  douce ponctuée de parcs organiques.
+- **Voiries naturelles** : les routes d'arrêt à arrêt ne font plus de détours
+  A* « autour des îlots » décoratifs (des escaliers de segments très
+  artificiels) — elles sont dessinées en ligne directe, et tous les angles
+  (y compris les plis à 90° des carrefours) sont arrondis au rendu.
+- **Menu en cascade auto-réparant** : si le shell HTML est périmé (cache
+  navigateur, copie locale ancienne), la barre flottante et le menu sont
+  reconstruits de zéro ; si l'initialisation échoue, les boutons historiques
+  sont réaffichés en secours — le jeu ne reste jamais sans outils.
+- **Anti-cache d'assets bumpé** (?v=29 → ?v=30) : un navigateur servant une
+  copie ancienne de main.js/style.css était la cause la plus probable du
+  menu « disparu ».
+
 ## V29 — Réseau : identité géométrique des nœuds + garde-fou d'invariants
 
 - **Identité = géométrie** : l'identité d'un nœud du graphe est sa position

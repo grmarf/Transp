@@ -166,18 +166,12 @@ export function createRenderer(canvas, state) {
     return n - Math.floor(n);
   }
   let cityBlocksCache = null;
-  let urbanObstaclesCache = null;
   let urbanCacheCityKey = null;
-  let roadPathCacheCityKey = null;
-  const roadPathCache = new Map();
   const roadAnimationStarts = new Map();
   const buildingPopAt = new Map();
   activeRendererCacheReset = function () {
     cityBlocksCache = null;
-    urbanObstaclesCache = null;
     urbanCacheCityKey = null;
-    roadPathCache.clear();
-    roadPathCacheCityKey = null;
   };
   const stopAnimationStarts = new Map();
 
@@ -191,106 +185,29 @@ export function createRenderer(canvas, state) {
     const key = cityCacheKey();
     if (cityBlocksCache && urbanCacheCityKey === key) return cityBlocksCache;
 
-    const blocks = [];
+    // V29.1 — seuls les parcs organiques habillent le fond de carte : les
+    // îlots carrés décoratifs ont disparu (générés par bruit, ils ne
+    // correspondaient ni aux zones, ni aux bâtiments réels, ni à la voirie,
+    // et « quadrillaient » la carte pour rien).
+    const parks = [];
     const cell = 120;
     const seed = Number(city.numericSeed) || 0;
-    // Les retraits réguliers forment des rues même avant le calcul d'itinéraire.
     for (let x = -cell; x < (city.width || 1000) + cell; x += cell) {
       for (let y = -cell; y < (city.height || 650) + cell; y += cell) {
         const n = urbanNoise(x, y, seed);
         if (n > 0.88) {
-          blocks.push({ type: "park", x: x + 15, y: y + 15, w: cell - 30, h: cell - 30, n });
-        } else {
-          const inset = 15 + n * 7;
-          blocks.push({ type: "block", x: x + inset, y: y + inset, w: cell - inset * 2, h: cell - inset * 2, n });
+          parks.push({ type: "park", x: x + 15, y: y + 15, w: cell - 30, h: cell - 30, n });
         }
       }
     }
-    cityBlocksCache = blocks;
-    urbanObstaclesCache = blocks.filter(function (block) { return block.type === "block"; });
+    cityBlocksCache = parks;
     urbanCacheCityKey = key;
-    roadPathCache.clear();
-    roadPathCacheCityKey = key;
-    return blocks;
+    return parks;
   }
 
-  function urbanObstacles() {
-    ensureCityGeometry();
-    return urbanObstaclesCache || [];
-  }
-
-  function routeAroundBuildings(a, b) {
-    const key = [a.id, b.id].sort().join("|");
-    const cityKey = cityCacheKey();
-    if (roadPathCacheCityKey !== cityKey) {
-      roadPathCache.clear();
-      roadPathCacheCityKey = cityKey;
-    }
-    if (roadPathCache.has(key)) {
-      const cached = roadPathCache.get(key);
-      return a.id < b.id ? cached : cached.slice().reverse();
-    }
-    const step = 20;
-    const city = state.city || {};
-    const cols = Math.max(51, Math.ceil(((city.width || 1000) + 40) / step));
-    const rows = Math.max(34, Math.ceil(((city.height || 650) + 40) / step));
-    const obstacles = urbanObstacles();
-    const blocked = function (x, y, endpoint) {
-      if (endpoint) return false;
-      return obstacles.some(function (o) {
-        return x >= o.x - 12 && x <= o.x + o.w + 12 && y >= o.y - 12 && y <= o.y + o.h + 12;
-      });
-    };
-    const toNode = function (point) {
-      return { x: Math.max(0, Math.min(cols - 1, Math.round(point.x / step))), y: Math.max(0, Math.min(rows - 1, Math.round(point.y / step))) };
-    };
-    const start = toNode(a);
-    const goal = toNode(b);
-    const id = function (x, y) { return y * cols + x; };
-    const startId = id(start.x, start.y);
-    const goalId = id(goal.x, goal.y);
-    const open = [{ x: start.x, y: start.y, f: 0 }];
-    const cameFrom = new Map();
-    const cost = new Map([[startId, 0]]);
-    const heuristic = function (x, y) { return Math.abs(x - goal.x) + Math.abs(y - goal.y); };
-    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
-    let found = false;
-    while (open.length && open.length < 5000) {
-      open.sort(function (left, right) { return left.f - right.f; });
-      const current = open.shift();
-      if (id(current.x, current.y) === goalId) { found = true; break; }
-      directions.forEach(function (direction) {
-        const nx = current.x + direction[0];
-        const ny = current.y + direction[1];
-        if (nx < 0 || nx >= cols || ny < 0 || ny >= rows) return;
-        const nextId = id(nx, ny);
-        if (blocked(nx * step, ny * step, nextId === startId || nextId === goalId)) return;
-        const moveCost = direction[0] && direction[1] ? 1.4 : 1;
-        const nextCost = (cost.get(id(current.x, current.y)) || 0) + moveCost;
-        if (nextCost >= (cost.get(nextId) ?? Infinity)) return;
-        cost.set(nextId, nextCost);
-        cameFrom.set(nextId, id(current.x, current.y));
-        open.push({ x: nx, y: ny, f: nextCost + heuristic(nx, ny) });
-      });
-    }
-    if (!found) return [a, b];
-    const nodes = [];
-    let currentId = goalId;
-    while (currentId !== undefined) {
-      nodes.unshift({ x: (currentId % cols) * step, y: Math.floor(currentId / cols) * step });
-      currentId = cameFrom.get(currentId);
-    }
-    nodes[0] = { x: a.x, y: a.y };
-    nodes[nodes.length - 1] = { x: b.x, y: b.y };
-    const simplified = nodes.filter(function (point, index) {
-      if (index === 0 || index === nodes.length - 1) return true;
-      const previous = nodes[index - 1];
-      const next = nodes[index + 1];
-      return Math.sign(point.x - previous.x) !== Math.sign(next.x - point.x) || Math.sign(point.y - previous.y) !== Math.sign(next.y - point.y);
-    });
-    roadPathCache.set(key, a.id < b.id ? simplified : simplified.slice().reverse());
-    return a.id < b.id ? simplified : simplified.slice().reverse();
-  }
+  // V29.1 — les voiries d'arrêt à arrêt sont dessinées en ligne directe :
+  // l'ancien routage décoratif « autour des îlots » (A* sur grille 20 px)
+  // produisait des escaliers de segments très artificiels.
 
   function drawOrganicPark(block, seed) {
     ctx.save();
@@ -315,55 +232,51 @@ export function createRenderer(canvas, state) {
   }
 
   function drawUrbanBase(left, top, viewW, viewH) {
-    const blocks = ensureCityGeometry();
+    const parks = ensureCityGeometry();
     const city = state.city || {};
     const seed = Number(city.numericSeed) || 0;
-    // V28 — sol « cartoon » : herbe douce, îlots crème qui laissent les
-    // bâtiments colorés et les voiries ressortir nettement.
+    // V29.1 — sol « cartoon » : herbe douce et parcs organiques. Les îlots
+    // carrés décoratifs ont disparu : ils ne correspondaient à rien (ni
+    // zones, ni bâtiments réels, ni voirie) — le fond reste calme et
+    // laisse voiries et bâtiments ressortir nettement.
     ctx.fillStyle = "#cde8a8";
     ctx.fillRect(left, top, viewW, viewH);
     ctx.save();
     ctx.beginPath();
     ctx.rect(left, top, viewW, viewH);
     ctx.clip();
-    blocks.forEach(function (block) {
-      if (block.x + block.w < left || block.x > left + viewW || block.y + block.h < top || block.y > top + viewH) return;
-      if (block.type === "park") {
-        drawOrganicPark(block, seed);
-        return;
-      }
-      ctx.fillStyle = "rgba(31, 35, 64, 0.2)";
-      roundRect(block.x + 3, block.y + 3, block.w, block.h, 10);
-      ctx.fill();
-      ctx.fillStyle = "#f2e8cf";
-      roundRect(block.x, block.y, block.w, block.h, 10);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(31, 35, 64, .18)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      // Quelques volumes internes suggèrent des bâtiments sans recréer le bruit visuel initial.
-      ctx.fillStyle = "rgba(255, 248, 236, .28)";
-      const inner = 2 + Math.floor(block.n * 3);
-      for (let i = 0; i < inner; i++) {
-        const bw = 16 + urbanNoise(block.x + i * 23, block.y, seed) * 24;
-        const bh = 12 + urbanNoise(block.x, block.y + i * 23, seed) * 20;
-        const bx = block.x + 12 + urbanNoise(block.x + i, block.y + 4, seed) * Math.max(8, block.w - bw - 24);
-        const by = block.y + 12 + urbanNoise(block.x + 4, block.y + i, seed) * Math.max(8, block.h - bh - 24);
-        roundRect(bx, by, bw, bh, 3);
-        ctx.fill();
-      }
+    parks.forEach(function (park) {
+      if (park.x + park.w < left || park.x > left + viewW || park.y + park.h < top || park.y > top + viewH) return;
+      drawOrganicPark(park, seed);
     });
     ctx.restore();
   }
+
   function pathLength(path) {
     let length = 0;
     for (let i = 1; i < path.length; i++) length += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
     return Math.max(1, length);
   }
-  function strokePath(path) {
+  function strokePath(path, cornerRadius) {
     ctx.beginPath();
     ctx.moveTo(path[0].x, path[0].y);
-    path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
+    if (!cornerRadius || path.length < 3) {
+      path.slice(1).forEach(function (point) { ctx.lineTo(point.x, point.y); });
+    } else {
+      // V29.1 — coins arrondis (arcTo) : les plis à 90° des carrefours
+      // deviennent des virages naturels au lieu d'angles vifs.
+      for (let i = 1; i < path.length - 1; i++) {
+        const previous = path[i - 1];
+        const vertex = path[i];
+        const next = path[i + 1];
+        const radius = Math.min(cornerRadius,
+          Math.hypot(vertex.x - previous.x, vertex.y - previous.y) / 2,
+          Math.hypot(next.x - vertex.x, next.y - vertex.y) / 2);
+        ctx.arcTo(vertex.x, vertex.y, next.x, next.y, radius);
+      }
+      const last = path[path.length - 1];
+      ctx.lineTo(last.x, last.y);
+    }
     ctx.stroke();
   }
   function drawCity(heatmap) {
@@ -426,12 +339,13 @@ export function createRenderer(canvas, state) {
         const spec = ROAD_TYPES[road.type] || ROAD_TYPES.street;
         const width = spec.width;
         const asphalt = spec.color;
-        // V27 — une route-joueur avec polyline explicite suit exactement son tracé
-        // (le détour décoratif routeAroundBuildings ne s'applique qu'aux voiries
-        // d'arrêt à arrêt générées par la ville).
+        // V29.1 — une voirie avec polyline explicite suit exactement son
+        // tracé ; les voiries d'arrêt à arrêt générées par la ville sont
+        // dessinées en ligne directe (l'ancien détour décoratif « autour
+        // des îlots » produisait des escaliers de segments peu naturels).
         const path = Array.isArray(road.points) && road.points.length >= 2
           ? road.points
-          : routeAroundBuildings(a, b);
+          : [a, b];
         const roadKey = road.id || [road.a || road.startStopId, road.b || road.endStopId].sort().join("|");
         if (!roadAnimationStarts.has(roadKey)) roadAnimationStarts.set(roadKey, now);
         const progress = Math.min(1, Math.max(0, (now - roadAnimationStarts.get(roadKey)) / 850));
@@ -441,7 +355,9 @@ export function createRenderer(canvas, state) {
             ctx.setLineDash([length, length]);
             ctx.lineDashOffset = length * (1 - progress);
           }
-          strokePath(path);
+          // V29.1 — coins arrondis : les angles des polylignes (plis de
+          // carrefour à 90° notamment) deviennent des virages naturels.
+          strokePath(path, 10);
           ctx.setLineDash([]);
           ctx.lineDashOffset = 0;
         };
@@ -449,6 +365,7 @@ export function createRenderer(canvas, state) {
         ctx.strokeStyle = "rgba(31, 35, 64, .32)";
         ctx.lineWidth = width + 5;
         ctx.lineCap = "round";
+        ctx.lineJoin = "round";
         drawProgress();
 
         ctx.strokeStyle = closed ? ROAD_CLOSED : asphalt;
@@ -461,13 +378,13 @@ export function createRenderer(canvas, state) {
           ctx.lineWidth = road.type === "highway" ? 2.6 : road.type === "boulevard" ? 2.2 : road.type === "avenue" ? 1.7 : 1;
           ctx.setLineDash(road.type === "highway" ? [18, 12] : road.type === "boulevard" ? [13, 10] : road.type === "avenue" ? [8, 10] : [3, 11]);
           if (progress < 1) ctx.lineDashOffset = length * (1 - progress);
-          strokePath(path);
+          strokePath(path, 10);
           // Les artères ont une seconde ligne centrale discrète, comme une vraie voirie hiérarchisée.
           if (road.type === "boulevard" || road.type === "highway") {
             ctx.strokeStyle = "rgba(255,255,255,.72)";
             ctx.lineWidth = 1;
             ctx.lineDashOffset = length * (1 - progress) + 11;
-            strokePath(path);
+            strokePath(path, 10);
           }
           ctx.setLineDash([]);
           ctx.lineDashOffset = 0;
@@ -526,7 +443,7 @@ export function createRenderer(canvas, state) {
         const a = state.city.stops.find(function (stop) { return stop.id === roadA; });
         const b = state.city.stops.find(function (stop) { return stop.id === roadB; });
         if (!a || !b) return;
-        const path = routeAroundBuildings(a, b);
+        const path = [a, b];
         ctx.strokeStyle = "#ff6b35";
         ctx.lineWidth = 4;
         ctx.setLineDash([7, 5]);
@@ -1306,11 +1223,8 @@ export function createRenderer(canvas, state) {
     camera: camera,
     resizeCanvas: resizeCanvas,
     invalidateUrbanCache: function () {
-      urbanObstaclesCache = null;
       cityBlocksCache = null;
       urbanCacheCityKey = null;
-      roadPathCache.clear();
-      roadPathCacheCityKey = null;
     },
     clearRendererCaches: function () { activeRendererCacheReset(); }
   };
