@@ -25,10 +25,10 @@ assert.ok(mainjs.includes('boutons historiques réaffichés'),
   'secours si l\'initialisation du menu échoue');
 
 // 4. Anti-cache : les trois références d'assets partagent la même version,
-// bumpée par rapport à la V29 (v=30).
+// bumpée à chaque livraison (v30 puis v31).
 const versions = [...html.matchAll(/\?v=(\d+)/g)].map((m) => m[1]);
 assert.ok(versions.length >= 3, 'références d\'assets versionnées');
 assert.equal(new Set(versions).size, 1, 'tous les assets partagent la même version');
-assert.equal(versions[0], '30', 'anti-cache bumpé en v30');
+assert.ok(Number(versions[0]) >= 31, 'anti-cache bumpé au-delà de v30');
 
 console.log(JSON.stringify({ ok: true, suite: 'v29.1-natural-map', assetVersion: versions[0] }));

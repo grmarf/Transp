@@ -11,6 +11,7 @@ import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingSt
 import { developCityCarrefours } from "./carrefours.js";
 import { refreshAllLineRoutes } from "./disruptions.js";
 import { startCampaign } from "./advertising.js";
+import { pruneRedundantRoads, pruneOrphanCarrefourStops } from "./pruning.js";
 
 const canvas = document.getElementById("map");
 const miniMapCanvas = document.getElementById("miniMapCanvas");
@@ -400,6 +401,31 @@ function reportNetworkViolations(targetState, log) {
   const violations = validateNetwork(targetState.network, targetState.city, { maxEdgeLength: diagonal });
   if (violations.length) {
     log("⚠️ Réseau incohérent : " + violations[0] + (violations.length > 1 ? " (+" + (violations.length - 1) + " autre" + (violations.length > 2 ? "s" : "") + ")" : ""));
+  }
+}
+
+// V29.2 — déssaimage automatique de la voirie : la génération urbaine crée
+// des secondes liaisons et des boucles de secours qui, à mesure que la
+// ville pousse, finissent par se croiser inutilement — chaque croisement
+// devient un carrefour et la carte se couvre de nœuds. Au boot (ville neuve
+// comme sauvegarde restaurée), les tronçons REDONDANTS (leur retrait ne
+// déconnecte aucun arrêt) sont retirés, puis les arrêts de carrefour devenus
+// orphelins disparaissent. Les voiries du joueur (construites, corridors,
+// tracés libres) ne sont jamais candidates ; le déssaimage est idempotent.
+function rationaliseCityRoads() {
+  const protectedIds = new Set();
+  (state.lines || []).forEach(function (line) {
+    (line.stopIds || []).forEach(function (id) { protectedIds.add(id); });
+  });
+  (state.pendingStops || []).forEach(function (id) { protectedIds.add(id); });
+  const report = pruneRedundantRoads(state.city);
+  const orphanStops = pruneOrphanCarrefourStops(state.city, protectedIds);
+  if (report.removed.length || orphanStops.length) {
+    rebuildNetwork();
+    log("🧹 Voirie rationalisée : " + report.removed.length + " tronçon" +
+      (report.removed.length > 1 ? "s" : "") + " redondant" + (report.removed.length > 1 ? "s" : "") +
+      " retiré" + (report.removed.length > 1 ? "s" : "") + ", " + orphanStops.length +
+      " arrêt" + (orphanStops.length > 1 ? "s" : "") + " de carrefour orphelin" + (orphanStops.length > 1 ? "s" : "") + ".");
   }
 }
 
@@ -1185,6 +1211,7 @@ function boot(seed, scenarioId, restoredPayload) {
   // V29 — garde-fou dès le boot (ville neuve comme sauvegarde restaurée) :
   // le graphe reconstruit doit être sain, toute incohérence est journalisée.
   reportNetworkViolations(state, log);
+  rationaliseCityRoads();
 
   const nextRenderer = createRenderer(canvas, nextState);
   rendererState.current = nextRenderer;
@@ -1245,6 +1272,10 @@ function boot(seed, scenarioId, restoredPayload) {
       refreshUI();
     });
   });
+
+  // V29.2 — ceinture finale : la carte ne doit jamais rester sans menu.
+  const mapMenuCheck = document.getElementById("mapMenu");
+  if (mapMenuCheck && !mapMenuCheck.querySelector("button")) setMapMenu("std");
 
   startLoop();
 }
