@@ -9,6 +9,7 @@ import { escapeHtml as h } from "./html.js";
 import { invalidateRoutingCache } from "./routing.js";
 import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingStats, BUILDING_TYPES, ZONE_TYPES, seedInitialZones, traceBlockedBuildings, expropriateAbandonedAlongTrace, spawnInitialBuildings } from "./buildings.js";
 import { developCityCarrefours } from "./carrefours.js";
+import { refreshAllLineRoutes } from "./disruptions.js";
 import { startCampaign } from "./advertising.js";
 
 const canvas = document.getElementById("map");
@@ -379,6 +380,11 @@ function rebuildNetwork() {
   state.network.pathCache.clear();
   invalidateRoutingCache(state);
   clearRendererCaches();
+  // Correction : sans ce recalcul, toute edition de voirie (construction,
+  // demolition, amelioration, sens unique, annuler/retablir) laissait les
+  // lignes existantes sur des noeuds disparus du graphe reconstruit : les
+  // vehicules se figeaient silencieusement et les passagers restaient a bord.
+  refreshAllLineRoutes(state, log);
 }
 
 const ROAD_UNDO_MAX = 20;
@@ -1106,6 +1112,9 @@ function boot(seed, scenarioId, restoredPayload) {
     nextState.network.pathCache.clear();
     nextState.undergroundNetwork = createUndergroundNetwork(nextState.city);
     nextState.tramNetwork = createTramNetwork(nextState.city);
+    // Correction : une fois les fermetures pour travaux restaurees, les
+    // itineraires doivent tenir compte des routes fermees des maintenant.
+    refreshAllLineRoutes(nextState, function () {});
     nextRng = mulberry32(nextState.city.numericSeed ^ 0xA57E2);
     if (restoredPayload.rngState != null && nextRng.setState) {
       nextRng.setState(restoredPayload.rngState);
