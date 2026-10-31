@@ -682,12 +682,22 @@ function clickMap(e) {
         return line.route && Array.isArray(line.route.nodeIds)
           && line.route.nodeIds.includes(nearestRoad.a) && line.route.nodeIds.includes(nearestRoad.b);
       })) || false;
+      // Correction : les voiries libres (sans arrêts a/b) n'étaient jamais
+      // détectées comme utilisées par une ligne ; on compare la longueur
+      // d'itinéraire de chaque ligne avant/après reconstruction du réseau.
+      const lengthsBefore = new Map(state.lines.map(function (line) {
+        return [line.id, (line.route && line.route.totalLength) || 0];
+      }));
       const refund = Math.round((nearestRoad.cost || 0) * 0.3);
       state.city.roads = state.city.roads.filter(function (road) { return road !== nearestRoad; });
       rebuildNetwork();
       pushRoadAction({ kind: "remove", road: nearestRoad, refund });
       state.money += refund;
+      const rerouted = state.lines.filter(function (line) {
+        return Math.abs(((line.route && line.route.totalLength) || 0) - (lengthsBefore.get(line.id) || 0)) > 0.01;
+      });
       if (usedByLine) log("Attention : une ligne utilisait cette voirie, son itinéraire sera recalculé.");
+      else if (rerouted.length) log("Attention : " + rerouted.length + (rerouted.length > 1 ? " lignes" : " ligne") + (rerouted.length > 1 ? " voient" : " voit") + " son itinéraire recalculé.");
       log(refund > 0
         ? `Route démolie (remboursement ${refund.toLocaleString("fr-FR")} €).`
         : "Route démolie.");

@@ -32,10 +32,16 @@ function buildLineAdjacency(line) {
   const stops = line.stopIds || [];
   const adj = new Map();
   if (stops.length < 2) return adj;
+  // Correction V21 : une ligne parcourt un aller-retour (routeLine), pas
+  // une boucle. De l'arrêt i vers l'arrêt j, le véhicule traverse |i-j|
+  // inter-arrêts, à l'aller comme au retour. L'ancien modèle circulaire
+  // sous-estimait tous les trajets « vers l'arrière » (dernier arrêt →
+  // premier = 1 saut au lieu de n-1) et faussait le choix d'itinéraire.
   for (let i = 0; i < stops.length; i++) {
     const reachable = [];
-    for (let hops = 1; hops < stops.length; hops++) {
-      reachable.push({ to: stops[(i + hops) % stops.length], hops });
+    for (let j = 0; j < stops.length; j++) {
+      if (j === i) continue;
+      reachable.push({ to: stops[j], hops: Math.abs(i - j) });
     }
     adj.set(stops[i], reachable);
   }

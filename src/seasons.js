@@ -1,5 +1,7 @@
 /** V19.0 — seasonal city calendar. */
 
+import { DISTRICT_AREA_KM2 } from "./city.js";
+
 export const SEASONS = Object.freeze([
   { id: "spring", label: "Printemps", icon: "🌱", demandMultiplier: 1.05, fareMultiplier: 1.00, growthMultiplier: 1.04 },
   { id: "summer", label: "Été", icon: "☀", demandMultiplier: 1.18, fareMultiplier: 1.05, growthMultiplier: 1.02 },
@@ -36,6 +38,8 @@ export function applySeasonalGrowth(state) {
     stop.population = Math.max(1, Math.round(stop.population * factor));
     stop.jobs = Math.max(1, Math.round(stop.jobs * factor));
     stop.commerce = Math.max(1, Math.round(stop.commerce * factor));
-    stop.density = Math.max(1, Math.round(stop.density * factor));
+    // Correction : la densité est une valeur dérivée (population / km²),
+    // pas un stock qui croît tout seul — elle dérivait depuis growStop.
+    stop.density = Math.round(stop.population / DISTRICT_AREA_KM2);
   }
 }

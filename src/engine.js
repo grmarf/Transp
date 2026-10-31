@@ -454,11 +454,14 @@ export function economy(state, log = () => {}) {
   // V4.0: cost is computed and attributed per line (so profitability is
   // comparable line by line), instead of one flat global deduction.
   const hours = (TICK_MINUTES / 60) * state.speed;
+  // Correction : le log d'entretien ne sortait que si l'horloge tombait
+  // exactement sur l'heure ; il suit désormais le vrai franchissement horaire.
+  const hourBoundaryCrossed = Math.floor((state.time + TICK_MINUTES * state.speed) / 60) !== Math.floor(state.time / 60);
   for (const line of state.lines) {
     const cost = lineOperatingCost(state, line, hours);
     line.expenses = (line.expenses || 0) + cost;
     state.money -= cost;
-    if (cost > 0 && state.time % 60 === 0) log(`−${cost.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € entretien · ${line.name}.`);
+    if (cost > 0 && hourBoundaryCrossed) log(`−${cost.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € entretien · ${line.name}.`);
   }
 }
 
@@ -515,7 +518,10 @@ export function satisfaction(state) {
     : 0;
   const intermodal = intermodalStats(state);
   const intermodalBonus = intermodal.shareWithTransfer > 0.15 ? 5 : 0;
-  return Math.max(0, Math.min(100, 100 - waitPenalty - abandonPenalty + intermodalBonus + eventSatisfactionDelta(state) + wageSatisfactionDelta(state)));
+  // Correction : les sans-abri (démolition d'un bâtiment occupé) pesaient
+  // sur la satisfaction dans le journal mais pas dans le calcul.
+  const homelessPenalty = Math.min(20, (state.buildingHomeless || 0) / 50);
+  return Math.max(0, Math.min(100, 100 - waitPenalty - abandonPenalty + intermodalBonus + eventSatisfactionDelta(state) + wageSatisfactionDelta(state) - homelessPenalty));
 }
 
 /**
@@ -549,6 +555,11 @@ export function cityJournal(state) {
   if (unprofitableLine) entries.push({ type: "warning", text: `${unprofitableLine.line.name} perd de l'argent (${Math.round(unprofitableLine.net).toLocaleString("fr-FR")} €).` });
   if (saturatedLine) entries.push({ type: "warning", text: `${saturatedLine.line.name} est saturée (${(saturatedLine.occupancy * 100).toFixed(0)}% de remplissage).` });
   if (underservedStop) entries.push({ type: "info", text: `Le quartier ${underservedStop.stop.name} manque de transport (niveau de service ${(underservedStop.level * 100).toFixed(0)}%).` });
+  // Correction : la demande perdue faute d'arrêt couvert était comptée mais
+  // jamais montrée au joueur.
+  if ((state.odSuppressed || 0) > 0) {
+    entries.push({ type: "warning", text: `${Math.round(state.odSuppressed).toLocaleString("fr-FR")} trajet(s) perdu(s) depuis la fondation faute d'arrêt desservi à portée de marche : étendez la couverture.` });
+  }
   entries.push(...eventJournal(state));
   if (!entries.length) entries.push({ type: "positive", text: "Le réseau fonctionne correctement." });
   return entries;

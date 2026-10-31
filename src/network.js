@@ -93,9 +93,13 @@ export function createNetwork(city) {
   const stopsById = new Map(city.stops.map(s => [s.id, s]));
 
   // --- 1. Polylines normalisées des routes ------------------------------
-  const roads = (city.roads || []).map(road => {
+  const roads = (city.roads || []).map((road, roadIndex) => {
     const points = roadPoints(road, stopsById);
-    return points ? { road, points } : null;
+    // Correction : les voiries sans id (routes générées pliées en carrefour à
+    // 90°) produisaient des waypoints « waypoint-undefined-N » qui fusionnaient
+    // entre routes différentes (le test d'id court-circuite le test de
+    // position) : arêtes parasites traversant la carte. Uid stable par voirie.
+    return points ? { road, uid: road.id || `road-${roadIndex + 1}`, points } : null;
   }).filter(Boolean);
 
   // --- 2. Nœuds : arrêts d'abord ------------------------------------------
@@ -123,20 +127,20 @@ export function createNetwork(city) {
     junctionCount += 1;
     return registerNode(`junction-${junctionCount}`, x, y, "Jonction", "junction");
   };
-  const makeWaypointNode = (roadId, index, x, y) => {
+  const makeWaypointNode = (uid, index, x, y) => {
     waypointCount += 1;
-    return registerNode(`waypoint-${roadId}-${index}`, x, y, null, "waypoint");
+    return registerNode(`waypoint-${uid}-${index}`, x, y, null, "waypoint");
   };
 
   // --- 3. Waypoints intérieurs des polylignes -----------------------------
   // (un point intermédiaire devient un nœud du graphe : les arrêts/segments
   // suivants peuvent s'y accrocher, et le rendu suit exactement la polyline.)
-  const roadNodeSequences = roads.map(({ road, points }) => {
+  const roadNodeSequences = roads.map(({ road, uid, points }) => {
     const seq = points.map((point, index) => {
       if (index === 0 || index === points.length - 1) return { point, interior: false };
       return { point, interior: true };
     });
-    return { road, points, seq };
+    return { road, uid, points, seq };
   });
 
   // --- 4. Jonctions : intersections entre paires de routes ----------------
@@ -164,19 +168,19 @@ export function createNetwork(city) {
   }
 
   // --- 5. Séquences de nœuds par route (points + jonctions + waypoints) ----
-  const roadEdgePlans = roadNodeSequences.map(({ road, points, seq }, index) => {
+  const roadEdgePlans = roadNodeSequences.map(({ road, uid, points, seq }, index) => {
     const nodeIds = [];
     for (let s = 0; s < points.length; s++) {
       const entry = seq[s];
       if (entry.interior) {
-        nodeIds.push(makeWaypointNode(road.id, s, points[s].x, points[s].y));
+        nodeIds.push(makeWaypointNode(uid, s, points[s].x, points[s].y));
       } else {
         // Extrémités : accrochées à l'arrêt si la route en désigne un.
         const stopId = s === 0 ? (road.a || road.startStopId) : (road.b || road.endStopId);
         if (stopId && stopsById.has(stopId) && near(stopsById.get(stopId), points[s], 1)) {
           nodeIds.push(stopId);
         } else {
-          const nodeId = makeWaypointNode(road.id, s, points[s].x, points[s].y);
+          const nodeId = makeWaypointNode(uid, s, points[s].x, points[s].y);
           nodeIds.push(nodeId);
         }
       }
