@@ -316,6 +316,7 @@ export function createRenderer(canvas, state) {
         // joueur : « ça fait beaucoup autour de l'arrêt »). La densité de
         // population reste lisible dans l'opacité du trait ; le voile
         // intérieur est à peine perceptible.
+        const radius = Math.max(6, Math.sqrt(stop.population / 90));
         const density = Math.min(0.9, stop.population / 3500);
         ctx.strokeStyle = "rgba(255, 210, 63, " + (0.3 + density * 0.3) + ")";
         ctx.lineWidth = 1.5;
