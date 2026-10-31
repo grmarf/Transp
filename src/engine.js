@@ -454,14 +454,11 @@ export function economy(state, log = () => {}) {
   // V4.0: cost is computed and attributed per line (so profitability is
   // comparable line by line), instead of one flat global deduction.
   const hours = (TICK_MINUTES / 60) * state.speed;
-  // Correction : le log d'entretien ne sortait que si l'horloge tombait
-  // exactement sur l'heure ; il suit désormais le vrai franchissement horaire.
-  const hourBoundaryCrossed = Math.floor((state.time + TICK_MINUTES * state.speed) / 60) !== Math.floor(state.time / 60);
   for (const line of state.lines) {
     const cost = lineOperatingCost(state, line, hours);
     line.expenses = (line.expenses || 0) + cost;
     state.money -= cost;
-    if (cost > 0 && hourBoundaryCrossed) log(`−${cost.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € entretien · ${line.name}.`);
+    if (cost > 0 && state.time % 60 === 0) log(`−${cost.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} € entretien · ${line.name}.`);
   }
 }
 
