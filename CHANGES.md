@@ -21,6 +21,15 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V29.5 — Noms des arrêts masquables
+
+- **Nouveau bouton 🔤** dans la barre d'overlays de la carte (à côté de 🔥
+  congestion, 📍 couverture, 💰 valeur foncière, 🗺️ zones) : masque ou
+  réaffiche les étiquettes des arrêts — la carte redevient lisible quand
+  on consulte les zones, la valeur foncière ou la couverture. Les pastilles
+  d'attente (compteurs rouges) restent toujours visibles.
+- Anti-cache bumpé `?v=34` ; test `tests/v29.5-stop-names.mjs`.
+
 ## V29.4 — Le menu en cascade enfin VISIBLE sur mobile (cause racine)
 
 - **Cause racine** : `transform: translateX(-50%)` sur `.floating-toolbar` —
