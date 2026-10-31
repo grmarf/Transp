@@ -8,17 +8,14 @@ import { createNetwork, validateNetwork } from '../src/network.js';
 const renderer = readFileSync(new URL('../src/renderer.js', import.meta.url), 'utf8');
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
-// 1. Chaque croisement réel est matérialisé par une plaque giratoire.
-assert.ok(renderer.includes('import { computeCarrefours } from "./carrefours.js";'),
-  'renderer calcule les croisements réels');
-assert.ok(renderer.includes('function ensureCarrefourCrossings'),
-  'les croisements sont mis en cache (pas recalculés chaque frame)');
-assert.ok(renderer.includes('ensureCarrefourCrossings().forEach'),
-  'drawCity dessine une plaque à chaque croisement');
-assert.ok(renderer.includes('Îlot central pointillé'),
-  'la plaque ressemble à un mini rond-point');
-assert.ok(!renderer.includes('id.startsWith("junction-")'),
-  'plus de garde restrictive : tous les croisements sont dessinés');
+// 1. V29.6 — croisements simples : les plaques giratoires systématiques
+// (V29.3) rendaient la carte illisible ; elles disparaissent complètement.
+assert.ok(!renderer.includes('computeCarrefours'),
+  'V29.6 : le renderer ne calcule plus de plaques');
+assert.ok(!renderer.includes('ensureCarrefourCrossings'),
+  'V29.6 : plus de plaque giratoire dessinée à chaque croisement');
+assert.ok(!renderer.includes('Îlot central pointillé'),
+  'V29.6 : plus de mini rond-point décoratif');
 
 // 2. Anti-cache bumpé à v32 et homogène.
 const versions = [...html.matchAll(/\?v=(\d+)/g)].map((m) => m[1]);

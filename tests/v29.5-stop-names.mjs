@@ -15,7 +15,7 @@ const index = read("index.html");
 check("index.html : bouton toggleStopNamesBtn présent", index.includes('id="toggleStopNamesBtn"'));
 check("index.html : bouton stylé map-overlay-btn", /class="map-overlay-btn"[^>]*id="toggleStopNamesBtn"|id="toggleStopNamesBtn"[^>]*class="map-overlay-btn"/.test(index));
 check("index.html : 6 boutons d'overlay", (index.match(/map-overlay-btn/g) || []).length === 6);
-check("index.html : anti-cache bumpé v34 (plus de v33)", !index.includes("?v=33") && (index.match(/\?v=34/g) || []).length >= 3);
+check("index.html : anti-cache bumpé v35 (plus de v34)", !index.includes("?v=34") && (index.match(/\?v=35/g) || []).length >= 3);
 
 const main = read("src/main.js");
 check("main.js : bouton branché via bindTap", main.includes('bindTap(document.getElementById("toggleStopNamesBtn")'));
@@ -23,8 +23,8 @@ check("main.js : bascule showStopNames (défaut = affiché)", main.includes("sta
 check("main.js : aria-pressed suit l'état affiché", main.includes('String(state.showStopNames !== false)'));
 
 const renderer = read("src/renderer.js");
-check("renderer.js : l'étiquette est gardée par showStopNames", renderer.includes("if (state.showStopNames !== false)"));
-check("renderer.js : le nom est dessiné sous la garde", /if \(state\.showStopNames !== false\) \{[\s\S]{0,2000}?ctx\.fillText\(s\.name, s\.x, labelY\);/.test(renderer));
+check("renderer.js : l'étiquette est gardée par showStopNames", renderer.includes("state.showStopNames !== false"));
+check("renderer.js : le nom est dessiné sous la garde (LOD inclus)", /if \(state\.showStopNames !== false && camera\.zoom >= 0\.55\) \{[\s\S]{0,2000}?ctx\.fillText\(s\.name, s\.x, labelY\);/.test(renderer));
 check("renderer.js : la pastille d'attente reste hors de la garde", /ctx\.restore\(\);\s*\n\s*\}\s*\n\s*const waiting =/.test(renderer));
 
 if (failures.length) {

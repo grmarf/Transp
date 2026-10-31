@@ -23,7 +23,7 @@ let bootCount = 0;
 
 const cameraState = {
   x: 0, y: 0, zoom: 1,
-  minZoom: 0.5, maxZoom: 3,
+  minZoom: 0.25, maxZoom: 3, // V29.6 — 0.25 : 🎯 cadre toute la ville même sur mobile
   isDragging: false,
   lastDragX: 0, lastDragY: 0,
   downX: 0, downY: 0,
