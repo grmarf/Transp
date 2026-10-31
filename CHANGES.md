@@ -18,6 +18,11 @@ résume l'état courant du jeu et les derniers changements.
   apparaît dans le journal de ville.
 - **Démolition de voirie** : les lignes réellement reroutées sont signalées
   (les voiries libres n'étaient jamais détectées).
+- **Smoke test non flaky** : la ville est régénérée avec une graine aléatoire
+  à chaque exécution ; le tracé fixe de l'étape « construction d'une route »
+  finissait par croiser un bâtiment occupé ou viser un arrêt saturé (refus
+  silencieux, CI intermittente). Le tracé est désormais choisi dynamiquement,
+  à distance des arrêts et hors de toute zone construite.
 - **Valeur foncière** échantillonnée au centre du bâtiment, densité
   saisonnière recalculée depuis la population, essaimage urbain non plus
   annulé par un candidat carrefour, progression du scénario « satisfaction »
