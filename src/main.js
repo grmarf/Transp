@@ -1938,22 +1938,36 @@ function setMapMenu(level) {
 // Les contrôles historiques restent dans le DOM (branchés et testables) mais
 // cèdent la place au menu en cascade. « Terminer » garde sa logique propre.
 (function initMapMenu() {
-  // Robustesse cache : si le shell HTML vient d'une version antérieure sans
-  // conteneur #mapMenu, on le crée — sinon les boutons historiques seraient
-  // cachés sans aucun menu pour les remplacer (barre vide).
-  let container = document.getElementById("mapMenu");
-  if (!container) {
-    const toolbar = document.querySelector(".floating-toolbar");
-    if (!toolbar) return;
-    container = document.createElement("div");
-    container.id = "mapMenu";
-    container.className = "map-menu";
-    container.setAttribute("aria-label", "Menu de la carte");
-    toolbar.insertBefore(container, toolbar.firstChild);
+  // V29.1 — auto-réparation : le menu ne doit JAMAIS disparaître. Si le shell
+  // HTML est périmé (cache navigateur, copie locale ancienne), la barre
+  // flottante et son conteneur sont reconstruits de zéro ; et si
+  // l'initialisation échoue pour toute autre raison, les boutons historiques
+  // sont réaffichés en secours plutôt que de laisser une barre vide.
+  try {
+    let container = document.getElementById("mapMenu");
+    if (!container) {
+      let toolbar = document.querySelector(".floating-toolbar");
+      if (!toolbar) {
+        toolbar = document.createElement("div");
+        toolbar.className = "floating-toolbar";
+        toolbar.setAttribute("role", "toolbar");
+        toolbar.setAttribute("aria-label", "Outils de carte");
+        document.body.appendChild(toolbar);
+      }
+      container = document.createElement("div");
+      container.id = "mapMenu";
+      container.className = "map-menu";
+      container.setAttribute("aria-label", "Menu de la carte");
+      toolbar.insertBefore(container, toolbar.firstChild);
+    }
+    const legacy = document.querySelectorAll(".floating-toolbar > button:not(#finishLineBtn), .floating-toolbar > .tool-group");
+    Array.prototype.forEach.call(legacy, function (el) { el.hidden = true; });
+    setMapMenu("std");
+  } catch (error) {
+    console.warn("Menu en cascade indisponible — boutons historiques réaffichés.", error);
+    const fallback = document.querySelectorAll("button[id]");
+    Array.prototype.forEach.call(fallback, function (el) { el.hidden = false; });
   }
-  const legacy = document.querySelectorAll(".floating-toolbar > button:not(#finishLineBtn), .floating-toolbar > .tool-group");
-  Array.prototype.forEach.call(legacy, function (el) { el.hidden = true; });
-  setMapMenu("std");
 })();
 
 bindSheet();
