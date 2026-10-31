@@ -9,7 +9,6 @@ import { seasonSummary } from "./seasons.js";
 import { passengerStats, waitStats, PASSENGER_STATES } from "./passengers.js";
 import { CAMPAIGNS, activeCampaigns } from "./advertising.js";
 import { escapeHtml as h } from "./html.js";
-import { computeCarrefours } from "./carrefours.js";
 
 const INK = "#1f2340";
 const CREAM = "#fdf6e3";
@@ -127,7 +126,7 @@ export function renderFleetPanel(state) {
 export function createRenderer(canvas, state) {
   const ctx = canvas.getContext("2d");
 
-  const camera = { x: 0, y: 0, zoom: 1, minZoom: 0.5, maxZoom: 3 };
+  const camera = { x: 0, y: 0, zoom: 1, minZoom: 0.25, maxZoom: 3 }; // V29.6 — 0.25 : la vue d'ensemble tient sur mobile
 
   function resizeCanvas() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -168,13 +167,11 @@ export function createRenderer(canvas, state) {
   }
   let cityBlocksCache = null;
   let urbanCacheCityKey = null;
-  let carrefoursCache = null;
   const roadAnimationStarts = new Map();
   const buildingPopAt = new Map();
   activeRendererCacheReset = function () {
     cityBlocksCache = null;
     urbanCacheCityKey = null;
-    carrefoursCache = null;
   };
   const stopAnimationStarts = new Map();
 
@@ -282,19 +279,6 @@ export function createRenderer(canvas, state) {
     }
     ctx.stroke();
   }
-  // V29.3 — croisements réels de la voirie (calculés à la computeCarrefours,
-  // mis en cache jusqu'à la prochaine invalidation du réseau : rebuildNetwork
-  // appelle invalidateUrbanCache à chaque édition de voirie).
-  function ensureCarrefourCrossings() {
-    if (carrefoursCache) return carrefoursCache;
-    try {
-      carrefoursCache = computeCarrefours(state.city || {});
-    } catch (error) {
-      carrefoursCache = [];
-    }
-    return carrefoursCache;
-  }
-
   function drawCity(heatmap) {
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -408,51 +392,10 @@ export function createRenderer(canvas, state) {
       });
     }
 
-    // V29.3 — carrefours lisibles : chaque croisement réel (géométrique via
-    // computeCarrefours, ou nœud de jonction du réseau) est matérialisé par
-    // une plaque giratoire — les convergences en « Y » ou en « X » cessent
-    // de ressembler à un accident de tracé et deviennent un aménagement.
-    {
-      const plates = new Map();
-      const remember = function (x, y) {
-        const key = Math.round(x / 6) + "|" + Math.round(y / 6);
-        if (!plates.has(key)) plates.set(key, { x: x, y: y });
-      };
-      ensureCarrefourCrossings().forEach(function (cross) { remember(cross.x, cross.y); });
-      (state.network?.junctions || state.city?.junctions || []).forEach(function (junction) {
-        const node = state.network?.nodes?.get(junction.nodeId) ||
-          state.city.stops.find(function (stop) { return stop.id === junction.nodeId; });
-        if (node) remember(node.x, node.y);
-      });
-      plates.forEach(function (plate) {
-        const r = 13;
-        ctx.fillStyle = ROAD_LIGHT;
-        ctx.strokeStyle = "rgba(31,35,64,.7)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(plate.x, plate.y, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-        // Îlot central pointillé : l'anneau d'un mini rond-point.
-        ctx.strokeStyle = "rgba(31,35,64,.5)";
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 3]);
-        ctx.beginPath();
-        ctx.arc(plate.x, plate.y, 5.5, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        // Passages piétons aux quatre abords.
-        ctx.fillStyle = "rgba(255,255,255,.85)";
-        [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (dir) {
-          for (let k = -1; k <= 1; k++) {
-            const px = plate.x + dir[0] * (r + 3) + (dir[0] === 0 ? k * 4 : 0);
-            const py = plate.y + dir[1] * (r + 3) + (dir[1] === 0 ? k * 4 : 0);
-            ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
-          }
-        });
-      });
-    }
-
+    // V29.6 — croisements simples : les plaques giratoires systématiques
+    // (V29.3) transformaient la carte en « soupe de ronds-points ». Elles
+    // disparaissent — les voiries arrondies se croisent proprement en T ou
+    // en croix, comme une vraie ville ; seuls les feux signalisés restent.
     // Les feux appartiennent aux carrefours du réseau, pas aux arrêts.
     const junctions = state.network?.junctions || state.city?.junctions || [];
     junctions.forEach(function (junction) {
@@ -876,8 +819,10 @@ export function createRenderer(canvas, state) {
         }
 
         // V29.5 — étiquette masquable via le bouton 🔤 de la barre d'overlays.
-        if (state.showStopNames !== false) {
-        const fontSize = Math.max(10, 13 / camera.zoom);
+        // V29.6 — niveau de détail : en vue d'ensemble (zoom < 0.55) les
+        // étiquettes s'effacent d'elles-mêmes pour ne pas faire une soupe.
+        if (state.showStopNames !== false && camera.zoom >= 0.55) {
+        const fontSize = Math.min(16, Math.max(10, 13 / camera.zoom)); // V29.6 — borné
         ctx.font = "800 " + fontSize + 'px "Nunito", system-ui, sans-serif';
         ctx.textAlign = "center";
         ctx.textBaseline = "alphabetic";
@@ -907,7 +852,7 @@ export function createRenderer(canvas, state) {
           const countX = s.x + radius + 4;
           const countY = s.y + radius - 4;
           const countText = String(Math.floor(waiting));
-          const countFont = Math.max(9, 11 / camera.zoom);
+          const countFont = Math.min(15, Math.max(9, 11 / camera.zoom)); // V29.6 — borné
           ctx.font = "900 " + countFont + 'px "Nunito", system-ui, sans-serif';
           const tw = ctx.measureText(countText).width;
           const cr = countFont * 0.9;
@@ -1260,7 +1205,6 @@ export function createRenderer(canvas, state) {
     invalidateUrbanCache: function () {
       cityBlocksCache = null;
       urbanCacheCityKey = null;
-      carrefoursCache = null;
     },
     clearRendererCaches: function () { activeRendererCacheReset(); }
   };

@@ -34,10 +34,10 @@
 import { distance } from "./constants.js";
 
 export const ROAD_TYPES = {
-  street:    { id: "street",    name: "Rue",            lanes: 1, width: 8,  speed: 0.85, speedLimit: 40,  capacity: 400,  costPerPixel: 0.45, allowStops: true,  tramPossible: false, color: "#6B7889" },
-  avenue:    { id: "avenue",    name: "Avenue",         lanes: 1, width: 13, speed: 1.1,  speedLimit: 60,  capacity: 800,  costPerPixel: 0.7,  allowStops: true,  tramPossible: true,  color: "#5A6577" },
-  boulevard: { id: "boulevard", name: "Boulevard",      lanes: 2, width: 19, speed: 1.35, speedLimit: 70,  capacity: 1200, costPerPixel: 1.15, allowStops: false, tramPossible: true,  color: "#4A5568" },
-  highway:   { id: "highway",   name: "Voie rapide",    lanes: 2, width: 24, speed: 1.6,  speedLimit: 100, capacity: 2000, costPerPixel: 1.8,  allowStops: false, tramPossible: false, color: "#39424E" }
+  street:    { id: "street",    name: "Rue",            lanes: 1, width: 6,  speed: 0.85, speedLimit: 40,  capacity: 400,  costPerPixel: 0.45, allowStops: true,  tramPossible: false, color: "#6B7889" },
+  avenue:    { id: "avenue",    name: "Avenue",         lanes: 1, width: 9, speed: 1.1,  speedLimit: 60,  capacity: 800,  costPerPixel: 0.7,  allowStops: true,  tramPossible: true,  color: "#5A6577" },
+  boulevard: { id: "boulevard", name: "Boulevard",      lanes: 2, width: 13, speed: 1.35, speedLimit: 70,  capacity: 1200, costPerPixel: 1.15, allowStops: false, tramPossible: true,  color: "#4A5568" },
+  highway:   { id: "highway",   name: "Voie rapide",    lanes: 2, width: 16, speed: 1.6,  speedLimit: 100, capacity: 2000, costPerPixel: 1.8,  allowStops: false, tramPossible: false, color: "#39424E" }
 };
 
 // Alias historiques V22 : les routes générées avant la V27 restent lisibles.

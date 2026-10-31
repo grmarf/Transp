@@ -132,8 +132,10 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 assert.ok(mainjs.includes('developCityCarrefours(city,'), 'le boot aménage les carrefours de la ville générée');
 assert.ok(mainjs.includes('developCityCarrefours(state.city, rng, { road }'), 'le tracé joueur aménage aussi ses carrefours');
 assert.ok(rendererjs.includes('buildingPopAt'), 'les bâtiments ont une animation pop au rendu');
-assert.ok(rendererjs.includes('ensureCarrefourCrossings().forEach'),
-  'les plaques de carrefour sont dessinées (V29.3 : une plaque giratoire à chaque croisement réel)');
+// V29.6 — les plaques giratoires systématiques ont disparu : les croisements
+// restent de simples T/croix lisibles (voirie arrondie au rendu).
+assert.ok(!rendererjs.includes('ensureCarrefourCrossings'),
+  'plus de plaques giratoires systématiques (V29.6 : croisements simples)');
 assert.ok(rendererjs.includes('easeOutBack'), 'le rebond pop est implémenté');
 // V28.2 — l'anti-cache est versionné mais ne fige plus le numéro : chaque
 // bump (?v=29, ?v=30…) reste valide tant que les deux assets portent une

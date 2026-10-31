@@ -21,6 +21,21 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V29.6 — Ville lisible : croisements simples, voirie fine, vue d'ensemble
+
+- **Adieu la « soupe de ronds-points »** : les plaques giratoires systématiques
+  (V29.3) disparaissent — les croisements redeviennent de simples T/croix,
+  dessinés proprement par les voiries arrondies. Seuls les feux des jonctions
+  signalisées restent matérialisés.
+- **Voirie plus fine** : rue 6 px, avenue 9, boulevard 13, voie rapide 16
+  (au lieu de 8/13/19/24) — les bâtiments et les arrêts respirent.
+- **Vue d'ensemble** : 🎯 Recentrer (et l'ouverture) cadrent désormais TOUTE
+  la ville, même sur mobile — le zoom minimum passe de 0.5 à 0.25.
+- **Niveau de détail** : en vue d'ensemble (zoom < 0.55), les étiquettes
+  d'arrêts s'effacent d'elles-mêmes ; les compteurs rouges restent bornés.
+- Anti-cache bumpé `?v=35` ; test `tests/v29.6-ville-lisible.mjs` ; v28 et
+  v29.3 mis à jour (croisements simples), v29.5 (garde LOD).
+
 ## V29.5 — Noms des arrêts masquables
 
 - **Nouveau bouton 🔤** dans la barre d'overlays de la carte (à côté de 🔥
