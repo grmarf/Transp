@@ -2,10 +2,11 @@
  *
  * Module 100 % pur (importable en Node sans navigateur) :
  *  - pruneRedundantRoads(city) : retire les tronçons REDONDANTS — ceux dont
- *    le retrait ne déconnecte aucun arrêt (union-find sur les extrémités :
- *    les ponts ne sont jamais retirés). Les candidats sont priorisés par
- *    nombre de croisements générés, puis par longueur — on enlève d'abord
- *    ce qui encombre le plus la carte.
+ *    le retrait ne déconnecte aucun arrêt ET ne crée aucun nouveau pont
+ *    (union-find sur les extrémités) : les boucles de secours de la ville
+ *    survivent, une fermeture pour travaux n'isolera donc jamais un
+ *    quartier. Les candidats sont priorisés par nombre de croisements
+ *    générés, puis par longueur — on enlève d'abord ce qui encombre le plus.
  *  - pruneOrphanCarrefourStops(city, protectedIds) : fait disparaître les
  *    arrêts de carrefour plus desservis par aucune voirie (orphelins après
  *    un déssaimage), sauf s'ils sont protégés (ligne, sélection en cours)
@@ -43,6 +44,19 @@ function componentsCount(stopIds, roads) {
   return roots.size;
 }
 
+/** Nombre de ponts du graphe des arrêts (une voirie dont le retrait
+ *  déconnecte des arrêts). Préserver les boucles de secours compte :
+ *  une ville sans boucle ne survive à aucune fermeture de travaux. */
+function countBridges(stopIds, roads) {
+  const reference = componentsCount(stopIds, roads);
+  let bridges = 0;
+  for (const road of roads) {
+    const without = roads.filter(function (r) { return r !== road; });
+    if (componentsCount(stopIds, without) > reference) bridges += 1;
+  }
+  return bridges;
+}
+
 function roadLength(road, stopsById) {
   const a = stopsById.get(road.a), b = stopsById.get(road.b);
   return (a && b) ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
@@ -77,11 +91,16 @@ export function pruneRedundantRoads(city) {
   });
   const active = roads.slice();
   const reference = componentsCount(stopIds, roads);
+  let activeBridges = countBridges(stopIds, active);
   const removed = [];
   for (const candidate of candidates) {
     const without = active.filter(function (r) { return r !== candidate; });
-    if (componentsCount(stopIds, without) === reference) {
+    // Double garde : le retrait ne déconnecte aucun arrêt ET ne crée aucun
+    // nouveau pont (les boucles de secours de la ville sont préservées).
+    const nextBridges = countBridges(stopIds, without);
+    if (componentsCount(stopIds, without) === reference && nextBridges <= activeBridges) {
       removed.push(candidate);
+      activeBridges = nextBridges;
       active.length = 0;
       for (const r of without) active.push(r);
     }
