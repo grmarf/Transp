@@ -9,6 +9,7 @@ import { seasonSummary } from "./seasons.js";
 import { passengerStats, waitStats, PASSENGER_STATES } from "./passengers.js";
 import { CAMPAIGNS, activeCampaigns } from "./advertising.js";
 import { escapeHtml as h } from "./html.js";
+import { computeCarrefours } from "./carrefours.js";
 
 const INK = "#1f2340";
 const CREAM = "#fdf6e3";
@@ -167,11 +168,13 @@ export function createRenderer(canvas, state) {
   }
   let cityBlocksCache = null;
   let urbanCacheCityKey = null;
+  let carrefoursCache = null;
   const roadAnimationStarts = new Map();
   const buildingPopAt = new Map();
   activeRendererCacheReset = function () {
     cityBlocksCache = null;
     urbanCacheCityKey = null;
+    carrefoursCache = null;
   };
   const stopAnimationStarts = new Map();
 
@@ -279,6 +282,19 @@ export function createRenderer(canvas, state) {
     }
     ctx.stroke();
   }
+  // V29.3 — croisements réels de la voirie (calculés à la computeCarrefours,
+  // mis en cache jusqu'à la prochaine invalidation du réseau : rebuildNetwork
+  // appelle invalidateUrbanCache à chaque édition de voirie).
+  function ensureCarrefourCrossings() {
+    if (carrefoursCache) return carrefoursCache;
+    try {
+      carrefoursCache = computeCarrefours(state.city || {});
+    } catch (error) {
+      carrefoursCache = [];
+    }
+    return carrefoursCache;
+  }
+
   function drawCity(heatmap) {
     const now = typeof performance !== "undefined" ? performance.now() : Date.now();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -392,29 +408,45 @@ export function createRenderer(canvas, state) {
       });
     }
 
-    // V28 — carrefours : plaque claire et passages piétons aux croisements
-    // (nœuds de jonction et arrêts de carrefour uniquement).
+    // V29.3 — carrefours lisibles : chaque croisement réel (géométrique via
+    // computeCarrefours, ou nœud de jonction du réseau) est matérialisé par
+    // une plaque giratoire — les convergences en « Y » ou en « X » cessent
+    // de ressembler à un accident de tracé et deviennent un aménagement.
     {
-      const jns = state.network?.junctions || state.city?.junctions || [];
-      jns.forEach(function (junction) {
+      const plates = new Map();
+      const remember = function (x, y) {
+        const key = Math.round(x / 6) + "|" + Math.round(y / 6);
+        if (!plates.has(key)) plates.set(key, { x: x, y: y });
+      };
+      ensureCarrefourCrossings().forEach(function (cross) { remember(cross.x, cross.y); });
+      (state.network?.junctions || state.city?.junctions || []).forEach(function (junction) {
         const node = state.network?.nodes?.get(junction.nodeId) ||
           state.city.stops.find(function (stop) { return stop.id === junction.nodeId; });
-        if (!node) return;
-        const id = String(node.id || "");
-        if (!id.startsWith("junction-") && !id.startsWith("carrefour-")) return;
-        const s = 15;
+        if (node) remember(node.x, node.y);
+      });
+      plates.forEach(function (plate) {
+        const r = 13;
         ctx.fillStyle = ROAD_LIGHT;
         ctx.strokeStyle = "rgba(31,35,64,.7)";
         ctx.lineWidth = 2;
-        roundRect(node.x - s / 2, node.y - s / 2, s, s, 4);
+        ctx.beginPath();
+        ctx.arc(plate.x, plate.y, r, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+        // Îlot central pointillé : l'anneau d'un mini rond-point.
+        ctx.strokeStyle = "rgba(31,35,64,.5)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.arc(plate.x, plate.y, 5.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
         // Passages piétons aux quatre abords.
         ctx.fillStyle = "rgba(255,255,255,.85)";
         [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(function (dir) {
           for (let k = -1; k <= 1; k++) {
-            const px = node.x + dir[0] * (s / 2 + 3) + (dir[0] === 0 ? k * 4 : 0);
-            const py = node.y + dir[1] * (s / 2 + 3) + (dir[1] === 0 ? k * 4 : 0);
+            const px = plate.x + dir[0] * (r + 3) + (dir[0] === 0 ? k * 4 : 0);
+            const py = plate.y + dir[1] * (r + 3) + (dir[1] === 0 ? k * 4 : 0);
             ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
           }
         });
@@ -1225,6 +1257,7 @@ export function createRenderer(canvas, state) {
     invalidateUrbanCache: function () {
       cityBlocksCache = null;
       urbanCacheCityKey = null;
+      carrefoursCache = null;
     },
     clearRendererCaches: function () { activeRendererCacheReset(); }
   };
