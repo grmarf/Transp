@@ -182,12 +182,55 @@ try {
   assert.equal(lineCreation.lines, 1, 'la création d’une ligne doit fonctionner');
 
   // --- Étape 4 : construction d'une route libre -----------------------------
+  // La ville est générée avec une graine aléatoire à chaque exécution : un
+  // tracé à coordonnées fixes finit par croiser un bâtiment occupé ou viser
+  // un arrêt saturé (3 routes), refusé sans erreur visible — un échec de CI
+  // intermittent. Le tracé est donc choisi dynamiquement : extrémités à
+  // plus de 45 px de tout arrêt (seuil de snapping), aucun bâtiment sur la
+  // trace (marge 10 px).
   const roadBuild = await evaluate(`(() => {
-    document.querySelector('#buildRoadBtn').click();
-    window.__worldClick(120, 100);
-    window.__worldClick(250, 180);
-    return { built: window.__vieTLignes.getState().city.roads.filter((road) => road.built).length };
+    const state = window.__vieTLignes.getState();
+    const stops = state.city.stops;
+    const buildings = state.city.buildings || [];
+    const nearStop = (x, y) => stops.some((stop) => Math.hypot(stop.x - x, stop.y - y) < 45);
+    const hitsBuilding = (x1, y1, x2, y2) => {
+      const steps = Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 4);
+      for (let i = 0; i <= steps; i++) {
+        const x = x1 + (x2 - x1) * (i / steps);
+        const y = y1 + (y2 - y1) * (i / steps);
+        for (const building of buildings) {
+          if (building.x - 10 <= x && x <= building.x + building.w + 10 &&
+              building.y - 10 <= y && y <= building.y + building.h + 10) return true;
+        }
+      }
+      return false;
+    };
+    const offsets = [[130, 80], [80, 130], [-130, 80], [130, -80], [100, 100], [-100, -100]];
+    let trace = null;
+    for (let gx = 70; gx <= 820 && !trace; gx += 30) {
+      for (let gy = 70; gy <= 500 && !trace; gy += 30) {
+        for (const offset of offsets) {
+          const x2 = gx + offset[0];
+          const y2 = gy + offset[1];
+          if (x2 < 40 || x2 > 940 || y2 < 40 || y2 > 600) continue;
+          if (nearStop(gx, gy) || nearStop(x2, y2)) continue;
+          if (hitsBuilding(gx, gy, x2, y2)) continue;
+          trace = { x1: gx, y1: gy, x2, y2 };
+          break;
+        }
+      }
+    }
+    if (trace) {
+      document.querySelector('#buildRoadBtn').click();
+      window.__worldClick(trace.x1, trace.y1);
+      window.__worldClick(trace.x2, trace.y2);
+    }
+    return {
+      built: window.__vieTLignes.getState().city.roads.filter((road) => road.built).length,
+      trace
+    };
   })()`);
+  assert.ok(roadBuild.trace, 'un tracé libre doit exister quelque part sur la carte');
   assert.equal(roadBuild.built, 1, 'une route libre doit pouvoir être construite');
 
   // --- Étape 5 : renommage de la ville sans écrasement -----------------------

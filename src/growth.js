@@ -51,7 +51,10 @@ function maybeSpawnSatellite(state, rng, log, levels) {
   // bloque plus l’extension. Un seul quartier par jour garde une pression
   // lisible pour le joueur et évite une explosion artificielle de la carte.
   const candidates = state.city.stops
-    .filter(s => s.population >= SATELLITE_POP_THRESHOLD)
+    // V28 — un carrefour est un arrêt de traversée, pas un quartier qui
+    // essime : exclu dès la sélection (l'ancien early-return annulait
+    // l'essaimage du jour dès que le candidat nº1 était un carrefour).
+    .filter(s => s.population >= SATELLITE_POP_THRESHOLD && !String(s.id).startsWith("carrefour-"))
     .map(stop => ({
       stop,
       // Une zone dont le voisinage est déjà dense est moins intéressante
@@ -63,8 +66,6 @@ function maybeSpawnSatellite(state, rng, log, levels) {
     .sort((a, b) => b.frontier - a.frontier || b.stop.population - a.stop.population);
   const candidate = candidates[0]?.stop;
   if (!candidate) return;
-  // V28 — un carrefour est un arrêt de traversée, pas un quartier qui essime.
-  if (String(candidate.id).startsWith("carrefour-")) return;
   const service = levels.get(candidate.id) || 0;
 
   const newStop = addSatelliteStop(state.city, candidate, rng);

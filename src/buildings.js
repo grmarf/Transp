@@ -411,7 +411,9 @@ export function updateBuildings(state, rng = Math.random, hour = null, log = () 
   // --- Cycle de vie des bâtiments ------------------------------------------
   for (const building of city.buildings) {
     building.age += 1;
-    building.landValue = landValueAt(state, building.x, building.y);
+    // Correction : échantillonnage au centre du bâtiment (cohérent avec
+    // l'émergence), pas au coin haut-gauche.
+    building.landValue = landValueAt(state, building.x + building.w / 2, building.y + building.h / 2);
     if (building.abandoned) {
       // Démolition automatique après un long abandon.
       if (simHour - (building.abandonedAtHour || building.createdHour || simHour) >= AUTO_DEMOLISH_HOURS) {

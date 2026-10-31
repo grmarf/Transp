@@ -28,7 +28,7 @@ if [ ! -f "$GAMEDIR/index.html" ]; then
   echo "  index.html introuvable dans : $GAMEDIR"
   echo ""
   echo "  Deux options :"
-  echo "   1) Copiez le dossier du jeu dans : $HOME/tycoon-www"
+  echo "   1) Copiez le dossier du jeu dans : $HOME/vie-t-lignes-www"
   echo "      puis relancez : bash $(basename "$0")"
   echo "   2) Ou : bash $(basename "$0") /chemin/vers/le/dossier/du/jeu"
   echo ""

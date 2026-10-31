@@ -3,6 +3,32 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V28.4 — Audit V2 : collisions de waypoints, routage aller-retour, compteurs morts
+
+- **Waypoints de voiries sans id** : les routes générées pliées en carrefour
+  produisaient des nœuds « waypoint-undefined-N » fusionnant entre voiries
+  différentes (arêtes parasites traversant la carte) ; chaque voirie reçoit
+  désormais un uid stable.
+- **Routage passager aligné sur l'aller-retour** : le coût entre deux arrêts
+  d'une ligne est |i−j|, plus un modèle circulaire qui sous-estimait les
+  trajets vers l'arrière.
+- **Sans-abri et demande perdue rendus visibles** : la démolition d'un
+  bâtiment occupé pèse désormais sur la satisfaction (le journal le
+  promettait, le calcul non) ; la demande OD perdue faute d'arrêt couvert
+  apparaît dans le journal de ville.
+- **Démolition de voirie** : les lignes réellement reroutées sont signalées
+  (les voiries libres n'étaient jamais détectées).
+- **Smoke test non flaky** : la ville est régénérée avec une graine aléatoire
+  à chaque exécution ; le tracé fixe de l'étape « construction d'une route »
+  finissait par croiser un bâtiment occupé ou viser un arrêt saturé (refus
+  silencieux, CI intermittente). Le tracé est désormais choisi dynamiquement,
+  à distance des arrêts et hors de toute zone construite.
+- **Valeur foncière** échantillonnée au centre du bâtiment, densité
+  saisonnière recalculée depuis la population, essaimage urbain non plus
+  annulé par un candidat carrefour, progression du scénario « satisfaction »
+  suivant l'objectif, log d'entretien au vrai franchissement horaire,
+  message du lanceur Termux corrigé.
+
 ## V28.3 — Correctifs de bugs silencieux (véhicules gelés, tramway, travaux, NaN)
 
 - **Véhicules gelés après édition de voirie** : `rebuildNetwork()` recalcule

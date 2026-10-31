@@ -64,6 +64,11 @@ export function scenarioProgress(state, metrics) {
   if (type === "transported") return Math.max(0, Math.min(1, state.totalArrived / target));
   if (type === "netBalance") return Math.max(0, Math.min(1, metrics.net / target));
   if (type === "satisfaction") {
+    // Correction : quand l'appelant fournit la satisfaction courante, la
+    // progression suit l'objectif ; repli sur le temps écoulé sinon.
+    if (Number.isFinite(metrics?.currentSatisfaction)) {
+      return Math.max(0, Math.min(1, metrics.currentSatisfaction / target));
+    }
     return scenario.durationDays ? Math.max(0, Math.min(1, (state.elapsedDays || 0) / scenario.durationDays)) : 0;
   }
   return 0;
