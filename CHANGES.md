@@ -21,6 +21,15 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V29.7 — Quartier léger autour des arrêts
+
+- **Anneau pointillé au lieu du disque plein** : le halo jaune de population
+  qui noyait chaque arrêt (opacité jusqu'à 0.5) devient une **limite de
+  quartier en pointillés** avec un voile intérieur imperceptible (0.06) —
+  comme sur un plan de cadastre. La densité reste lisible : plus un arrêt
+  est peuplé, plus le pointillé est opaque.
+- Anti-cache bumpé `?v=36` ; test `tests/v29.7-leger-autour-arret.mjs`.
+
 ## V29.6 — Ville lisible : croisements simples, voirie fine, vue d'ensemble
 
 - **Adieu la « soupe de ronds-points »** : les plaques giratoires systématiques

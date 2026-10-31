@@ -311,9 +311,20 @@ export function createRenderer(canvas, state) {
     if (state.city && state.city.stops) {
 
       state.city.stops.forEach(function (stop) {
-        const radius = Math.max(6, Math.sqrt(stop.population / 90));
+        // V29.7 — quartier léger : un anneau pointillé remplace le disque
+        // jaune plein qui noyait l'arrêt et ses alentours (réclamation
+        // joueur : « ça fait beaucoup autour de l'arrêt »). La densité de
+        // population reste lisible dans l'opacité du trait ; le voile
+        // intérieur est à peine perceptible.
         const density = Math.min(0.9, stop.population / 3500);
-        ctx.fillStyle = "rgba(255, 210, 63, " + (0.15 + density * 0.35) + ")";
+        ctx.strokeStyle = "rgba(255, 210, 63, " + (0.3 + density * 0.3) + ")";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(stop.x, stop.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255, 210, 63, 0.06)";
         ctx.beginPath();
         ctx.arc(stop.x, stop.y, radius, 0, Math.PI * 2);
         ctx.fill();
