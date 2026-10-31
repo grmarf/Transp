@@ -3,6 +3,27 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V29 — Réseau : identité géométrique des nœuds + garde-fou d'invariants
+
+- **Identité = géométrie** : l'identité d'un nœud du graphe est sa position
+  (fusion ≤ 2 px), plus jamais une chaîne fabriquée. L'ancien registre testait
+  l'id AVANT la position : toute collision d'étiquettes (« waypoint-undefined-N »
+  entre voiries sans id, id de voirie dupliqué dans une sauvegarde importée)
+  fusionnait des nœuds géographiquement éloignés et cousait des arêtes
+  parasites à travers la carte, sans aucun message. Une étiquette demandée ne
+  peut plus jamais réutiliser l'id d'un nœud situé ailleurs (suffixe dérivé).
+- **Garde-fou structurel (validateNetwork)** : invariants vérifiables —
+  références pendantes, arêtes plus longues que la diagonale de la carte,
+  identités corrompues, arrêts absents du graphe, quasi-doublons
+  géométriques. Journalisé dans la ville au boot et après chaque édition de
+  voirie ; verrouillé par des tests CI adversaires (voiries sans id, ids
+  dupliqués, croisements confondus, carrefours pliés à 90°).
+- **Ids de nœuds éphémères** : la règle est formalisée — les ids du graphe
+  vivent le temps d'une construction et ne se persistent jamais ; seuls les
+  ids d'arrêts et de lignes sont stables, le graphe se reconstruit toujours
+  depuis city.roads et les véhicules sont ré-ancrés à chaque recalcul
+  d'itinéraire.
+
 ## V28.4 — Audit V2 : collisions de waypoints, routage aller-retour, compteurs morts
 
 - **Waypoints de voiries sans id** : les routes générées pliées en carrefour
