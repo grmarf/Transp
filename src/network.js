@@ -15,6 +15,20 @@
  *
  * Les ids historiques (local/secondary/arterial) restent acceptés en lecture
  * (roadType() les mappe) : les anciens appels de test continuent de fonctionner.
+ *
+ * V29 — identité géométrique des nœuds + garde-fou d'invariants :
+ *  - l'identité d'un nœud est sa POSITION (fusion ≤ 2 px), jamais une
+ *    chaîne : une collision d'étiquettes (« waypoint-undefined-N », ids de
+ *    voirie dupliqués) ne peut plus téléporter un nœud d'une voirie à
+ *    l'autre — la cause du « sac de nœuds » V28.4 ;
+ *  - validateNetwork() : invariants vérifiables (références pendantes,
+ *    arêtes plus longues que la carte, identités corrompues, arrêts
+ *    absents, quasi-doublons) — un graphe cassé devient un échec de CI ou
+ *    une ligne du journal de ville, jamais un comportement silencieux ;
+ *  - les ids de nœuds sont ÉPHÉMÈRES : ils vivent le temps d'une
+ *    construction du graphe et ne se persistent jamais. Seuls les ids
+ *    d'arrêts et de lignes sont stables ; le graphe se reconstruit
+ *    toujours depuis city.roads.
  */
 
 import { distance } from "./constants.js";
@@ -95,24 +109,55 @@ export function createNetwork(city) {
   // --- 1. Polylines normalisées des routes ------------------------------
   const roads = (city.roads || []).map((road, roadIndex) => {
     const points = roadPoints(road, stopsById);
-    // Correction : les voiries sans id (routes générées pliées en carrefour à
-    // 90°) produisaient des waypoints « waypoint-undefined-N » qui fusionnaient
-    // entre routes différentes (le test d'id court-circuite le test de
-    // position) : arêtes parasites traversant la carte. Uid stable par voirie.
+    // Étiquette de voirie pour les nœuds de débogage. V28.4 l'introduisait
+    // comme identité de secours (voiries sans id) ; V29 la rétrograde en
+    // simple étiquette : les nœuds fusionnent par position (registerNode),
+    // jamais par chaîne — même un id de voirie dupliqué reste inoffensif.
     return points ? { road, uid: road.id || `road-${roadIndex + 1}`, points } : null;
   }).filter(Boolean);
 
-  // --- 2. Nœuds : arrêts d'abord ------------------------------------------
+  // --- 2. Nœuds : identité géométrique, étiquettes libres ------------------
+  // V29 — l'identité d'un nœud est sa POSITION, pas une chaîne. L'ancien
+  // registre testait l'id AVANT la position : une collision de chaîne
+  // (« waypoint-undefined-N » entre deux voiries sans id, id de voirie
+  // dupliqué) fusionnait des nœuds géographiquement éloignés et cousait des
+  // arêtes parasites à travers la carte, sans aucun message. Désormais :
+  //  - même position (≤ 2 px) → même nœud, quelle que soit l'étiquette ;
+  //  - positions distinctes → nœuds distincts, quoi qu'il arrive aux ids ;
+  //  - une étiquette demandée ne peut JAMAIS réutiliser l'id d'un nœud
+  //    situé ailleurs (suffixe dérivé, unicité garantie).
+  const NODE_CELL = 2;            // px — cellule du registre géométrique
+  const NODE_MERGE_TOLERANCE = 2; // px — rayon de fusion des nœuds confondus
   const nodes = new Map();
-  const nodeAt = new Map(); // clé "x|y" arrondie → id, pour fusionner les nœuds confondus
+  const nodeAt = new Map(); // cellule "x|y" → id du nœud qui l'occupe
+  const findNodeAt = (x, y) => {
+    const cx = Math.round(x / NODE_CELL);
+    const cy = Math.round(y / NODE_CELL);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const id = nodeAt.get(`${cx + dx}|${cy + dy}`);
+        if (id === undefined) continue;
+        const node = nodes.get(id);
+        if (node && Math.hypot(node.x - x, node.y - y) <= NODE_MERGE_TOLERANCE) return id;
+      }
+    }
+    return null;
+  };
   const registerNode = (id, x, y, name, kind) => {
-    if (nodes.has(id)) return id;
-    const key = `${Math.round(x * 10)}|${Math.round(y * 10)}`;
-    const existing = nodeAt.get(key);
-    if (existing && near(nodes.get(existing), { x, y })) return existing;
-    nodes.set(id, { id, x, y, name: name || id, kind: kind || "waypoint" });
-    nodeAt.set(key, id);
-    return id;
+    // 1. Identité géométrique d'abord : même position → même nœud.
+    const existingId = findNodeAt(x, y);
+    if (existingId !== null) return existingId;
+    // 2. Nouveau nœud : la chaîne demandée n'est qu'une étiquette de
+    //    débogage ; on n'en réutilise jamais une déjà prise.
+    let nodeId = String(id);
+    if (nodes.has(nodeId)) {
+      let suffix = nodes.size + 1;
+      while (nodes.has(`${nodeId}-${suffix}`)) suffix += 1;
+      nodeId = `${nodeId}-${suffix}`;
+    }
+    nodes.set(nodeId, { id: nodeId, x, y, name: name || nodeId, kind: kind || "waypoint" });
+    nodeAt.set(`${Math.round(x / NODE_CELL)}|${Math.round(y / NODE_CELL)}`, nodeId);
+    return nodeId;
   };
   for (const stop of city.stops) {
     registerNode(stop.id, stop.x, stop.y, stop.name, "stop");
@@ -120,10 +165,9 @@ export function createNetwork(city) {
 
   let junctionCount = 0;
   let waypointCount = 0;
+  // V29 — la fusion par position vit dans registerNode : les fabriques ne
+  // fournissent plus qu'une étiquette de débogage, jamais une identité.
   const makeJunctionNode = (x, y) => {
-    const key = `${Math.round(x * 10)}|${Math.round(y * 10)}`;
-    const existing = nodeAt.get(key);
-    if (existing && near(nodes.get(existing), { x, y })) return existing;
     junctionCount += 1;
     return registerNode(`junction-${junctionCount}`, x, y, "Jonction", "junction");
   };
@@ -262,6 +306,60 @@ export function createNetwork(city) {
     junctions,
     pathCache: new Map()
   };
+}
+
+/**
+ * V29 — garde-fou structurel du graphe : retourne la liste des violations
+ * d'invariants (vide = graphe sain). Un « sac de nœuds » doit se voir en CI
+ * rouge ou dans le journal de ville, jamais rester un comportement silencieux.
+ *
+ * Invariants vérifiés :
+ *  - aucune référence pendante (arête ou adjacency vers un nœud inexistant) ;
+ *  - aucune arête de longueur absurde (nulle, non finie, ou plus longue que
+ *    la limite fournie — la diagonale de la carte en production) ;
+ *  - aucune identité corrompue (« undefined » / « NaN »), position finie ;
+ *  - chaque arrêt de la ville existe comme nœud (routage des lignes) ;
+ *  - option checkNearDuplicates : aucun couple de nœuds quasi confondus
+ *    (symptôme d'une fusion par chaîne au lieu de la position) — O(n²),
+ *    réservé aux tests.
+ */
+export function validateNetwork(network, city, options = {}) {
+  const violations = [];
+  const maxEdgeLength = Number.isFinite(options.maxEdgeLength) ? options.maxEdgeLength : Infinity;
+  const checkNearDuplicates = options.checkNearDuplicates === true;
+  const nodes = network.nodes;
+  const corrupted = /undefined|NaN/;
+  for (const edge of (network.edges || [])) {
+    if (corrupted.test(String(edge.id))) violations.push(`arête : identité corrompue « ${edge.id} »`);
+    if (!nodes.has(edge.a)) violations.push(`arête ${edge.id} : nœud « ${edge.a} » inexistant`);
+    if (!nodes.has(edge.b)) violations.push(`arête ${edge.id} : nœud « ${edge.b} » inexistant`);
+    if (!Number.isFinite(edge.length)) violations.push(`arête ${edge.id} : longueur non finie`);
+    else if (edge.length <= 0) violations.push(`arête ${edge.id} : longueur nulle`);
+    else if (edge.length > maxEdgeLength) violations.push(`arête ${edge.id} : ${Math.round(edge.length)} px (max ${Math.round(maxEdgeLength)} px)`);
+  }
+  for (const [id, node] of nodes) {
+    if (corrupted.test(String(id))) violations.push(`nœud : identité corrompue « ${id} »`);
+    if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) violations.push(`nœud « ${id} » : position non finie`);
+  }
+  for (const [fromId, links] of (network.adjacency || new Map())) {
+    if (!nodes.has(fromId)) violations.push(`adjacency : nœud « ${fromId} » inexistant`);
+    for (const link of links) {
+      if (!nodes.has(link.to)) violations.push(`adjacency « ${fromId} » → « ${link.to} » : cible inexistante`);
+    }
+  }
+  for (const stop of ((city && city.stops) || [])) {
+    if (!nodes.has(stop.id)) violations.push(`arrêt « ${stop.id} » absent du graphe`);
+  }
+  if (checkNearDuplicates) {
+    const list = [...nodes.values()];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const gap = Math.hypot(list[i].x - list[j].x, list[i].y - list[j].y);
+        if (gap > 0.001 && gap <= 0.5) violations.push(`nœuds quasi confondus « ${list[i].id} » / « ${list[j].id} » (${gap.toFixed(3)} px)`);
+      }
+    }
+  }
+  return violations;
 }
 
 /** V27 — arête entre deux nœuds adjacents (sens unique respecté). */

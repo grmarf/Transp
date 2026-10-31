@@ -2,7 +2,7 @@ import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
 import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
 import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, editLineStops, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal, estimateLineCost } from "./engine.js";
-import { createNetwork, routeLine, createUndergroundNetwork, createTramNetwork, roadType, roadConstructionCost, ROAD_TYPES } from "./network.js";
+import { createNetwork, routeLine, createUndergroundNetwork, createTramNetwork, roadType, roadConstructionCost, validateNetwork, ROAD_TYPES } from "./network.js";
 import { createRenderer, clearRendererCaches, renderFleetPanel } from "./renderer.js";
 import { saveGame, readSavedGame, SAVE_KEY, exportGameToFile, importGameFromFile } from "./persistence.js";
 import { escapeHtml as h } from "./html.js";
@@ -385,6 +385,22 @@ function rebuildNetwork() {
   // lignes existantes sur des noeuds disparus du graphe reconstruit : les
   // vehicules se figeaient silencieusement et les passagers restaient a bord.
   refreshAllLineRoutes(state, log);
+  // V29 — garde-fou structurel : un graphe incohérent doit se voir dans le
+  // journal de ville, jamais rester un comportement silencieux.
+  reportNetworkViolations(state, log);
+}
+
+// V29 — diagnostic du garde-fou validateNetwork() : journalise plutôt qu'il ne
+// lève, pour ne jamais interrompre une partie en cours. L'invariant clé en
+// production : aucune arête ne peut être plus longue que la diagonale de la
+// carte (le symptôme historique des nœuds fusionnés par collision d'ids).
+function reportNetworkViolations(targetState, log) {
+  if (!targetState || !targetState.network || !targetState.city) return;
+  const diagonal = Math.hypot(targetState.city.width || 1000, targetState.city.height || 650);
+  const violations = validateNetwork(targetState.network, targetState.city, { maxEdgeLength: diagonal });
+  if (violations.length) {
+    log("⚠️ Réseau incohérent : " + violations[0] + (violations.length > 1 ? " (+" + (violations.length - 1) + " autre" + (violations.length > 2 ? "s" : "") + ")" : ""));
+  }
 }
 
 const ROAD_UNDO_MAX = 20;
@@ -1165,6 +1181,10 @@ function boot(seed, scenarioId, restoredPayload) {
 
   state = nextState;
   rng = nextRng;
+
+  // V29 — garde-fou dès le boot (ville neuve comme sauvegarde restaurée) :
+  // le graphe reconstruit doit être sain, toute incohérence est journalisée.
+  reportNetworkViolations(state, log);
 
   const nextRenderer = createRenderer(canvas, nextState);
   rendererState.current = nextRenderer;
