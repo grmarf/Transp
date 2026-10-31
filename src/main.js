@@ -1561,6 +1561,16 @@ bindTap(document.getElementById("toggleZonesBtn"), function () {
   refreshUI();
 });
 
+// V29.5 — noms d'arrêts masquables : la carte reste lisible quand zones,
+// valeur foncière et couverture se superposent aux étiquettes.
+bindTap(document.getElementById("toggleStopNamesBtn"), function () {
+  if (!state) return;
+  state.showStopNames = !(state.showStopNames !== false);
+  const button = document.getElementById("toggleStopNamesBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showStopNames !== false));
+  refreshUI();
+});
+
 // V27 — clavier du tracé : Échap annule le tracé / le mode, Entrée termine la
 // chaîne de segments, Ctrl+Z / Ctrl+Shift+Z pilotent l'annulation voirie.
 document.addEventListener("keydown", function (e) {

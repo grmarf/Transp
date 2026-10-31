@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="favicon.png" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="src/style.css?v=33">
+  <link rel="stylesheet" href="src/style.css?v=34">
 </head>
 <body>
 <header class="topbar" aria-label="En-tête du jeu">
@@ -72,7 +72,7 @@
       <canvas id="map" aria-label="Carte de la ville et du réseau de transport"></canvas>
       <div class="map-overlays" aria-label="Affichages de la carte">
         <button id="advertisingBtn" type="button" class="map-overlay-btn" aria-label="Ouvrir les campagnes publicitaires" title="Publicité">📣</button>
-        <div class="map-overlay-right"><button id="toggleHeatmapBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false" title="Congestion">🔥</button><button id="toggleCoverageBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la couverture du réseau" aria-pressed="false" title="Couverture">📍</button><button id="toggleLandValueBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la valeur foncière" aria-pressed="false" title="Valeur foncière">💰</button><button id="toggleZonesBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer les zones urbanisées" aria-pressed="false" title="Zones">🗺️</button></div>
+        <div class="map-overlay-right"><button id="toggleHeatmapBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la carte de congestion" aria-pressed="false" title="Congestion">🔥</button><button id="toggleCoverageBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la couverture du réseau" aria-pressed="false" title="Couverture">📍</button><button id="toggleLandValueBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer la valeur foncière" aria-pressed="false" title="Valeur foncière">💰</button><button id="toggleZonesBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer les zones urbanisées" aria-pressed="false" title="Zones">🗺️</button><button id="toggleStopNamesBtn" type="button" class="map-overlay-btn" aria-label="Afficher ou masquer les noms des arrêts" aria-pressed="true" title="Noms des arrêts">🔤</button></div>
       </div>
 
       <div id="heatmapLegend" class="heatmap-legend" hidden aria-hidden="true">
@@ -174,7 +174,7 @@
     "./src/events.js", "./src/progression.js", "./src/contracts.js",
     "./src/reports.js", "./src/seasons.js",
     "./src/demographics.js", "./src/coverage.js", "./src/advertising.js",
-    "./src/engine.js", "./src/renderer.js", "./src/main.js?v=33"
+    "./src/engine.js", "./src/renderer.js", "./src/main.js?v=34"
   ];
 
   var results = [];
@@ -202,7 +202,7 @@
   document.body.appendChild(b);
 })();
 </script>
-<script type="module" src="src/main.js?v=33"></script>
+<script type="module" src="src/main.js?v=34"></script>
 </body>
 </html>
 

@@ -875,6 +875,8 @@ export function createRenderer(canvas, state) {
           ctx.stroke();
         }
 
+        // V29.5 — étiquette masquable via le bouton 🔤 de la barre d'overlays.
+        if (state.showStopNames !== false) {
         const fontSize = Math.max(10, 13 / camera.zoom);
         ctx.font = "800 " + fontSize + 'px "Nunito", system-ui, sans-serif';
         ctx.textAlign = "center";
@@ -898,6 +900,7 @@ export function createRenderer(canvas, state) {
         ctx.fillStyle = INK;
         ctx.fillText(s.name, s.x, labelY);
         ctx.restore();
+        }
 
         const waiting = Object.values(s.waitingByDestination || {}).reduce(function (a, v) { return a + v; }, 0);
         if (waiting > 1) {
