@@ -33,6 +33,9 @@ const freeSpot = (state) => {
 // --- 1. Totaux & paiement atomique ------------------------------------------
 {
   const state = makeState();
+  // L'infrastructure visée doit exister : une entrée orpheline n'est pas facturée.
+  state.city.roads.push({ id: "built-road-1", start: { x: 100, y: 100 }, end: { x: 300, y: 100 }, type: "street" });
+  state.city.stops.push({ id: "stop-99", name: "Arrêt 99", x: 500, y: 500, waiting: 0, waitingByDestination: {} });
   const queue = [
     { kind: "road", roadId: "built-road-1", cost: 900 },
     { kind: "stop", stopId: "stop-99", cost: STOP_BUILD_COST }
