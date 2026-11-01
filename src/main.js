@@ -13,6 +13,8 @@ import { refreshAllLineRoutes } from "./disruptions.js";
 import { startCampaign } from "./advertising.js";
 import { pruneRedundantRoads, pruneOrphanCarrefourStops } from "./pruning.js";
 import { buildStop, demolishStop, upgradeStopMultimodal, STOP_BUILD_COST, MULTIMODAL_UPGRADE_COST } from "./stops.js";
+import { TICK_MINUTES } from "./engine.js";
+import { fastForwardDay } from "./worker-client.js";
 
 const canvas = document.getElementById("map");
 const miniMapCanvas = document.getElementById("miniMapCanvas");
@@ -1314,6 +1316,9 @@ function boot(seed, scenarioId, restoredPayload) {
   if (scenarioSelect) scenarioSelect.value = (state.scenario && state.scenario.id) || "sandbox";
   const pauseBtn = document.getElementById("pauseBtn");
   if (pauseBtn) pauseBtn.textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
+  // V31 — le bouton d'avance rapide repart proprement après un boot.
+  const ffBootBtn = document.getElementById("ffBtn");
+  if (ffBootBtn) { ffBootBtn.textContent = "⏩ +1 j"; ffBootBtn.disabled = false; }
   const speedBtn = document.getElementById("speedBtn");
   if (speedBtn) speedBtn.textContent = "▶ " + state.speed + "×";
   const toggle = document.getElementById("toggleHeatmapBtn");
@@ -1681,6 +1686,34 @@ bindTap(document.getElementById("finishLineBtn"), function () {
   refreshUI();
 });
 
+// V31 — Web Worker : avance rapide d'un jour entier sans bloquer l'interface.
+let ffBusy = false;
+function fastForwardOneDay() {
+  if (!state || ffBusy) return;
+  if (state.paused) { log("La partie est en pause — reprenez-la avant l'avance rapide."); return; }
+  const btn = document.getElementById("ffBtn");
+  ffBusy = true;
+  if (btn) { btn.textContent = "⏳ …"; btn.disabled = true; }
+  const savedPaused = state.paused;
+  const savedSpeed = state.speed;
+  state.paused = true; // gèle la boucle principale le temps de la simulation
+  const ticks = Math.max(1, Math.round(1440 / TICK_MINUTES));
+  const seed = ((((state.city && state.city.numericSeed) || 1) ^ ((state.elapsedDays || 0) + 0xB00C)) >>> 0) || 1;
+  const finish = function (result, mode) {
+    ffBusy = false;
+    const btn2 = document.getElementById("ffBtn");
+    if (btn2) { btn2.textContent = "⏩ +1 j"; btn2.disabled = false; }
+    if (!result || !result.state) { state.paused = savedPaused; state.speed = savedSpeed; refreshUI(); return; }
+    result.state.paused = savedPaused;
+    result.state.speed = savedSpeed;
+    boot(initialSeed, "sandbox", { state: result.state, rngState: null });
+    log("Avance rapide : 1 jour simulé en " + (mode === "worker" ? "arrière-plan (Web Worker)" : "mode synchronisé") + (result.ms ? " (" + result.ms + " ms)" : "") + ".");
+    refreshUI();
+  };
+  const mode = fastForwardDay(state, seed, ticks, finish);
+  if (mode === "worker") log("Avance rapide d'un jour en cours (Web Worker)…");
+}
+
 bindTap(document.getElementById("pauseBtn"), function () {
   if (!state) return;
   state.paused = !state.paused;
@@ -1696,6 +1729,8 @@ bindTap(document.getElementById("speedBtn"), function () {
   if (btn) btn.textContent = "▶ " + state.speed + "×";
   refreshUI();
 });
+
+bindTap(document.getElementById("ffBtn"), fastForwardOneDay);
 
 bindTap(document.getElementById("resetZoomBtn"), resetCameraView);
 bindTap(document.getElementById("saveBtn"), saveCurrentGame);

@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="favicon.png" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="src/style.css?v=37">
+  <link rel="stylesheet" href="src/style.css?v=38">
 </head>
 <body>
 <header class="topbar" aria-label="En-tête du jeu">
@@ -24,7 +24,7 @@
     <input id="cityNameInput" class="city-name-input" type="text" maxlength="60" autocomplete="off" spellcheck="false" aria-label="Nom de la ville" placeholder="Nom de la ville">
     <label class="sr-only" for="scenarioSelect">Scénario</label>
     <select id="scenarioSelect" aria-label="Scénario de jeu"></select>
-    <div class="time-controls" aria-label="Temps"><span class="toolbar-caption">⏱️</span><button id="pauseBtn" type="button" class="btn" aria-label="Mettre en pause ou reprendre la partie">⏸ Pause</button><button id="speedBtn" type="button" class="btn" aria-label="Modifier la vitesse de simulation">▶ 1×</button></div>
+    <div class="time-controls" aria-label="Temps"><span class="toolbar-caption">⏱️</span><button id="pauseBtn" type="button" class="btn" aria-label="Mettre en pause ou reprendre la partie">⏸ Pause</button><button id="speedBtn" type="button" class="btn" aria-label="Modifier la vitesse de simulation">▶ 1×</button><button id="ffBtn" type="button" class="btn" aria-label="Simuler un jour entier en avance rapide via un Web Worker">⏩ +1 j</button></div>
     <div class="menu-wrap"><button id="gameMenuBtn" type="button" class="btn" aria-expanded="false" aria-controls="gameMenuDropdown">☰ Menu</button>
       <div id="gameMenuDropdown" class="menu-dropdown" role="menu">
         <button id="newCityBtn" type="button" role="menuitem" class="btn btn-warn">🏙️ Nouvelle ville</button>
@@ -177,7 +177,7 @@
     "./src/events.js", "./src/progression.js", "./src/contracts.js",
     "./src/reports.js", "./src/seasons.js",
     "./src/demographics.js", "./src/coverage.js", "./src/advertising.js",
-    "./src/engine.js", "./src/stops.js", "./src/renderer.js", "./src/main.js?v=37"
+    "./src/engine.js", "./src/stops.js", "./src/worker-core.js", "./src/engine-worker.js", "./src/worker-client.js", "./src/renderer.js", "./src/main.js?v=38"
   ];
 
   var results = [];
@@ -205,7 +205,7 @@
   document.body.appendChild(b);
 })();
 </script>
-<script type="module" src="src/main.js?v=37"></script>
+<script type="module" src="src/main.js?v=38"></script>
 </body>
 </html>
 

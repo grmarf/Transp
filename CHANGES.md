@@ -21,6 +21,20 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V31 — Web Worker : avance rapide d'un jour
+
+- **⏩ +1 j** dans les contrôles de temps : simule exactement une journée
+  (144 ticks à vitesse 1) **dans un Web Worker** (`src/engine-worker.js`,
+  module ES) — l'interface reste fluide, la carte reste manipulable.
+- **Repli synchrone garanti** : si `Worker` est indisponible, que le module
+  échoue ou que l'état n'est pas clonable, la simulation repart de l'état
+  original sur le fil principal (jamais de double application).
+- Choix conservateur : la boucle de jeu par tick reste sur le fil principal
+  (rendu + état partagés) ; seul le calcul long est déporté. Les drapeaux
+  pause/vitesse du joueur sont restaurés de part en part.
+- Anti-cache bumpé `?v=38` ; test `tests/v31-worker.mjs` (exactitude,
+  déterminisme, clonabilité postMessage, repli synchrone, câblage).
+
 ## V30 — Gestion des arrêts & multimodalité
 
 - **Construire un arrêt** (🚏 Arrêts ▸ ➕) : pose d'un arrêt neuf à 1 200 €,
