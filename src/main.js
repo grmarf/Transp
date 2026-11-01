@@ -2162,73 +2162,87 @@ function isMenuActArmed(act) {
 }
 
 let mapMenuLevel = "std";
-// V35 — le rendu du menu est coalescé et différé d'une frame : pendant un
-// tap (pointerup → action → updateInstructions → setMapMenu), les boutons
-// ne sont jamais détruits au milieu de l'événement. Sinon le « click »
-// synthétique du navigateur peut viser un bouton reconstruit et invoquer
-// le handler une seconde fois : l'outil s'arme puis se désarme aussitôt —
-// « les boutons ne réagissent pas » (rapport joueur, mobile).
-let mapMenuRenderQueued = false;
+
+// V36 — le menu est construit UNE FOIS pour toutes : chaque niveau du
+// cascade est une page (.map-menu-page) déjà présente dans le DOM et
+// masquée par [hidden]. setMapMenu se contente de basculer la page
+// visible et de rafraîchir le surlignage (classes uniquement) : AUCUN
+// bouton n'est jamais détruit au runtime. Les régressions à répétition
+// (✕ inerte, actions « qui ne réagissent pas », taps perdus entre deux
+// reconstructions) venaient toutes de la destruction/recréation des
+// boutons pendant ou juste après un tap : le « click » synthétique du
+// navigateur pouvait viser un bouton disparu ou reconstruit et
+// ré-invoquer le handler (armement puis désarmement immédiat).
+function buildMapMenuPages(container) {
+  container.textContent = "";
+  Object.keys(MAP_MENU).forEach(function (level) {
+    const page = document.createElement("div");
+    page.className = "map-menu-page";
+    page.dataset.level = level;
+    page.hidden = level !== mapMenuLevel;
+    // ✕ uniquement hors niveau std : revient au menu racine.
+    if (level !== "std") {
+      const back = document.createElement("button");
+      back.type = "button";
+      back.className = "btn btn-map-back";
+      back.setAttribute("aria-label", "Revenir au menu principal de la carte");
+      back.textContent = "✕";
+      bindTap(back, function () { setMapMenu("std"); });
+      page.appendChild(back);
+    }
+    for (const item of MAP_MENU[level]) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn";
+      btn.textContent = item.label;
+      btn.__menuGoto = item.goto || null;
+      btn.__menuAct = item.act || null;
+      if (item.goto) {
+        bindTap(btn, function () { setMapMenu(item.goto); });
+      } else {
+        bindTap(btn, function () {
+          if (item.select) {
+            const sel = document.getElementById(item.select);
+            if (sel) { sel.value = item.value; sel.dispatchEvent(new Event("change")); }
+          }
+          const target = item.act && document.getElementById(item.act);
+          if (target) target.click();
+          // V28.2 — on reste sur la page : changer de type de route ou de
+          // zone devient immédiat (l'outil armé est surligné). La croix ou
+          // Échap ramènent à la racine.
+          setMapMenu(mapMenuLevel);
+        });
+      }
+      page.appendChild(btn);
+    }
+    container.appendChild(page);
+  });
+}
 
 function setMapMenu(level) {
   const container = document.getElementById("mapMenu");
   if (!container) return;
   mapMenuLevel = MAP_MENU[level] ? level : "std";
-  if (mapMenuRenderQueued) return;
-  mapMenuRenderQueued = true;
-  requestAnimationFrame(function () {
-    mapMenuRenderQueued = false;
-    renderMapMenu();
-  });
-}
-
-function renderMapMenu() {
-  const container = document.getElementById("mapMenu");
-  if (!container) return;
-  container.textContent = "";
-  const items = MAP_MENU[mapMenuLevel];
-  // ✕ uniquement hors niveau std : revient au menu racine.
-  if (mapMenuLevel !== "std") {
-    const back = document.createElement("button");
-    back.type = "button";
-    back.className = "btn btn-map-back";
-    back.setAttribute("aria-label", "Revenir au menu principal de la carte");
-    back.textContent = "✕";
-    bindTap(back, function () { setMapMenu("std"); });
-    container.appendChild(back);
-  }
   // V27.6 — retour visuel : la branche racine liée à l'outil armé
-  // (voirie / urbanisme / ligne) reste surlignée sur le trio std.
+  // (voirie / urbanisme / ligne / arrêts) reste surlignée sur la racine.
   const armed = state && state.roadEditMode ? "voirie"
     : state && state.zoneMode ? "urbanisme"
     : state && (state.lineMode || (state.pendingStops && state.pendingStops.length)) ? "ligne"
     : state && state.stopToolMode ? "arrets"
     : null;
-  for (const item of items) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "btn";
-    if (mapMenuLevel === "std" && armed && item.goto === armed) btn.classList.add("is-active");
-    // V28.2 — l'outil armé reste surligné sur sa propre page.
-    if (item.act && isMenuActArmed(item.act)) btn.classList.add("is-active");
-    btn.textContent = item.label;
-    if (item.goto) {
-      bindTap(btn, function () { setMapMenu(item.goto); });
-    } else {
-      bindTap(btn, function () {
-        if (item.select) {
-          const sel = document.getElementById(item.select);
-          if (sel) { sel.value = item.value; sel.dispatchEvent(new Event("change")); }
-        }
-        const target = item.act && document.getElementById(item.act);
-        if (target) target.click();
-        // V28.2 — on reste sur la page : changer de type de route ou de zone
-        // devient immédiat (l'outil armé est surligné). La croix ou Échap
-        // ramènent à la racine.
-        setMapMenu(mapMenuLevel);
-      });
+  const pages = container.querySelectorAll(".map-menu-page");
+  for (const page of pages) {
+    page.hidden = page.dataset.level !== mapMenuLevel;
+    const isPageStd = page.dataset.level === "std";
+    const buttons = page.querySelectorAll("button");
+    for (const btn of buttons) {
+      const goto = btn.__menuGoto;
+      const act = btn.__menuAct;
+      // V28.2 — l'outil armé reste surligné sur sa propre page.
+      btn.classList.toggle("is-active",
+        (isPageStd && armed && goto === armed) ||
+        (!goto && act && isMenuActArmed(act)));
     }
-    container.appendChild(btn);
   }
 }
 
@@ -2259,7 +2273,8 @@ function renderMapMenu() {
     }
     const legacy = document.querySelectorAll(".floating-toolbar > button:not(#finishLineBtn), .floating-toolbar > .tool-group");
     Array.prototype.forEach.call(legacy, function (el) { el.hidden = true; });
-    setMapMenu("std");
+    buildMapMenuPages(container);
+    setMapMenu(mapMenuLevel);
   } catch (error) {
     console.warn("Menu en cascade indisponible — boutons historiques réaffichés.", error);
     const fallback = document.querySelectorAll("button[id]");

@@ -63,7 +63,7 @@ async function touch(x, y) {
   await sleep(60);
   await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
-const btnCenter = (label) => `(() => { const b = [...document.querySelectorAll("#mapMenu button")].find((x) => x.textContent.includes(${JSON.stringify(label)})); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
+const btnCenter = (label) => `(() => { const b = [...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].find((x) => x.textContent.includes(${JSON.stringify(label)})); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
 
 try {
   await waitFor('serveur HTTP prêt', async () => (await fetch(url)).ok);
@@ -105,15 +105,15 @@ try {
   await sleep(500); // premier rendu du menu (différé d'une frame) + recadrage
 
   // --- 1. La racine tient sur UNE ligne (4 boutons, mêmes tops) ----------
-  const stdTopsRaw = await evaluate('[...document.querySelectorAll("#mapMenu button")].map((b) => Math.round(b.getBoundingClientRect().top))');
+  const stdTopsRaw = await evaluate('[...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].map((b) => Math.round(b.getBoundingClientRect().top))');
   assert.equal(stdTopsRaw.length, 4, 'std : 4 boutons attendus, tops=' + JSON.stringify(stdTopsRaw));
   assert.equal(new Set(stdTopsRaw).size, 1, 'std : les boutons tiennent sur une seule ligne, tops=' + JSON.stringify(stdTopsRaw));
 
   // --- 2. Tap réel sur « 🚏 Arrêts ▸ » → page Arrêts ---------------------
   let target2 = await waitFor('bouton Arrêts visible', () => evaluate(btnCenter('Arrêts')));
   await touch(target2.x, target2.y);
-  await waitFor('page arrets ouverte', () => evaluate('Boolean([...document.querySelectorAll("#mapMenu button")].some((b) => b.textContent.includes("Construire")))'));
-  const pageTops = await evaluate('[...document.querySelectorAll("#mapMenu button")].map((b) => Math.round(b.getBoundingClientRect().top))');
+  await waitFor('page arrets ouverte', () => evaluate('Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes("Construire")))'));
+  const pageTops = await evaluate('[...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].map((b) => Math.round(b.getBoundingClientRect().top))');
   assert.equal(pageTops.length, 4, 'page arrets : ✕ + 3 actions, tops=' + JSON.stringify(pageTops));
   assert.equal(new Set(pageTops).size, 1, 'page arrets : ✕ et les 3 actions sur la MÊME ligne, tops=' + JSON.stringify(pageTops));
 
@@ -180,6 +180,25 @@ try {
   await touch(initStop.sx, initStop.sy);
   await waitFor('arrêt initial démoli', () => evaluate(`!window.__vieTLignes.getState().city.stops.some((s) => s.id === ${JSON.stringify(initStop.id)})`), 5000)
     .catch(() => { throw new Error('arrêt initial non supprimé : ' + initStop.id); });
+
+  // --- 6. La croix ✕ bascule instantanément vers la racine ----------------
+  const cross1 = await waitFor('croix visible (page arrets)', () => evaluate(btnCenter('✕')));
+  await touch(cross1.x, cross1.y);
+  await waitFor('croix : retour std', () => evaluate('Boolean([...document.querySelectorAll(' + String.fromCharCode(34) + '#mapMenu .map-menu-page:not([hidden]) button' + String.fromCharCode(34) + ')].some((b) => b.textContent.includes("Voirie")))'));
+  assert.equal(await evaluate('Boolean([...document.querySelectorAll(' + String.fromCharCode(34) + '#mapMenu .map-menu-page:not([hidden]) button' + String.fromCharCode(34) + ')].some((b) => b.textContent.includes("Construire")))'), false,
+    'la croix a bien quitté la page Arrêts');
+  // retour sur Arrêts, armement, puis ✕ : l'outil reste armé (la racine surligne la branche)
+  const arrets2 = await waitFor('bouton Arrêts re-visible', () => evaluate(btnCenter('Arrêts')));
+  await touch(arrets2.x, arrets2.y);
+  await waitFor('page arrets rouverte', () => evaluate(btnCenter('Construire')));
+  const build2 = await evaluate(btnCenter('Construire'));
+  await touch(build2.x, build2.y);
+  await waitFor('outil ré-armé', () => evaluate('window.__vieTLignes.getState().stopToolMode === "build"'), 5000);
+  const cross2 = await waitFor('croix re-visible', () => evaluate(btnCenter('✕')));
+  await touch(cross2.x, cross2.y);
+  await waitFor('croix : retour std (2)', () => evaluate('Boolean([...document.querySelectorAll(' + String.fromCharCode(34) + '#mapMenu .map-menu-page:not([hidden]) button' + String.fromCharCode(34) + ')].some((b) => b.textContent.includes("Voirie")))'));
+  assert.equal(await evaluate('window.__vieTLignes.getState().stopToolMode'), 'build',
+    '✕ ne désarme pas l\'outil : la racine surligne la branche armée');
 
   assert.equal(consoleErrors.length, 0, 'erreurs navigateur : ' + consoleErrors.join(' ; ').slice(0, 200));
   console.log(JSON.stringify({ ok: true, suite: 'v35-menu-arrets' }));

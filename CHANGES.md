@@ -21,6 +21,25 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V36 — Menu en cascade reconstruit : pages statiques, ✕ fiable
+
+- **Fin des bugs à répétition** : le menu n'est plus détruit/recréé à
+  chaque interaction. Chaque niveau (std, voirie, urbanisme, ligne,
+  arrêts et pages annexes) est construit UNE FOIS au démarrage comme
+  page `.map-menu-page` masquée par `[hidden]` ; `setMapMenu` se contente
+  de basculer la page visible et de rafraîchir le surlignage (des
+  classes, rien d'autre).
+- **✕ immédiat** : la croix ne dépend plus d'aucune reconstruction du
+  DOM — elle bascule la page racine à l'instant du tap, y compris en
+  double tap ou pendant un armement d'outil (l'outil reste armé, la
+  racine surligne sa branche). Aucun bouton ne pouvant plus disparaître
+  pendant un tap, le « click » synthétique du navigateur ne peut plus
+  viser un bouton disparu ou reconstruit — la source des régressions
+  V28 à V35 (actions « qui ne réagissent pas », ✕ inerte, taps perdus).
+- Tests : `v35-menu-arrets` étendu (croix : retour racine, page rouverte,
+  outil armé conservé) ; `v27-map-menu` épingle l'architecture pages.
+- Anti-cache bumpé `?v=42`.
+
 ## V35 — Menu arrêts : une ligne, taps fiables
 
 - **Une seule ligne de boutons** : sur mobile, la croix ✕ n'occupe plus une

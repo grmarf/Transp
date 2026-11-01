@@ -18,7 +18,7 @@ check("voile intérieur imperceptible (0.06)", renderer.includes("rgba(255, 210,
 check("la densité module l'opacité du trait", renderer.includes("0.3 + density * 0.3"));
 
 const index = read("index.html");
-check("anti-cache bumpé v41 (plus de v40)", !index.includes("?v=40") && (index.match(/\?v=41/g) || []).length >= 3);
+check("anti-cache bumpé v42 (plus de v41)", !index.includes("?v=41") && (index.match(/\?v=42/g) || []).length >= 3);
 
 const changes = read("CHANGES.md");
 check("CHANGES documente la V29.7", changes.includes("## V29.7"));

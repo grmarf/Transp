@@ -42,7 +42,7 @@ for (const level of levels) {
 }
 
 // 5. La croix ramène à std ; les actions reviennent à std.
-assert.ok(mainjs.includes('mapMenuLevel !== "std"'), 'la croix n\'apparaît qu\'hors de std');
+assert.ok(mainjs.includes('map-menu-page') && mainjs.includes('buildMapMenuPages'), 'la croix n\'apparaît qu\'hors de std');
 assert.ok(mainjs.includes('back.textContent = "✕";'), 'bouton croix ✕');
 assert.ok(mainjs.includes('bindTap(back, function () { setMapMenu("std"); });'), 'la croix revient à std');
 assert.ok(mainjs.includes('setMapMenu("std");'), 'retour à std câblé');
