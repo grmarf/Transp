@@ -333,6 +333,13 @@ function bindTap(el, handler) {
   if (window.PointerEvent) {
     el.addEventListener("pointerup", invoke, { passive: false });
     el.addEventListener("click", invoke);
+    // V36 — click fantôme : le handler de pointerup peut changer la page du
+    // menu (✕ → racine, « ▸ » → sous-page) ; le bouton tapé se masque alors
+    // et le click synthétique qui suit le touchend retombe sur le bouton
+    // révélé au même endroit — le ✕ rouvrait « Voirie », la navigation vers
+    // Arrêts armait « Pôle multimodal ». Sur tactile, pointerup a déjà tout
+    // traité : on annule ce click parasite.
+    el.addEventListener("touchend", function (e) { if (e.cancelable) e.preventDefault(); }, { passive: false });
   } else {
     el.addEventListener("touchend", invoke, { passive: false });
     el.addEventListener("click", invoke);
@@ -355,6 +362,13 @@ function bindDelegatedTap(container, selector, handler) {
   if (window.PointerEvent) {
     container.addEventListener("pointerup", invoke, { passive: false });
     container.addEventListener("click", invoke);
+    // V36 — click fantôme : le handler de pointerup peut changer la page du
+    // menu (✕ → racine, « ▸ » → sous-page) ; le bouton tapé se masque alors
+    // et le click synthétique qui suit le touchend retombe sur le bouton
+    // révélé au même endroit — le ✕ rouvrait « Voirie », la navigation vers
+    // Arrêts armait « Pôle multimodal ». Sur tactile, pointerup a déjà tout
+    // traité : on annule ce click parasite.
+    container.addEventListener("touchend", function (e) { if (e.cancelable) e.preventDefault(); }, { passive: false });
   } else {
     container.addEventListener("touchend", invoke, { passive: false });
     container.addEventListener("click", invoke);

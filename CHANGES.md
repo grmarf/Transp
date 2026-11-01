@@ -40,6 +40,15 @@ résume l'état courant du jeu et les derniers changements.
   outil armé conservé) ; `v27-map-menu` épingle l'architecture pages.
 - Anti-cache bumpé `?v=42`.
 
+
+**V36.1 — click fantôme (cause racine des bugs récurrents de la croix).**
+Sur tactile, le handler de `pointerup` change la page du menu pendant le tap
+(✕ → racine, « ▸ » → sous-page) : le bouton tapé est masqué et le click
+synthétique émis après le `touchend` retombe sur le bouton révélé au même
+endroit — le ✕ ramenait à la racine puis le fantôme rouvrait « Voirie », et
+la navigation vers Arrêts armait « Pôle multimodal » sans raison. Correctif :
+`bindTap` / `bindDelegatedTap` annulent ce click parasite sur tactile (branche
+PointerEvent) — `pointerup` a déjà tout traité. Anti-cache v43.
 ## V35 — Menu arrêts : une ligne, taps fiables
 
 - **Une seule ligne de boutons** : sur mobile, la croix ✕ n'occupe plus une
