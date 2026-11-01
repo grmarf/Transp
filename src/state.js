@@ -100,6 +100,10 @@ export function createState(city, scenario = null) {
     zoneMode: null,           // null | "zone" | "unzone" | "inspect"
     // V30 — outils d'arrêts (construction / démolition / multimodal).
     stopToolMode: null,       // null | "build" | "demolish" | "multimodal"
+    // V33 — mode planification : travaux posés gratuitement puis payés d'un bloc.
+    planMode: false,
+    planQueue: [],
+    planResumeAfter: false,
     pendingZoneCorner: null,  // premier coin posé pour peindre une zone
     selectedBuildingId: null,
   };

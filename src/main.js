@@ -13,6 +13,7 @@ import { refreshAllLineRoutes } from "./disruptions.js";
 import { startCampaign } from "./advertising.js";
 import { pruneRedundantRoads, pruneOrphanCarrefourStops } from "./pruning.js";
 import { buildStop, demolishStop, upgradeStopMultimodal, STOP_BUILD_COST, MULTIMODAL_UPGRADE_COST } from "./stops.js";
+import { planTotalCost, applyPlan, clearPlan } from "./planning.js";
 import { TICK_MINUTES } from "./engine.js";
 import { fastForwardDay } from "./worker-client.js";
 
@@ -172,6 +173,16 @@ function updateInstructions() {
     el.innerHTML = "Dézonage : clique une <b>zone</b> pour la retirer (les bâtiments restent).";
   } else if (state.zoneMode === "inspect") {
     el.innerHTML = "Inspection : clique un <b>bâtiment</b> pour afficher ses statistiques.";
+  } else if (state.planMode) {
+    const planCount = (state.planQueue || []).length;
+    const planSum = planTotalCost(state.planQueue || []);
+    const affordable = state.money >= planSum;
+    el.innerHTML = "📋 <b>Planification</b> : " + planCount + " travail" + (planCount > 1 ? "s" : "") +
+      " planifié" + (planCount > 1 ? "s" : "") + ", total <b" + (affordable ? "" : ' style="color:#ef476f"') + ">" +
+      planSum.toLocaleString("fr-FR") + " €</b>" +
+      (planCount === 0
+        ? " — pose tes routes (🛣️) et tes arrêts (🚏) sans payer."
+        : (affordable ? " — touche <b>✅</b> pour valider ou <b>✖</b> pour abandonner." : " (budget insuffisant à la validation)."));
   } else if (state.stopToolMode === "build") {
     el.innerHTML = "Arrêt : clique l'emplacement du <b>nouvel arrêt</b> (" + STOP_BUILD_COST.toLocaleString("fr-FR") + " €).";
   } else if (state.stopToolMode === "demolish") {
@@ -244,6 +255,7 @@ function updateInstructions() {
   if (undoRoadBtn) undoRoadBtn.disabled = !(state.roadUndoStack || []).length;
   const redoRoadBtn = document.getElementById("redoRoadBtn");
   if (redoRoadBtn) redoRoadBtn.disabled = !(state.roadRedoStack || []).length;
+  updatePlanButtons();
   updateToolbarVisibility();
   // V27.6 — le menu reflète l'état armé (surlignage du trio racine).
   setMapMenu(mapMenuLevel);
@@ -563,7 +575,7 @@ function updateRoadTracePreview(e) {
   const selectedType = roadType(state.roadType || "street");
   const cost = roadConstructionCost(selectedType.id, length);
   const tooShort = length < 24;
-  const tooExpensive = state.money < cost;
+  const tooExpensive = !state.planMode && state.money < cost;
   state.roadTrace = {
     from: anchor,
     to: point,
@@ -605,8 +617,11 @@ function setStopToolMode(mode) {
 // V30 — un tap en mode outil d'arrêt : pose, démolition ou upgrade multimodal.
 function handleStopToolTap(p) {
   if (state.stopToolMode === "build") {
-    const stop = buildStop(state, p.x, p.y, log);
+    // V33 — en mode planification, l'arrêt rejoint la file sans être payé.
+    const free = !!state.planMode;
+    const stop = buildStop(state, p.x, p.y, log, { free });
     if (stop) {
+      if (free) state.planQueue.push({ kind: "stop", stopId: stop.id, cost: STOP_BUILD_COST });
       rebuildNetwork();
       hapticFeedback(10);
       state.stopToolMode = null;
@@ -626,6 +641,41 @@ function handleStopToolTap(p) {
   } else if (state.stopToolMode === "multimodal") {
     if (upgradeStopMultimodal(state, nearest.id, log)) state.stopToolMode = null;
   }
+}
+
+// V33 — mode planification : la partie se met en pause pendant que le joueur
+// pose ses travaux ; ceux-ci rejoignent une file puis sont payés d'un bloc.
+function setPlanMode(on) {
+  if (!state) return;
+  state.planMode = !!on;
+  const pauseBtn = document.getElementById("pauseBtn");
+  if (state.planMode) {
+    state.planResumeAfter = !state.paused;
+    state.paused = true;
+    if (pauseBtn) pauseBtn.textContent = "▶ Reprendre";
+    log("📋 Planification : partie en pause. Pose tes travaux, puis valide le plan (✅) ou abandonne-le (✖).");
+  } else {
+    if (state.planResumeAfter) state.paused = false;
+    state.planResumeAfter = false;
+    if (pauseBtn) pauseBtn.textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
+  }
+  updatePlanButtons();
+  updateInstructions();
+  refreshUI();
+}
+
+// V33 — boutons du plan : valider/abandonner n'existent qu'en mode plan.
+function updatePlanButtons() {
+  const modeBtn = document.getElementById("planModeBtn");
+  const applyBtn = document.getElementById("planApplyBtn");
+  const clearBtn = document.getElementById("planClearBtn");
+  const n = (state && state.planQueue && state.planQueue.length) || 0;
+  if (modeBtn) {
+    modeBtn.textContent = state && state.planMode ? "📋 Quitter le plan" : "📋 Planifier";
+    modeBtn.setAttribute("aria-pressed", String(!!(state && state.planMode)));
+  }
+  if (applyBtn) { applyBtn.hidden = !state || !state.planMode; applyBtn.disabled = n === 0; }
+  if (clearBtn) { clearBtn.hidden = !state || !state.planMode; clearBtn.disabled = n === 0; }
 }
 
 function clickMap(e) {
@@ -709,7 +759,7 @@ function clickMap(e) {
       const selectedType = roadType(state.roadType || "street");
       const cost = roadConstructionCost(selectedType.id, length);
       if (length < 24) log("Segment trop court : éloigne le point suivant.");
-      else if (state.money < cost) log(`Construction impossible : il faut ${cost.toLocaleString("fr-FR")} €.`);
+      else if (!state.planMode && state.money < cost) log(`Construction impossible : il faut ${cost.toLocaleString("fr-FR")} €.`);
       else {
         if (!Number.isInteger(state.nextRoadId)) state.nextRoadId = 1;
         const road = { id: `built-road-${state.nextRoadId++}`, start, end,
@@ -741,8 +791,15 @@ function clickMap(e) {
           developCityCarrefours(state.city, rng, { road }, function (a, b) {
             return traceBlockedBuildings(state, a, b).length > 0;
           }, log);
-          state.money -= cost;
-          pushRoadAction({ kind: "build", roadId: road.id, road, cost });
+          if (state.planMode) {
+            // V33 — en mode plan : le segment rejoint la file au lieu d'être payé
+            // (pas de pile d'annulation voirie : la file pilote jusqu'à validation).
+            state.planQueue.push({ kind: "road", roadId: road.id, cost });
+            log(`Segment planifié (${cost.toLocaleString("fr-FR")} €) — à valider dans le plan.`);
+          } else {
+            state.money -= cost;
+            pushRoadAction({ kind: "build", roadId: road.id, road, cost });
+          }
           rebuildNetwork();
           state.pendingRoadPoint = end;
           state.pendingRoadStopId = stopId;
@@ -1263,6 +1320,11 @@ function boot(seed, scenarioId, restoredPayload) {
   nextState.roadType = roadType(nextState.roadType || "street").id;
   nextState.roadUndoStack = [];
   nextState.roadRedoStack = [];
+  // V33 — un boot repart toujours hors plan (une sauvegarde en cours de plan
+  // est chargée vide : les travaux non validés n'ont jamais été payés).
+  nextState.planMode = false;
+  nextState.planQueue = [];
+  nextState.planResumeAfter = false;
   nextState.logs = nextState.logs || [];
 
   state = nextState;
@@ -1734,6 +1796,34 @@ bindTap(document.getElementById("speedBtn"), function () {
 });
 
 bindTap(document.getElementById("ffBtn"), fastForwardOneDay);
+
+// V33 — planification : ouvrir/fermer, valider, abandonner.
+bindTap(document.getElementById("planModeBtn"), function () {
+  if (!state) return;
+  if (state.planMode) {
+    const removed = clearPlan(state, state.planQueue || [], log);
+    state.planQueue = [];
+    rebuildNetwork();
+    log("📋 Plan abandonné : " + removed + " travail" + (removed > 1 ? "s" : "") + " retiré" + (removed > 1 ? "s" : "") + " sans frais.");
+    setPlanMode(false);
+    refreshUI();
+  } else {
+    setPlanMode(true);
+  }
+});
+bindTap(document.getElementById("planApplyBtn"), function () {
+  if (!state || !state.planMode) return;
+  const total = planTotalCost(state.planQueue || []);
+  if (!applyPlan(state, state.planQueue || [], log)) { refreshUI(); return; }
+  state.planQueue = [];
+  log("📋 Plan validé : " + total.toLocaleString("fr-FR") + " € dépensés — les travaux deviennent définitifs.");
+  setPlanMode(false);
+  refreshUI();
+});
+bindTap(document.getElementById("planClearBtn"), function () {
+  const modeBtn = document.getElementById("planModeBtn");
+  if (modeBtn) modeBtn.click(); // abandonner = même chemin que quitter le plan
+});
 
 bindTap(document.getElementById("resetZoomBtn"), resetCameraView);
 bindTap(document.getElementById("saveBtn"), saveCurrentGame);

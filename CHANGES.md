@@ -21,6 +21,23 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V33 — Mode planification : construire en pause, payer d'un bloc
+
+- **📋 Planifier** dans les contrôles de temps : la partie se met en pause
+  et les travaux se posent **sans être payés** — segments de voirie (outil
+  🛣️ Construire) et arrêts (page 🚏 Arrêts ▸ ➕). Le bandeau d'instructions
+  affiche en permanence le nombre de travaux et le **total estimé**.
+- **✅ Valider** : paiement **atomique** de la file (refus explicite si le
+  budget est insuffisant, rien n'est débité sinon). **✖ Abandonner** (ou
+  re-touche 📋) : les travaux planifiés sont retirés **sans frais** — ils
+  n'avaient jamais été payés. La pause est restituée à la sortie.
+- Options conservatrices : la file ne couvre que routes + arrêts (les
+  lignes gardent leur estimation V25) ; les travaux planifiés n'entrent
+  pas dans la pile d'annulation voirie (la file remplace) ; un arrêt
+  planifié devenu desservi par une ligne ou une route réutilisée par un
+  itinéraire est **conservé** à l'abandon plutôt que de casser une ligne.
+- Anti-cache bumpé `?v=39` ; test `tests/v33-plan-mode.mjs`.
+
 ## V32 — Versioning & migration des sauvegardes
 
 - **Format de sauvegarde versionné** : passage au format 4 (localStorage et

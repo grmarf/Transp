@@ -44,7 +44,7 @@ function nearestDistrict(city, x, y) {
 }
 
 /** Validation sans mutation : raison prête à afficher en cas de refus. */
-export function canBuildStop(state, x, y) {
+export function canBuildStop(state, x, y, options = {}) {
   if (!state || !state.city) return { ok: false, reason: "aucune ville chargée" };
   const city = state.city;
   if (!Number.isFinite(x) || !Number.isFinite(y)) return { ok: false, reason: "position invalide" };
@@ -57,15 +57,15 @@ export function canBuildStop(state, x, y) {
       return { ok: false, reason: "trop proche de « " + s.name + " » (espacement minimal " + MIN_STOP_SPACING + " px)" };
     }
   }
-  if ((state.money ?? 0) < STOP_BUILD_COST) {
+  if (!options.free && (state.money ?? 0) < STOP_BUILD_COST) {
     return { ok: false, reason: "fonds insuffisants (" + STOP_BUILD_COST.toLocaleString("fr-FR") + " € nécessaires)" };
   }
   return { ok: true };
 }
 
 /** Construit un arrêt. Retourne l'arrêt créé, ou null après refus motivé. */
-export function buildStop(state, x, y, log = () => {}) {
-  const check = canBuildStop(state, x, y);
+export function buildStop(state, x, y, log = () => {}, options = {}) {
+  const check = canBuildStop(state, x, y, options);
   if (!check.ok) { log("Construction refusée : " + check.reason + "."); return null; }
   const city = state.city;
   const id = uniqueStopId(city);
@@ -90,9 +90,11 @@ export function buildStop(state, x, y, log = () => {}) {
     builtByPlayer: true
   };
   city.stops.push(stop);
-  state.money -= STOP_BUILD_COST;
+  if (!options.free) state.money -= STOP_BUILD_COST;
   invalidateRoutingCache(state);
-  log("Arrêt « " + stop.name + " » construit (" + STOP_BUILD_COST.toLocaleString("fr-FR") + " €). Raccordez-le à la voirie puis tracez une ligne pour le desservir.");
+  log(options.free
+    ? "Arrêt « " + stop.name + " » posé (plan : " + STOP_BUILD_COST.toLocaleString("fr-FR") + " € à la validation du plan)."
+    : "Arrêt « " + stop.name + " » construit (" + STOP_BUILD_COST.toLocaleString("fr-FR") + " €). Raccordez-le à la voirie puis tracez une ligne pour le desservir.");
   return stop;
 }
 
