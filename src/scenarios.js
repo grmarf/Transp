@@ -113,6 +113,13 @@ export const SCENARIOS = [
   }
 ];
 
+// Compat V33 : chaque scénario expose aussi son premier objectif sous
+// "objective" — l'ancien champ mono-objectif reste ainsi cohérent pour
+// les sauvegardes et tout code qui le lit encore.
+for (const s of SCENARIOS) {
+  s.objective = Array.isArray(s.objectives) && s.objectives.length ? s.objectives[0] : null;
+}
+
 export function findScenario(id) {
   return SCENARIOS.find(function (s) { return s.id === id; }) || SCENARIOS[0];
 }
