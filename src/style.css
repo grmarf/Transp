@@ -1462,7 +1462,7 @@ eight:bold; color:#fff; }
     right: 10px;
     bottom: 10px;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 6px;
     padding: 8px;
     background: var(--paper-2);
@@ -1473,12 +1473,13 @@ eight:bold; color:#fff; }
   }
   body.toolbar-busy .map-menu { bottom: 88px; }
   .map-menu .btn {
-    min-height: 46px;
+    min-height: 44px;
+    padding: 4px 2px;
     white-space: normal;
-    line-height: 1.15;
-    font-size: .82rem;
+    line-height: 1.1;
+    font-size: .72rem;
   }
-  .map-menu .btn-map-back { grid-column: 1 / -1; min-height: 40px; }
+  .map-menu .btn-map-back { min-height: 44px; }
 }
 @media (max-width: 700px) {
   .map-menu { bottom: calc(66px + env(safe-area-inset-bottom)); }

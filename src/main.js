@@ -2162,11 +2162,29 @@ function isMenuActArmed(act) {
 }
 
 let mapMenuLevel = "std";
+// V35 — le rendu du menu est coalescé et différé d'une frame : pendant un
+// tap (pointerup → action → updateInstructions → setMapMenu), les boutons
+// ne sont jamais détruits au milieu de l'événement. Sinon le « click »
+// synthétique du navigateur peut viser un bouton reconstruit et invoquer
+// le handler une seconde fois : l'outil s'arme puis se désarme aussitôt —
+// « les boutons ne réagissent pas » (rapport joueur, mobile).
+let mapMenuRenderQueued = false;
 
 function setMapMenu(level) {
   const container = document.getElementById("mapMenu");
   if (!container) return;
   mapMenuLevel = MAP_MENU[level] ? level : "std";
+  if (mapMenuRenderQueued) return;
+  mapMenuRenderQueued = true;
+  requestAnimationFrame(function () {
+    mapMenuRenderQueued = false;
+    renderMapMenu();
+  });
+}
+
+function renderMapMenu() {
+  const container = document.getElementById("mapMenu");
+  if (!container) return;
   container.textContent = "";
   const items = MAP_MENU[mapMenuLevel];
   // ✕ uniquement hors niveau std : revient au menu racine.
