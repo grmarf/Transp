@@ -21,6 +21,28 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V34 — Scénarios & défis (réécriture complète de l'ébauche V9)
+
+- **Objectifs multiples** par défi : chaque scénario liste désormais
+  plusieurs objectifs mesurables (passagers transportés, bilan net,
+  ligne d'un mode donné : bus/tram/métro) plus une **contrainte
+  continue** « satisfaction minimale » (échec immédiat si violée). Le
+  bandeau affiche chaque objectif avec sa progression et une barre
+  globale.
+- **Deux nouveaux défis** : « Cap sur le métro » (ouvrir une ligne de
+  métro + 400 passagers) et « Ville qui grandit » (croissance ×2,
+  demande ×1,2, 900 passagers). Les trois défis historiques (Premiers
+  pas, Expansion express, Crise infrastructure) sont repris avec
+  descriptions et objectifs rééquilibrés ; le bac à sable reste libre.
+- **Médailles or / argent / bronze** à la victoire selon la marge de
+  temps, et **record par scénario** conservé entre les parties (clé
+  localStorage dédiée, hors sauvegarde → aucune migration du format
+  V32, qui reste en v4).
+- Compatibilité : `evaluateScenario` / `scenarioProgress` gardent leurs
+  signatures (engine.js inchangé) ; une sauvegarde V33 au format
+  mono-objectif reste jouable (repli automatique sur `objective`).
+- Anti-cache bumpé `?v=40` ; test `tests/v34-scenarios.mjs`.
+
 ## V33 — Mode planification : construire en pause, payer d'un bloc
 
 - **📋 Planifier** dans les contrôles de temps : la partie se met en pause

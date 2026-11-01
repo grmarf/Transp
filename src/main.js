@@ -1,6 +1,6 @@
 import { createCity, createSeedFromQuery, mulberry32 } from "./city.js";
 import { createState } from "./state.js";
-import { SCENARIOS, findScenario, scenarioProgress } from "./scenarios.js";
+import { SCENARIOS, findScenario, scenarioProgress, scenarioObjectives, MEDAL_EMOJI, loadScenarioRecords, recordScenarioResult, saveScenarioRecords } from "./scenarios.js";
 import { createLine, cancelLineMode, finishLine, startExtendLine, finishExtendLine, editLineStops, step, STOP_RADIUS, buyVehicleForLine, sellVehicleFromLine, deleteLine, networkFinancials, congestionHeatmap, cityJournal, estimateLineCost } from "./engine.js";
 import { createNetwork, routeLine, createUndergroundNetwork, createTramNetwork, roadType, roadConstructionCost, validateNetwork, ROAD_TYPES } from "./network.js";
 import { createRenderer, clearRendererCaches, renderFleetPanel } from "./renderer.js";
@@ -1173,7 +1173,7 @@ function populateScenarioSelect() {
   const select = document.getElementById("scenarioSelect");
   if (!select) return;
   select.innerHTML = SCENARIOS.map(function (s) {
-    return '<option value="' + h(s.id) + '">' + h(s.name) + " (" + h(s.difficulty) + ")</option>";
+    return '<option value="' + h(s.id) + '" title="' + h(s.description || "") + '">' + h(s.name) + " (" + h(s.difficulty) + ")</option>";
   }).join("");
 }
 
@@ -1181,20 +1181,46 @@ function updateScenarioBanner() {
   const banner = document.getElementById("scenarioBanner");
   if (!banner || !state) return;
   const scenario = state.scenario;
-  if (!scenario || !scenario.objective) {
+  const objectives = scenario ? scenarioObjectives(scenario) : [];
+  if (!scenario || !objectives.length) {
     banner.hidden = true;
     return;
   }
   banner.hidden = false;
   banner.className = "scenario-banner" + (scenario.status !== "active" ? " " + scenario.status : "");
-  const progress = scenarioProgress(state, { net: networkFinancials(state).net }) || 0;
+  const progress = scenarioProgress(state, { net: networkFinancials(state).net }) || { overall: null, items: [] };
+  const day = (state.elapsedDays || 0) + 1;
+  const medalEmoji = scenario.medal && MEDAL_EMOJI[scenario.medal.id] ? MEDAL_EMOJI[scenario.medal.id] + " " : "";
   const statusText = scenario.status === "won"
-    ? "✅ Réussi"
+    ? "✅ Réussi · " + medalEmoji + "jour " + day
     : scenario.status === "lost"
       ? "❌ Échoué"
-      : "Jour " + ((state.elapsedDays || 0) + 1) + (scenario.durationDays ? "/" + scenario.durationDays : "");
-  banner.innerHTML = '<div><b>' + h(scenario.name) + '</b> (' + h(scenario.difficulty) + ') — ' + h(scenario.objective.label) + ' · ' + h(statusText) + '</div>' +
-    '<div class="bar"><div style="width:' + Math.round(progress * 100) + '%"></div></div>';
+      : "Jour " + day + (scenario.durationDays ? "/" + scenario.durationDays : "");
+  const itemsHtml = (progress.items || []).map(function (it) {
+    const mark = it.failed ? "❌" : it.done ? "✅" : it.type === "satisfactionMin" ? "🛡️" : "⏳";
+    const pct = it.progress == null ? "" : " · " + Math.round(it.progress * 100) + " %";
+    return '<div>' + mark + " " + h(it.label) + pct + "</div>";
+  }).join("");
+  // V34 — record enregistré une seule fois par fin de défi (le record vit
+  // hors sauvegarde : clé localStorage dédiée, aucun impact migration).
+  let recordHtml = "";
+  if (scenario.status !== "active" && !scenario.recordSaved) {
+    scenario.recordSaved = true;
+    const records = recordScenarioResult(loadScenarioRecords(), scenario.id, {
+      status: scenario.status,
+      medal: scenario.medal ? scenario.medal.id : null,
+      day: day
+    });
+    saveScenarioRecords(records);
+    scenario.record = records[scenario.id] || null;
+  }
+  if (scenario.record && scenario.record.status === "won") {
+    recordHtml = '<div>🏅 Record : ' + (MEDAL_EMOJI[scenario.record.medal] || "✅") + " jour " + scenario.record.day + "</div>";
+  }
+  banner.innerHTML = '<div><b>' + h(scenario.name) + '</b> (' + h(scenario.difficulty) + ') · ' + h(statusText) + '</div>' +
+    itemsHtml +
+    (progress.overall == null ? "" : '<div class="bar"><div style="width:' + Math.round(Math.max(0, Math.min(1, progress.overall)) * 100) + '%"></div></div>') +
+    recordHtml;
 }
 
 function refreshUI() {
@@ -1341,8 +1367,15 @@ function boot(seed, scenarioId, restoredPayload) {
   if (!restoredPayload) {
     log("Bienvenue ! Ton budget de départ : " + state.money.toLocaleString("fr-FR") + " €.");
     log("Ville générée : « " + state.city.name + " ».");
-    if (state.scenario && state.scenario.objective) {
-      log("Scénario : " + state.scenario.name + " — " + state.scenario.objective.label + ".");
+    if (state.scenario) {
+      const objectives = scenarioObjectives(state.scenario);
+      if (objectives.length) {
+        log("Défi « " + state.scenario.name + " » (" + state.scenario.difficulty + ") — " +
+          objectives.map(function (o) { return o.label; }).join(" · ") +
+          (state.scenario.durationDays ? " · " + state.scenario.durationDays + " jours" : "") + ".");
+      } else {
+        log("Scénario : " + state.scenario.name + " — libre, aucun objectif.");
+      }
     }
     log("Touche la carte pour sélectionner un arrêt !");
     if (carrefourReport && (carrefourReport.bends > 0 || carrefourReport.stops > 0)) {

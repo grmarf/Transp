@@ -15,7 +15,7 @@ const index = read("index.html");
 check("index.html : bouton toggleStopNamesBtn présent", index.includes('id="toggleStopNamesBtn"'));
 check("index.html : bouton stylé map-overlay-btn", /class="map-overlay-btn"[^>]*id="toggleStopNamesBtn"|id="toggleStopNamesBtn"[^>]*class="map-overlay-btn"/.test(index));
 check("index.html : 6 boutons d'overlay", (index.match(/map-overlay-btn/g) || []).length === 6);
-check("index.html : anti-cache bumpé v39 (plus de v38)", !index.includes("?v=38") && (index.match(/\?v=39/g) || []).length >= 3);
+check("index.html : anti-cache bumpé v40 (plus de v39)", !index.includes("?v=39") && (index.match(/\?v=40/g) || []).length >= 3);
 
 const main = read("src/main.js");
 check("main.js : bouton branché via bindTap", main.includes('bindTap(document.getElementById("toggleStopNamesBtn")'));
