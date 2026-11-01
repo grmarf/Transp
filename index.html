@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="favicon.png" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="src/style.css?v=36">
+  <link rel="stylesheet" href="src/style.css?v=37">
 </head>
 <body>
 <header class="topbar" aria-label="En-tête du jeu">
@@ -45,6 +45,9 @@
       <div id="mapMenu" class="map-menu" aria-label="Menu de la carte"></div>
       <button id="newLineBtn" type="button" class="btn btn-primary" aria-label="Créer ou annuler une nouvelle ligne">✏️ Ligne</button>
       <button id="resetZoomBtn" type="button" class="btn" aria-label="Recentrer la carte sur la ville">🎯 Recentrer</button>
+            <button id="buildStopBtn" type="button" class="btn" aria-label="Construire un nouvel arrêt">🚏 Construire</button>
+      <button id="demolishStopBtn" type="button" class="btn" aria-label="Supprimer un arrêt existant">➖ Arrêt</button>
+      <button id="multimodalStopBtn" type="button" class="btn" aria-label="Transformer un arrêt en pôle multimodal">⬆️ Multimodal</button>
       <button id="voirieBtn" type="button" class="btn" aria-expanded="false" aria-controls="voirieGroup">🛣️ Voirie</button>
       <div id="voirieGroup" class="tool-group" data-open="false">
         <button id="buildRoadBtn" type="button" class="btn" aria-label="Construire une route libre">🛣️ Construire</button>
@@ -174,7 +177,7 @@
     "./src/events.js", "./src/progression.js", "./src/contracts.js",
     "./src/reports.js", "./src/seasons.js",
     "./src/demographics.js", "./src/coverage.js", "./src/advertising.js",
-    "./src/engine.js", "./src/renderer.js", "./src/main.js?v=36"
+    "./src/engine.js", "./src/stops.js", "./src/renderer.js", "./src/main.js?v=37"
   ];
 
   var results = [];
@@ -202,7 +205,7 @@
   document.body.appendChild(b);
 })();
 </script>
-<script type="module" src="src/main.js?v=36"></script>
+<script type="module" src="src/main.js?v=37"></script>
 </body>
 </html>
 

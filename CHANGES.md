@@ -21,6 +21,23 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V30 — Gestion des arrêts & multimodalité
+
+- **Construire un arrêt** (🚏 Arrêts ▸ ➕) : pose d'un arrêt neuf à 1 200 €,
+  avec validation propre — refus motivé si trop proche d'un arrêt existant
+  (espacement minimal 80 px), hors du territoire, ou sans les fonds. Le nouvel
+  arrêt se raccorde ensuite à la voirie et aux lignes comme les autres.
+- **Supprimer un arrêt** (➖) : refusé tant qu'il est desservi par une ligne
+  (option conservatrice : retirez d'abord la ligne) ou sélectionné dans un
+  tracé en cours. Sinon : voirie raccordée supprimée, passagers en attente à
+  cet arrêt abandonnés et comptés, demandes purgées.
+- **Pôle multimodal** (⬆️) : upgrade d'un arrêt à 6 000 € — un passager EN
+  CORRESPONDANCE y attend deux fois moins vite, et l'arrêt est 20 % plus
+  attractif comme destination. Rétrogradation possible (remboursement 50 %).
+  Rendu : anneau pointillé ciel autour de l'arrêt. Sauvegardes compatibles
+  sans migration (champ `multimodal` optionnel).
+- Anti-cache bumpé `?v=37` ; test `tests/v30-stops.mjs`.
+
 ## V29.7 — Quartier léger autour des arrêts
 
 - **Anneau pointillé au lieu du disque plein** : le halo jaune de population

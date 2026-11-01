@@ -830,6 +830,17 @@ export function createRenderer(canvas, state) {
           ctx.stroke();
         }
 
+        // V30 — pôle multimodal : anneau pointillé ciel autour de l'arrêt.
+        if (s.multimodal) {
+          ctx.strokeStyle = SKY;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, radius + 3, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
         // V29.5 — étiquette masquable via le bouton 🔤 de la barre d'overlays.
         // V29.6 — niveau de détail : en vue d'ensemble (zoom < 0.55) les
         // étiquettes s'effacent d'elles-mêmes pour ne pas faire une soupe.

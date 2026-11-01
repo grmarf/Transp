@@ -98,6 +98,8 @@ export function createState(city, scenario = null) {
     showLandValue: false,
     showZones: false,
     zoneMode: null,           // null | "zone" | "unzone" | "inspect"
+    // V30 — outils d'arrêts (construction / démolition / multimodal).
+    stopToolMode: null,       // null | "build" | "demolish" | "multimodal"
     pendingZoneCorner: null,  // premier coin posé pour peindre une zone
     selectedBuildingId: null,
   };
