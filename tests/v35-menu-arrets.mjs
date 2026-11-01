@@ -182,9 +182,9 @@ try {
     .catch(() => { throw new Error('arrêt initial non supprimé : ' + initStop.id); });
 
   // --- 6. La croix ✕ bascule instantanément vers la racine ----------------
-  const visibleHas = (label) => `Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes(${'${'}JSON.stringify(label)})))`;
+  const visibleHas = (label) => `Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes(${JSON.stringify(label)})))`;
   const menuDiag = (x, y) => `(() => {
-    const el = document.elementFromPoint(${'${'}x}, ${'${'}y});
+    const el = document.elementFromPoint(${x}, ${y});
     const pages = [...document.querySelectorAll("#mapMenu .map-menu-page")].map((p) => p.dataset.level + (p.hidden ? "H" : "V")).join("|");
     const vis = [...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].map((b) => b.textContent).join(",");
     return "hit=" + (el ? (el.tagName + (el.id ? "#" + el.id : "")) : "rien") +
