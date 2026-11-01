@@ -183,23 +183,26 @@ try {
 
   // --- 6. La croix ✕ bascule instantanément vers la racine ----------------
   const visibleHas = (label) => `Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes(${JSON.stringify(label)})))`;
-  const menuDiag = (x, y) => `(() => {
-    const el = document.elementFromPoint(${x}, ${y});
-    const pages = [...document.querySelectorAll("#mapMenu .map-menu-page")].map((p) => p.dataset.level + (p.hidden ? "H" : "V")).join("|");
-    const vis = [...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].map((b) => b.textContent).join(",");
-    return "hit=" + (el ? (el.tagName + (el.id ? "#" + el.id : "")) : "rien") +
-      " txt=" + (el ? String(el.textContent || "").slice(0, 12) : "") +
-      " pages=" + pages + " vis=" + vis.slice(0, 44) +
-      " mode=" + (window.__vieTLignes.getState().stopToolMode || "-");
+  const crossState = () => `(() => { const p = document.querySelector("#mapMenu .map-menu-page:not([hidden])"); return JSON.stringify({ page: p ? p.dataset.level : "-", mode: window.__vieTLignes.getState().stopToolMode || "-" }); })`;
+  const traceEvents = () => `(() => {
+    window.__evdiag = [];
+    ["pointerdown", "pointerup", "touchstart", "touchend", "click"].forEach(function (ev) {
+      document.addEventListener(ev, function (e) {
+        const t = e.target;
+        window.__evdiag.push(ev + ">" + (t && t.tagName ? t.tagName + (t.id ? "#" + t.id : "") + "." + String(t.className || "").slice(0, 16) : "?"));
+      }, true);
+    });
+    return "ok";
   })()`;
   const cross1 = await waitFor('croix visible (page arrets)', () => evaluate(btnCenter('✕')));
-  const preDiag = await evaluate(menuDiag(Math.round(cross1.x), Math.round(cross1.y)));
+  await evaluate(traceEvents());
   await touch(cross1.x, cross1.y);
   await sleep(300);
   await waitFor('croix : retour std', () => evaluate(visibleHas('Voirie')))
     .catch(async function () {
-      const post = await evaluate(menuDiag(Math.round(cross1.x), Math.round(cross1.y)));
-      throw new Error('CROIX INERTE @' + Math.round(cross1.x) + ',' + Math.round(cross1.y) + ' avant[' + preDiag + '] apres[' + post + ']');
+      throw new Error('CROIX INERTE @' + Math.round(cross1.x) + ',' + Math.round(cross1.y)
+        + ' ev=' + (await evaluate('JSON.stringify(window.__evdiag || [])'))
+        + ' st=' + (await evaluate(crossState())));
     });
   assert.equal(await evaluate(visibleHas('Construire')), false,
     'la croix a bien quitté la page Arrêts');
@@ -211,12 +214,13 @@ try {
   await touch(build2.x, build2.y);
   await waitFor('outil ré-armé', () => evaluate('window.__vieTLignes.getState().stopToolMode === "build"'), 5000);
   const cross2 = await waitFor('croix re-visible', () => evaluate(btnCenter('✕')));
+  await evaluate('window.__evdiag = []');
   await touch(cross2.x, cross2.y);
   await sleep(300);
   await waitFor('croix : retour std (2)', () => evaluate(visibleHas('Voirie')))
     .catch(async function () {
-      const post = await evaluate(menuDiag(Math.round(cross2.x), Math.round(cross2.y)));
-      throw new Error('CROIX INERTE (2) @' + Math.round(cross2.x) + ',' + Math.round(cross2.y) + ' apres[' + post + ']');
+      throw new Error('CROIX INERTE(2) ev=' + (await evaluate('JSON.stringify(window.__evdiag || [])'))
+        + ' st=' + (await evaluate(crossState())));
     });
   assert.equal(await evaluate('window.__vieTLignes.getState().stopToolMode'), 'build',
     '✕ ne désarme pas l\'outil : la racine surligne la branche armée');
