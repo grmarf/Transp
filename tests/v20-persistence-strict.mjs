@@ -5,7 +5,7 @@ import { readSavedGame, SAVE_KEY, SAVE_VERSION, serializeState, validateSavePayl
 
 const state = createState(createCity('V20-STRICT'));
 const payload = serializeState(state, 123);
-assert.equal(SAVE_VERSION, 3);
+assert.equal(SAVE_VERSION, 4); // V32 — format de sauvegarde 4
 assert.equal(payload.state.version, '23.0');
 assert.equal(state.wageLevel, 1);
 assert.equal(state.fareLevel, 1);
