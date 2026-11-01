@@ -27,7 +27,9 @@ const s1 = createState(createCity('V9-WIN'), premiersPas);
 s1.totalArrived = premiersPas.objective.target;
 evaluateScenario(s1, () => {}, { net: 0, currentSatisfaction: 100 });
 assert.equal(s1.scenario.status, 'won');
-assert.equal(scenarioProgress(s1, { net: 0 }), 1);
+// V34 : scenarioProgress retourne désormais { overall, items } —
+// l'objectif mono devient overall, les objectifs multiples vivent dans items.
+assert.equal(scenarioProgress(s1, { net: 0 }).overall, 1);
 
 // Une fois le statut fixé, une réévaluation ne doit plus rien changer.
 s1.totalArrived = 0;
