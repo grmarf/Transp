@@ -183,7 +183,7 @@ try {
 
   // --- 6. La croix ✕ bascule instantanément vers la racine ----------------
   const visibleHas = (label) => `Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes(${JSON.stringify(label)})))`;
-  const crossState = () => `(() => { const p = document.querySelector("#mapMenu .map-menu-page:not([hidden])"); return JSON.stringify({ page: p ? p.dataset.level : "-", mode: window.__vieTLignes.getState().stopToolMode || "-" }); })`;
+  const crossState = () => `(() => { const p = document.querySelector("#mapMenu .map-menu-page:not([hidden])"); return JSON.stringify({ page: p ? p.dataset.level : "-", mode: window.__vieTLignes.getState().stopToolMode || "-" }); })()`;
   const traceEvents = () => `(() => {
     window.__evdiag = [];
     ["pointerdown", "pointerup", "touchstart", "touchend", "click"].forEach(function (ev) {
@@ -194,15 +194,32 @@ try {
     });
     return "ok";
   })()`;
+  // SONDE : pointerup synthétique directement sur le ✕ — le listener est-il branché ?
   const cross1 = await waitFor('croix visible (page arrets)', () => evaluate(btnCenter('✕')));
+  const synth = await evaluate(`(() => {
+    const b = [...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].find((x) => x.textContent.includes("\u2715"));
+    b.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 7 }));
+    const p = document.querySelector("#mapMenu .map-menu-page:not([hidden])");
+    return JSON.stringify({ page: p ? p.dataset.level : "-", croix: document.querySelectorAll("#mapMenu .btn-map-back").length });
+  })()`);
+  if (JSON.parse(synth).page === 'arrets') {
+    throw new Error('CROIX NON BRANCHEE : pointerup synthétique sans effet. croix=' + synth);
+  }
+  // retour sur la page Arrêts, puis tap RÉEL sur le ✕
+  const arrets1 = await waitFor('bouton Arrêts re-visible', () => evaluate(btnCenter('Arrêts')));
+  await touch(arrets1.x, arrets1.y);
+  await waitFor('page arrets rouverte', () => evaluate(btnCenter('Construire')));
+  const cross1b = await waitFor('croix re-visible', () => evaluate(btnCenter('✕')));
   await evaluate(traceEvents());
-  await touch(cross1.x, cross1.y);
+  await touch(cross1b.x, cross1b.y);
   await sleep(300);
   await waitFor('croix : retour std', () => evaluate(visibleHas('Voirie')))
     .catch(async function () {
-      throw new Error('CROIX INERTE @' + Math.round(cross1.x) + ',' + Math.round(cross1.y)
+      throw new Error('CROIX INERTE @' + Math.round(cross1b.x) + ',' + Math.round(cross1b.y)
+        + ' synth=' + synth
         + ' ev=' + (await evaluate('JSON.stringify(window.__evdiag || [])'))
-        + ' st=' + (await evaluate(crossState())));
+        + ' st=' + (await evaluate(crossState()))
+        + ' cond=' + (await evaluate(visibleHas('Voirie'))));
     });
   assert.equal(await evaluate(visibleHas('Construire')), false,
     'la croix a bien quitté la page Arrêts');
