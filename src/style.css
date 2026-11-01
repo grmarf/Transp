@@ -1436,6 +1436,11 @@ eight:bold; color:#fff; }
 
 /* V27.6 — retour visuel : branche racine armée surlignée ; cache busting. */
 .map-menu .btn.is-active { background: var(--sun); }
+/* V36 — pages du menu en cascade : une seule visible ; display:contents
+   pour que la grille (.map-menu) s'applique directement aux boutons,
+   sans wrapper visible. */
+.map-menu-page { display: contents; }
+.map-menu-page[hidden] { display: none; }
 
 
 

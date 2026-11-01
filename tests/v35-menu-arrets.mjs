@@ -63,7 +63,7 @@ async function touch(x, y) {
   await sleep(60);
   await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
-const btnCenter = (label) => `(() => { const b = [...document.querySelectorAll("#mapMenu button")].find((x) => x.textContent.includes(${JSON.stringify(label)})); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
+const btnCenter = (label) => `(() => { const b = [...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].find((x) => x.textContent.includes(${JSON.stringify(label)})); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
 
 try {
   await waitFor('serveur HTTP prêt', async () => (await fetch(url)).ok);
@@ -105,15 +105,15 @@ try {
   await sleep(500); // premier rendu du menu (différé d'une frame) + recadrage
 
   // --- 1. La racine tient sur UNE ligne (4 boutons, mêmes tops) ----------
-  const stdTopsRaw = await evaluate('[...document.querySelectorAll("#mapMenu button")].map((b) => Math.round(b.getBoundingClientRect().top))');
+  const stdTopsRaw = await evaluate('[...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].map((b) => Math.round(b.getBoundingClientRect().top))');
   assert.equal(stdTopsRaw.length, 4, 'std : 4 boutons attendus, tops=' + JSON.stringify(stdTopsRaw));
   assert.equal(new Set(stdTopsRaw).size, 1, 'std : les boutons tiennent sur une seule ligne, tops=' + JSON.stringify(stdTopsRaw));
 
   // --- 2. Tap réel sur « 🚏 Arrêts ▸ » → page Arrêts ---------------------
   let target2 = await waitFor('bouton Arrêts visible', () => evaluate(btnCenter('Arrêts')));
   await touch(target2.x, target2.y);
-  await waitFor('page arrets ouverte', () => evaluate('Boolean([...document.querySelectorAll("#mapMenu button")].some((b) => b.textContent.includes("Construire")))'));
-  const pageTops = await evaluate('[...document.querySelectorAll("#mapMenu button")].map((b) => Math.round(b.getBoundingClientRect().top))');
+  await waitFor('page arrets ouverte', () => evaluate('Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes("Construire")))'));
+  const pageTops = await evaluate('[...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].map((b) => Math.round(b.getBoundingClientRect().top))');
   assert.equal(pageTops.length, 4, 'page arrets : ✕ + 3 actions, tops=' + JSON.stringify(pageTops));
   assert.equal(new Set(pageTops).size, 1, 'page arrets : ✕ et les 3 actions sur la MÊME ligne, tops=' + JSON.stringify(pageTops));
 
@@ -180,6 +180,67 @@ try {
   await touch(initStop.sx, initStop.sy);
   await waitFor('arrêt initial démoli', () => evaluate(`!window.__vieTLignes.getState().city.stops.some((s) => s.id === ${JSON.stringify(initStop.id)})`), 5000)
     .catch(() => { throw new Error('arrêt initial non supprimé : ' + initStop.id); });
+
+  // --- 6. La croix ✕ bascule instantanément vers la racine ----------------
+  const visibleHas = (label) => `Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes(${JSON.stringify(label)})))`;
+  const crossState = () => `(() => { const p = document.querySelector("#mapMenu .map-menu-page:not([hidden])"); return JSON.stringify({ page: p ? p.dataset.level : "-", mode: window.__vieTLignes.getState().stopToolMode || "-" }); })()`;
+  const traceEvents = () => `(() => {
+    window.__evdiag = [];
+    ["pointerdown", "pointerup", "touchstart", "touchend", "click"].forEach(function (ev) {
+      document.addEventListener(ev, function (e) {
+        const t = e.target;
+        window.__evdiag.push(ev + ">" + (t && t.tagName ? t.tagName + (t.id ? "#" + t.id : "") + "." + String(t.className || "").slice(0, 16) : "?"));
+      }, true);
+    });
+    return "ok";
+  })()`;
+  // SONDE : pointerup synthétique directement sur le ✕ — le listener est-il branché ?
+  const cross1 = await waitFor('croix visible (page arrets)', () => evaluate(btnCenter('✕')));
+  const synth = await evaluate(`(() => {
+    const b = [...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].find((x) => x.textContent.includes("\u2715"));
+    b.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 7 }));
+    const p = document.querySelector("#mapMenu .map-menu-page:not([hidden])");
+    return JSON.stringify({ page: p ? p.dataset.level : "-", croix: document.querySelectorAll("#mapMenu .btn-map-back").length });
+  })()`);
+  if (JSON.parse(synth).page === 'arrets') {
+    throw new Error('CROIX NON BRANCHEE : pointerup synthétique sans effet. croix=' + synth);
+  }
+  // retour sur la page Arrêts, puis tap RÉEL sur le ✕
+  const arrets1 = await waitFor('bouton Arrêts re-visible', () => evaluate(btnCenter('Arrêts')));
+  await touch(arrets1.x, arrets1.y);
+  await waitFor('page arrets rouverte', () => evaluate(btnCenter('Construire')));
+  const cross1b = await waitFor('croix re-visible', () => evaluate(btnCenter('✕')));
+  await evaluate(traceEvents());
+  await touch(cross1b.x, cross1b.y);
+  await sleep(300);
+  await waitFor('croix : retour std', () => evaluate(visibleHas('Voirie')))
+    .catch(async function () {
+      throw new Error('CROIX INERTE @' + Math.round(cross1b.x) + ',' + Math.round(cross1b.y)
+        + ' synth=' + synth
+        + ' ev=' + (await evaluate('JSON.stringify(window.__evdiag || [])'))
+        + ' st=' + (await evaluate(crossState()))
+        + ' cond=' + (await evaluate(visibleHas('Voirie'))));
+    });
+  assert.equal(await evaluate(visibleHas('Construire')), false,
+    'la croix a bien quitté la page Arrêts');
+  // retour sur Arrêts, armement, puis ✕ : l'outil reste armé (la racine surligne la branche)
+  const arrets2 = await waitFor('bouton Arrêts re-visible', () => evaluate(btnCenter('Arrêts')));
+  await touch(arrets2.x, arrets2.y);
+  await waitFor('page arrets rouverte', () => evaluate(btnCenter('Construire')));
+  const build2 = await evaluate(btnCenter('Construire'));
+  await touch(build2.x, build2.y);
+  await waitFor('outil ré-armé', () => evaluate('window.__vieTLignes.getState().stopToolMode === "build"'), 5000);
+  const cross2 = await waitFor('croix re-visible', () => evaluate(btnCenter('✕')));
+  await evaluate('window.__evdiag = []');
+  await touch(cross2.x, cross2.y);
+  await sleep(300);
+  await waitFor('croix : retour std (2)', () => evaluate(visibleHas('Voirie')))
+    .catch(async function () {
+      throw new Error('CROIX INERTE(2) ev=' + (await evaluate('JSON.stringify(window.__evdiag || [])'))
+        + ' st=' + (await evaluate(crossState())));
+    });
+  assert.equal(await evaluate('window.__vieTLignes.getState().stopToolMode'), 'build',
+    '✕ ne désarme pas l\'outil : la racine surligne la branche armée');
 
   assert.equal(consoleErrors.length, 0, 'erreurs navigateur : ' + consoleErrors.join(' ; ').slice(0, 200));
   console.log(JSON.stringify({ ok: true, suite: 'v35-menu-arrets' }));
