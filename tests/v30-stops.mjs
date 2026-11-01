@@ -28,7 +28,15 @@ const makeState = () => {
   assert.equal(canBuildStop(state, s0.x, s0.y).ok, false, "trop proche -> refus");
   assert.ok(canBuildStop(state, s0.x, s0.y).reason.includes("trop proche"), "motif lisible");
   assert.equal(canBuildStop(state, -50, 100).ok, false, "hors territoire -> refus");
-  const far = { x: Math.min(900, s0.x + MIN_STOP_SPACING * 2), y: Math.min(600, s0.y + MIN_STOP_SPACING * 2) };
+  // Chercher une vraie position libre (≥ 80 px de tout arrêt, dans le territoire)
+  // plutôt qu'un point heuristique qui peut tomber près d'un autre arrêt.
+  let far = null;
+  outer: for (let y = 60; y <= 580; y += 20) {
+    for (let x = 60; x <= 930; x += 20) {
+      if (canBuildStop(state, x, y).ok) { far = { x, y }; break outer; }
+    }
+  }
+  assert.ok(far, "une position libre existe dans la ville");
   assert.equal(canBuildStop(state, far.x, far.y).ok, true, "position libre -> ok");
   const money0 = state.money;
   const stop = buildStop(state, far.x, far.y, log);
