@@ -182,10 +182,26 @@ try {
     .catch(() => { throw new Error('arrêt initial non supprimé : ' + initStop.id); });
 
   // --- 6. La croix ✕ bascule instantanément vers la racine ----------------
+  const visibleHas = (label) => `Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes(${'${'}JSON.stringify(label)})))`;
+  const menuDiag = (x, y) => `(() => {
+    const el = document.elementFromPoint(${'${'}x}, ${'${'}y});
+    const pages = [...document.querySelectorAll("#mapMenu .map-menu-page")].map((p) => p.dataset.level + (p.hidden ? "H" : "V")).join("|");
+    const vis = [...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].map((b) => b.textContent).join(",");
+    return "hit=" + (el ? (el.tagName + (el.id ? "#" + el.id : "")) : "rien") +
+      " txt=" + (el ? String(el.textContent || "").slice(0, 12) : "") +
+      " pages=" + pages + " vis=" + vis.slice(0, 44) +
+      " mode=" + (window.__vieTLignes.getState().stopToolMode || "-");
+  })()`;
   const cross1 = await waitFor('croix visible (page arrets)', () => evaluate(btnCenter('✕')));
+  const preDiag = await evaluate(menuDiag(Math.round(cross1.x), Math.round(cross1.y)));
   await touch(cross1.x, cross1.y);
-  await waitFor('croix : retour std', () => evaluate('Boolean([...document.querySelectorAll(' + String.fromCharCode(34) + '#mapMenu .map-menu-page:not([hidden]) button' + String.fromCharCode(34) + ')].some((b) => b.textContent.includes("Voirie")))'));
-  assert.equal(await evaluate('Boolean([...document.querySelectorAll(' + String.fromCharCode(34) + '#mapMenu .map-menu-page:not([hidden]) button' + String.fromCharCode(34) + ')].some((b) => b.textContent.includes("Construire")))'), false,
+  await sleep(300);
+  await waitFor('croix : retour std', () => evaluate(visibleHas('Voirie')))
+    .catch(async function () {
+      const post = await evaluate(menuDiag(Math.round(cross1.x), Math.round(cross1.y)));
+      throw new Error('CROIX INERTE @' + Math.round(cross1.x) + ',' + Math.round(cross1.y) + ' avant[' + preDiag + '] apres[' + post + ']');
+    });
+  assert.equal(await evaluate(visibleHas('Construire')), false,
     'la croix a bien quitté la page Arrêts');
   // retour sur Arrêts, armement, puis ✕ : l'outil reste armé (la racine surligne la branche)
   const arrets2 = await waitFor('bouton Arrêts re-visible', () => evaluate(btnCenter('Arrêts')));
@@ -196,7 +212,12 @@ try {
   await waitFor('outil ré-armé', () => evaluate('window.__vieTLignes.getState().stopToolMode === "build"'), 5000);
   const cross2 = await waitFor('croix re-visible', () => evaluate(btnCenter('✕')));
   await touch(cross2.x, cross2.y);
-  await waitFor('croix : retour std (2)', () => evaluate('Boolean([...document.querySelectorAll(' + String.fromCharCode(34) + '#mapMenu .map-menu-page:not([hidden]) button' + String.fromCharCode(34) + ')].some((b) => b.textContent.includes("Voirie")))'));
+  await sleep(300);
+  await waitFor('croix : retour std (2)', () => evaluate(visibleHas('Voirie')))
+    .catch(async function () {
+      const post = await evaluate(menuDiag(Math.round(cross2.x), Math.round(cross2.y)));
+      throw new Error('CROIX INERTE (2) @' + Math.round(cross2.x) + ',' + Math.round(cross2.y) + ' apres[' + post + ']');
+    });
   assert.equal(await evaluate('window.__vieTLignes.getState().stopToolMode'), 'build',
     '✕ ne désarme pas l\'outil : la racine surligne la branche armée');
 
