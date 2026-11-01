@@ -17,7 +17,10 @@ const MAP_MENU = (new Function('return ' + cfgMatch[0].replace('const MAP_MENU =
 const levels = Object.keys(MAP_MENU);
 assert.ok(levels.includes('std'), 'le niveau std existe');
 for (const level of levels) {
-  assert.equal(MAP_MENU[level].length, 3, `le menu "${level}" affiche exactement 3 boutons`);
+  // V30 — la racine « std » gagne une 4e entrée (🚏 Arrêts) ; les sous-menus
+  // restent à 3. Le contrat devient : entre 3 et 4 boutons par niveau.
+  assert.ok(MAP_MENU[level].length >= 3 && MAP_MENU[level].length <= 4,
+    `le menu "${level}" affiche 3 ou 4 boutons (reçu ${MAP_MENU[level].length})`);
 }
 
 // 3. Navigation : chaque goto pointe vers un niveau défini.
