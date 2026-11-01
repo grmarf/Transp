@@ -12,6 +12,7 @@ import { developCityCarrefours } from "./carrefours.js";
 import { refreshAllLineRoutes } from "./disruptions.js";
 import { startCampaign } from "./advertising.js";
 import { pruneRedundantRoads, pruneOrphanCarrefourStops } from "./pruning.js";
+import { buildStop, demolishStop, upgradeStopMultimodal, STOP_BUILD_COST, MULTIMODAL_UPGRADE_COST } from "./stops.js";
 
 const canvas = document.getElementById("map");
 const miniMapCanvas = document.getElementById("miniMapCanvas");
@@ -169,6 +170,12 @@ function updateInstructions() {
     el.innerHTML = "Dézonage : clique une <b>zone</b> pour la retirer (les bâtiments restent).";
   } else if (state.zoneMode === "inspect") {
     el.innerHTML = "Inspection : clique un <b>bâtiment</b> pour afficher ses statistiques.";
+  } else if (state.stopToolMode === "build") {
+    el.innerHTML = "Arrêt : clique l'emplacement du <b>nouvel arrêt</b> (" + STOP_BUILD_COST.toLocaleString("fr-FR") + " €).";
+  } else if (state.stopToolMode === "demolish") {
+    el.innerHTML = "Suppression : clique l'<b>arrêt</b> à démolir (refusé s'il est desservi par une ligne).";
+  } else if (state.stopToolMode === "multimodal") {
+    el.innerHTML = "Multimodal : clique un <b>arrêt</b> à transformer en pôle (" + MULTIMODAL_UPGRADE_COST.toLocaleString("fr-FR") + " €).";
   } else if (state.lineMode) {
     if (extending) {
       const line = state.lines.find(function (l) { return l.id === state.extendingLineId; });
@@ -576,6 +583,49 @@ function endRoadTrace() {
   refreshUI();
 }
 
+// V30 — armement d'un outil d'arrêt : les autres modes se désarment pour
+// qu'un tracé de ligne, un zonage et une pose d'arrêt ne se disputent pas le tap.
+function setStopToolMode(mode) {
+  if (!state) return;
+  state.stopToolMode = state.stopToolMode === mode ? null : mode;
+  if (state.stopToolMode) {
+    if (state.lineMode) cancelLineMode(state);
+    state.roadEditMode = null;
+    state.pendingRoadPoint = null;
+    state.pendingRoadStopId = null;
+    state.zoneMode = null;
+    state.pendingZoneCorner = null;
+  }
+  updateInstructions();
+  refreshUI();
+}
+
+// V30 — un tap en mode outil d'arrêt : pose, démolition ou upgrade multimodal.
+function handleStopToolTap(p) {
+  if (state.stopToolMode === "build") {
+    const stop = buildStop(state, p.x, p.y, log);
+    if (stop) {
+      rebuildNetwork();
+      hapticFeedback(10);
+      state.stopToolMode = null;
+    }
+    return;
+  }
+  let nearest = null;
+  let best = Infinity;
+  state.city.stops.forEach(function (stop) {
+    const d = Math.hypot(stop.x - p.x, stop.y - p.y);
+    const HIT = Math.max(STOP_RADIUS * 2.8, 36);
+    if (d <= HIT && d < best) { nearest = stop; best = d; }
+  });
+  if (!nearest) { log("Touche un arrêt existant sur la carte."); return; }
+  if (state.stopToolMode === "demolish") {
+    if (demolishStop(state, nearest.id, log)) { rebuildNetwork(); state.stopToolMode = null; }
+  } else if (state.stopToolMode === "multimodal") {
+    if (upgradeStopMultimodal(state, nearest.id, log)) state.stopToolMode = null;
+  }
+}
+
 function clickMap(e) {
   // L’API publique historique reçoit des coordonnées dans le repère monde
   // du canvas (sans type d’événement). Les vrais pointer events passent par
@@ -588,6 +638,14 @@ function clickMap(e) {
     p = { x: (e.clientX - rect.left) * scaleX, y: (e.clientY - rect.top) * scaleY };
   }
   if (!p || !state) return;
+
+  // V30 — outils d'arrêts : construire / démolir / passer en multimodal.
+  if (state.stopToolMode) {
+    handleStopToolTap(p);
+    updateInstructions();
+    refreshUI();
+    return;
+  }
 
   // V27 — outils d'urbanisme : zonage (deux coins), dézonage, inspection.
   if (state.zoneMode === "zone") {
@@ -1382,10 +1440,16 @@ function applyEditorAction(action, index) {
 bindTap(document.getElementById("newLineBtn"), function () {
   if (!state) return;
   if (state.lineMode) cancelLineMode(state);
-  else createLine(state);
+  else { state.stopToolMode = null; createLine(state); }
   updateInstructions();
   refreshUI();
 });
+
+// V30 — outils d'arrêts : boutons historiques branchés, pilotés par le menu
+// en cascade (page « 🚏 Arrêts »).
+bindTap(document.getElementById("buildStopBtn"), function () { if (state) setStopToolMode("build"); });
+bindTap(document.getElementById("demolishStopBtn"), function () { if (state) setStopToolMode("demolish"); });
+bindTap(document.getElementById("multimodalStopBtn"), function () { if (state) setStopToolMode("multimodal"); });
 
 bindTap(document.getElementById("gameMenuBtn"), function () { toggleGameMenu(); });
 bindTap(document.getElementById("voirieBtn"), function () {
@@ -1856,7 +1920,8 @@ const MAP_MENU = {
   "std": [
     { label: "🛣️ Voirie", goto: "voirie" },
     { label: "🏙️ Urbanisme", goto: "urbanisme" },
-    { label: "🚌 Ligne", goto: "ligne" }
+    { label: "🚌 Ligne", goto: "ligne" },
+    { label: "🚏 Arrêts ▸", goto: "arrets" }
   ],
   "voirie": [
     { label: "🛣️ Construire ▸", goto: "voirie-types" },
@@ -1907,6 +1972,11 @@ const MAP_MENU = {
     { label: "🚌 Bus", select: "modeSelect", value: "bus" },
     { label: "🚊 Tramway", select: "modeSelect", value: "tram" },
     { label: "🚇 Métro", select: "modeSelect", value: "metro" }
+  ],
+  "arrets": [
+    { label: "➕ Construire", act: "buildStopBtn" },
+    { label: "➖ Supprimer", act: "demolishStopBtn" },
+    { label: "⬆️ Pôle multimodal", act: "multimodalStopBtn" }
   ]
 };
 
@@ -1921,6 +1991,9 @@ function isMenuActArmed(act) {
   if (act === "unzoneBtn") return state.zoneMode === "unzone";
   if (act === "inspectBtn") return state.zoneMode === "inspect";
   if (act === "newLineBtn") return !!state.lineMode;
+  if (act === "buildStopBtn") return state.stopToolMode === "build";
+  if (act === "demolishStopBtn") return state.stopToolMode === "demolish";
+  if (act === "multimodalStopBtn") return state.stopToolMode === "multimodal";
   return false;
 }
 
@@ -1947,6 +2020,7 @@ function setMapMenu(level) {
   const armed = state && state.roadEditMode ? "voirie"
     : state && state.zoneMode ? "urbanisme"
     : state && (state.lineMode || (state.pendingStops && state.pendingStops.length)) ? "ligne"
+    : state && state.stopToolMode ? "arrets"
     : null;
   for (const item of items) {
     const btn = document.createElement("button");

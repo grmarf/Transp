@@ -355,7 +355,8 @@ export function generateDemand(state, rng) {
       let totalWeight = 0;
       const weights = candidates.map(destination => {
         const d = Math.max(1, distance(origin, destination));
-        const attractiveness = destination.jobs * jobsWeight + destination.commerce * commerceWeight;
+        // V30 — un pôle multimodal est 20 % plus attractif comme destination.
+        const attractiveness = (destination.jobs * jobsWeight + destination.commerce * commerceWeight) * (destination.multimodal ? 1.2 : 1);
         const weight = attractiveness * (0.65 + Math.min(1.35, d / 350));
         totalWeight += weight;
         return weight;
@@ -588,7 +589,13 @@ export function step(state, rng, log) {
   if (state.paused) return;
   for (const passenger of state.passengers) {
     if (passenger.state === PASSENGER_STATES.WAITING || passenger.state === PASSENGER_STATES.TRANSFERRING) {
-      passenger.waitedMinutes += TICK_MINUTES * state.speed;
+      // V30 — pôle multimodal : une correspondance à un arrêt multimodal
+      // s'écoule deux fois moins vite (quais partagés, info temps réel).
+      const transferStop = passenger.state === PASSENGER_STATES.TRANSFERRING
+        ? state.city.stops.find(s => s.id === passenger.currentStopId)
+        : null;
+      const waitFactor = transferStop && transferStop.multimodal ? 0.5 : 1;
+      passenger.waitedMinutes += TICK_MINUTES * state.speed * waitFactor;
       if (passenger.waitedMinutes >= 120 && !findPassengerRoute(state, passenger.currentStopId, passenger.destinationId)) {
         passenger.state = PASSENGER_STATES.ABANDONED;
         passenger.completedAt = (state.elapsedDays || 0) * 1440 + state.time;
