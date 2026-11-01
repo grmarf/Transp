@@ -21,6 +21,31 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V35 — Menu arrêts : une ligne, taps fiables
+
+- **Une seule ligne de boutons** : sur mobile, la croix ✕ n'occupe plus une
+  rangée entière au-dessus des boutons — la cascade passe en 4 colonnes
+  compactes (racine et pages : ✕ + actions sur la même ligne, texte plus
+  petit, cibles ≥ 44 px). Demande joueur : « met ces boutons sur la même
+  ligne, quitte à ce que les boutons soient plus petits ».
+- **Taps enfin réactifs** : le menu n'est plus reconstruit pendant le tap
+  lui-même. Auparavant, pointerup → action → updateInstructions détruisait
+  et recréait les boutons au milieu de l'événement ; le « click »
+  synthétique du navigateur pouvait alors viser le bouton reconstruit et
+  invoquer le handler une seconde fois : l'outil s'armait puis se
+  désarmait aussitôt — « on dirait qu'ils ne réagissent pas ». Le rendu du
+  menu est désormais coalescé et différé d'une frame
+  (requestAnimationFrame) : le bouton tapé survit à toute la chaîne
+  d'événements, et les reconstructions multiples se fondent en une seule.
+- **Arrêts initiaux suppressibles** : confirmé et verrouillé par test — la
+  démolition n'a jamais distingué arrêts générés et arrêts du joueur ;
+  seul un arrêt desservi par une ligne (ou dans un tracé en cours) reste
+  protégé. Le nouveau test navigateur démolit réellement un arrêt initial.
+- Anti-cache bumpé `?v=41` ; test `tests/v35-menu-arrets.mjs` (viewport
+  mobile 412×915, taps réels Input.dispatchTouchEvent : navigation,
+  armement stable, construction, démolition d'un arrêt initial, une seule
+  ligne).
+
 ## V34 — Scénarios & défis (réécriture complète de l'ébauche V9)
 
 - **Objectifs multiples** par défi : chaque scénario liste désormais
