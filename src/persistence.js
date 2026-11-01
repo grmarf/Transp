@@ -1,6 +1,6 @@
 /** V20.0 — strict current-save persistence, no historical migrations. */
 
-export const SAVE_FORMAT_VERSION = 3;
+export const SAVE_FORMAT_VERSION = 4;
 export const SAVE_VERSION = SAVE_FORMAT_VERSION;
 export const SAVE_KEY = "vie-t-lignes-v20-save";
 const SAVE_FORMAT = "vie-t-lignes-save";
@@ -309,6 +309,55 @@ export function validateSavePayload(payload) {
   return payload;
 }
 
+// V32 — versioning des sauvegardes : chaîne de migrations ASCENDANTES.
+// Chaque étape transforme un payload de format `from` en format `to` ;
+// le chargement applique les étapes dans l'ordre jusqu'à la version courante.
+// Règles conservatrices : plus ancien que 3 (avant-V20) ou plus récent que le
+// jeu -> refus explicite, jamais de reconstruction hasardeuse.
+export const MIGRATIONS = [
+  {
+    from: 3,
+    to: 4,
+    note: "champs d'arrêts explicites (pôle multimodal, compteur d'arrêts joueur)",
+    apply(payload) {
+      const state = payload.state;
+      for (const stop of state.city.stops) {
+        // V30 — le drapeau multimodal était optionnel (absent = simple arrêt).
+        if (stop.multimodal === undefined) stop.multimodal = false;
+      }
+      // V30 — compteur de nommage des arrêts construits par le joueur.
+      if (state.city.customStopCount === undefined) {
+        state.city.customStopCount = state.city.stops.filter(function (s) {
+          return s.builtByPlayer === true || /^stop-\d+$/.test(s.id);
+        }).length;
+      }
+      return payload;
+    }
+  }
+];
+
+/** Applique les migrations nécessaires puis valide. Retourne le payload
+ *  migré (avec `migrationNotes` si des étapes ont été jouées). */
+export function migrateSavePayload(payload) {
+  object(payload, "payload");
+  if (payload.format !== SAVE_FORMAT) invalid("format inconnu");
+  const start = Number.isInteger(payload.version) ? payload.version : 0;
+  if (start < 3) invalid("sauvegarde trop ancienne (format " + (start || "inconnu") + ", antérieur à la V20) — démarrez une nouvelle partie");
+  if (start > SAVE_FORMAT_VERSION) invalid("sauvegarde plus récente (format " + start + ") que le jeu (format " + SAVE_FORMAT_VERSION + ") — mettez le jeu à jour");
+  const notes = [];
+  let guard = 0;
+  while (payload.version < SAVE_FORMAT_VERSION) {
+    const step = MIGRATIONS.find(function (s) { return s.from === payload.version; });
+    if (!step) invalid("aucune migration depuis le format " + payload.version);
+    if (guard++ > 100) invalid("chaîne de migration en boucle");
+    step.apply(payload);
+    payload.version = step.to;
+    notes.push("format " + step.from + " → " + step.to + " : " + step.note);
+  }
+  if (notes.length) payload.migrationNotes = notes;
+  return validateSavePayload(payload);
+}
+
 export function serializeState(state, rngState = null) {
   const clean = clone({
     ...state,
@@ -338,7 +387,7 @@ export function readSavedGame(storage = globalThis.localStorage) {
   if (!storage) return null;
   const raw = storage.getItem(SAVE_KEY);
   if (!raw) return null;
-  try { return validateSavePayload(JSON.parse(raw)); }
+  try { return migrateSavePayload(JSON.parse(raw)); }
   catch (error) { throw new Error(error.message.startsWith("Sauvegarde V20 invalide") ? error.message : "Sauvegarde V20 invalide : JSON illisible"); }
 }
 
@@ -359,7 +408,7 @@ export async function importGameFromFile(file) {
   let payload;
   try { payload = JSON.parse(await file.text()); }
   catch { throw new Error("Fichier de sauvegarde V20 illisible"); }
-  return validateSavePayload(payload);
+  return migrateSavePayload(payload);
 }
 
 

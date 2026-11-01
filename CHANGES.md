@@ -21,6 +21,23 @@ résume l'état courant du jeu et les derniers changements.
   copie ancienne de main.js/style.css était la cause la plus probable du
   menu « disparu ».
 
+## V32 — Versioning & migration des sauvegardes
+
+- **Format de sauvegarde versionné** : passage au format 4 (localStorage et
+  exports fichiers). Le chargement applique une **chaîne de migrations
+  ascendantes** (`MIGRATIONS` dans persistence.js) jusqu'à la version courante.
+- **Migration 3 → 4** : drapeau `multimodal` rendu explicite sur chaque arrêt
+  (absent = faux, cohérent avec la V30), compteur `customStopCount` des arrêts
+  construits par le joueur recalculé si absent.
+- **Refus explicites plutôt que conversions hasardeuses** : plus ancien que le
+  format 3 (avant-V20) ou plus récent que le jeu -> message clair (nouvelle
+  partie ou mise à jour), jamais de reconstruction silencieuse.
+- **Traçabilité** : les étapes jouées sont journalisées au chargement et à
+  l'import (« 💾 Sauvegarde migrée… ») via `payload.migrationNotes`.
+- Test : `tests/v32-migrations.mjs` (sérialisation v4, migration d'une
+  sauvegarde v3, refus trop ancien/trop récent, idempotence, storage factice,
+  câblage statique).
+
 ## V31 — Web Worker : avance rapide d'un jour
 
 - **⏩ +1 j** dans les contrôles de temps : simule exactement une journée
