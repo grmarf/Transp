@@ -1385,6 +1385,9 @@ function loadCurrentGame() {
     const payload = readSavedGame();
     if (!payload) { updateSaveStatus("Aucune sauvegarde locale."); return; }
     boot(payload.state.city.seed, (payload.state.scenario && payload.state.scenario.id) || "sandbox", payload);
+    if (payload.migrationNotes && payload.migrationNotes.length) {
+      log("💾 Sauvegarde migrée (" + payload.migrationNotes.length + " étape" + (payload.migrationNotes.length > 1 ? "s" : "") + ") : " + payload.migrationNotes.join(" ; ") + ".");
+    }
     updateSaveStatus("Partie chargée.");
   } catch (error) {
     updateSaveStatus("Sauvegarde invalide.");
@@ -1855,6 +1858,9 @@ if (importFileEl) {
     try {
       const payload = await importGameFromFile(file);
       boot(payload.state.city.seed, (payload.state.scenario && payload.state.scenario.id) || "sandbox", payload);
+      if (payload.migrationNotes && payload.migrationNotes.length) {
+        log("💾 Sauvegarde migrée (" + payload.migrationNotes.length + " étape" + (payload.migrationNotes.length > 1 ? "s" : "") + ") : " + payload.migrationNotes.join(" ; ") + ".");
+      }
       log("Partie importée avec succès.");
       refreshUI();
     } catch (error) {
