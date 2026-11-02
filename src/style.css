@@ -1416,6 +1416,14 @@ eight:bold; color:#fff; }
   /* Onglets exclusifs : une pile de 6 onglets ouverts est illisible. */
   .dashboard.sheet-open .dashboard-tab { margin-bottom: 8px; }
   .dashboard.sheet-open .dashboard-body { padding: 8px 8px 32px; }
+  /* V39 — le contenu ouvert doit défiler au doigt de façon garantie :
+     geste vertical attribué au panneau (pan-y), défilement tactile natif
+     actif, et l'overscroll ne doit pas fuiter vers la page. */
+  .dashboard.sheet-open .dashboard-body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
 }
 
 
