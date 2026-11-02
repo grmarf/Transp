@@ -3,6 +3,22 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V38 — Scroll des sous-menus sur smartphone
+
+- **Panneau défilant** : sur mobile (≤ 959 px), le panneau du menu en cascade
+  (`.map-menu`, fixé en bas d'écran) n'avait ni hauteur maximale ni
+  défilement — une page plus haute que l'écran (police système agrandie,
+  écran court, paysage) masquait des boutons sans aucun recours. Il est
+  désormais plafonné (`calc(100dvh - 180px)`, repli `vh`) et défile au doigt
+  (`overflow-y: auto`, `touch-action: pan-y`, `overscroll-behavior:
+  contain` — le glissé ne se propage ni à la carte ni à la page).
+- **Sonde CI** : `tests/v38-sousmenu-scroll.mjs` parcourt les 12 pages de la
+  cascade sur trois viewports mobiles (412×915, 360×740, 740×360 paysage)
+  et vérifie que chaque bouton est intégralement à l'écran et réellement
+  tapable (`elementFromPoint`), que le panneau est scrollable, et qu'une
+  page plus haute que l'écran défile réellement (scrollTop).
+- Anti-cache bumpé `?v=44`.
+
 ## V29.1 — Fond de carte naturel, voiries directes, menu auto-réparant
 
 - **Fond de carte** : les îlots carrés décoratifs ont disparu — générés par
