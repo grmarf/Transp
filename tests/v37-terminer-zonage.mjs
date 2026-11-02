@@ -175,28 +175,31 @@ try {
     const st = window.__vieTLignes.getState();
     const cam = window.__vieTLignes.cameraState;
     const rect = document.querySelector("#map").getBoundingClientRect();
-    const zones = st.city.zones || [];
     const toScreen = (wx, wy) => ({ sx: (wx - cam.x) * cam.zoom + rect.width / 2 + rect.left, sy: (wy - cam.y) * cam.zoom + rect.height / 2 + rect.top });
+    const segs = [];
     for (const r of st.city.roads || []) {
       const pts = r.points || [];
-      if (pts.length < 2) continue;
-      const a = pts[0], b = pts[pts.length - 1];
+      for (let i = 0; i + 1 < pts.length; i++) segs.push([pts[i], pts[i + 1]]);
+      if (pts.length < 2 && r.start && r.end) segs.push([r.start, r.end]);
+    }
+    window.__segsCount = segs.length;
+    for (const pair of segs) {
+      const a = pair[0], b = pair[1];
       const dx = b.x - a.x, dy = b.y - a.y;
       const len = Math.hypot(dx, dy);
-      if (len < 140) continue;
+      if (len < 100) continue;
       const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      const c1 = { x: mx - ux * 60 - nx * 30, y: my - uy * 60 - ny * 30 };
-      const c2 = { x: mx + ux * 60 + nx * 30, y: my + uy * 60 + ny * 30 };
-      const nearZone = (p) => zones.some((z) => p.x >= z.x - 50 && p.x <= z.x + z.w + 50 && p.y >= z.y - 50 && p.y <= z.y + z.h + 50);
-      if (nearZone(c1) || nearZone(c2)) continue;
+      const c1 = { x: mx - ux * 55 - nx * 30, y: my - uy * 55 - ny * 30 };
+      const c2 = { x: mx + ux * 55 + nx * 30, y: my + uy * 55 + ny * 30 };
       const s1 = toScreen(c1.x, c1.y), s2 = toScreen(c2.x, c2.y);
       const onMap = (s) => s.sx >= rect.left + 10 && s.sx <= rect.right - 10 && s.sy >= rect.top + 10 && s.sy <= rect.bottom - 10 && (() => { const h = document.elementFromPoint(s.sx, s.sy); return h && h.id === "map"; })();
       if (!onMap(s1) || !onMap(s2)) continue;
       return { s1, s2 };
     }
     return null;
-  })()`));
+  })()`))
+    .catch(async function () { throw new Error('PAS DE BANDE CANDIDATE segs=' + (await evaluate('window.__segsCount')) + ' st=' + (await evaluate(stateDiag()))); });
   await touch(cand.s1.sx, cand.s1.sy);
   await waitFor('premier coin posé', () => evaluate('Boolean(window.__vieTLignes.getState().pendingZoneCorner)'), 5000)
     .catch(async function () { throw new Error('COIN 1 SANS EFFET st=' + (await evaluate(stateDiag()))); });
