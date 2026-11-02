@@ -3,6 +3,38 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V48 — Carte allégée : voiries générées droites + mini-carte flottante
+
+Deux irritants de la carte, signalés en zoom maximal ; anti-cache bumpé
+`?v=48` (cache SW `vtl-cache-v48`), nouveaux gels de non-régression
+`tests/v48-map-clutter.mjs`.
+
+- **Voiries générées : fin des « arêtes de poisson »** — depuis le V28, chaque
+  croisement pliait à 90° la voirie la plus récente (bras de 22 px) : un
+  segment d'arrêt à arrêt qui en croisait plusieurs finissait en zigzags et
+  boucles illisibles qui surchargeaient la carte au zoom maximal. La ville se
+  génère désormais avec `skipGeneratedBends` : les voiries d'arrêt à arrêt
+  restent droites, les croisements restent de simples X (esprit V29.6) et
+  l'arrêt de carrefour y est toujours posé — le réseau fusionne par position.
+  Les tracés du joueur (`opts.road`) conservent leur redressement à 90°.
+- **Sauvegardes héritées décrassées automatiquement** — nouvelle fonction
+  `straightenGeneratedRoads` (pruning.js) : au chargement d'une partie, les
+  polylines pliées des voiries générées (et uniquement elles — jamais les
+  voiries construites, corridors ou tracés libres) retrouvent leur géométrie
+  directe arrêt → arrêt. Idempotent, appelé dans `rationaliseCityRoads` avant
+  le déssaimage, avec reconstruction du réseau.
+- **Mini-carte flottante (mobile ≤959px)** — elle était posée en bas à droite
+  du canvas et le menu du bas la recouvrait en partie. Elle devient
+  `position: fixed`, ancrée juste au-dessus du menu du bas (elle peut en
+  chevaucher le haut, le menu garde le dessus), réduite à 120×80 pour ne pas
+  manger la carte, remonte quand la barre flottante est visible et
+  s'escamote quand la feuille du bas est ouverte. Le desktop (≥960px) ne
+  change pas.
+- **Test v37 adapté** — le parcours de zonage cherchait ses boîtes
+  candidates uniquement dans les polylines (`road.points`) : les voiries
+  générées n'en portant plus, le test résout désormais aussi leurs
+  extrémités via les ids d'arrêts `a`/`b` (comme `roadPoints` dans le jeu).
+
 ## V47 — Correctifs d'audit (affichage, contrats, avance rapide, sauvegardes)
 
 Correctifs issus de l'audit complet du code ; anti-cache bumpé `?v=47`

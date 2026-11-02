@@ -11,7 +11,7 @@ import { ensureBuildingsState, addZone, removeZone, demolishBuilding, buildingSt
 import { developCityCarrefours } from "./carrefours.js";
 import { refreshAllLineRoutes } from "./disruptions.js";
 import { startCampaign } from "./advertising.js";
-import { pruneRedundantRoads, pruneOrphanCarrefourStops } from "./pruning.js";
+import { pruneRedundantRoads, pruneOrphanCarrefourStops, straightenGeneratedRoads } from "./pruning.js";
 import { buildStop, demolishStop, upgradeStopMultimodal, STOP_BUILD_COST, MULTIMODAL_UPGRADE_COST } from "./stops.js";
 import { planTotalCost, applyPlan, clearPlan } from "./planning.js";
 import { TICK_MINUTES } from "./engine.js";
@@ -522,14 +522,25 @@ function rationaliseCityRoads() {
     (line.stopIds || []).forEach(function (id) { protectedIds.add(id); });
   });
   (state.pendingStops || []).forEach(function (id) { protectedIds.add(id); });
+  // V48 — décrassage d'abord : les plis à 90° hérités (V28) sur les voiries
+  // générées (zigzags illisibles en zoom maximal, « arêtes de poisson »)
+  // sont défaits AVANT le déssaimage — les croisements retrouvent leur
+  // géométrie directe et l'union-find voit la vraie topologie.
+  const straightened = straightenGeneratedRoads(state.city);
   const report = pruneRedundantRoads(state.city);
   const orphanStops = pruneOrphanCarrefourStops(state.city, protectedIds);
+  if (straightened) {
+    log("🛣️ Voirie simplifiée : " + straightened + " tracé" + (straightened > 1 ? "s" : "") +
+      " d'arrêt à arrêt redressé" + (straightened > 1 ? "s" : "") + " (fin des zigzags hérités des carrefours pliés).");
+  }
   if (report.removed.length || orphanStops.length) {
     rebuildNetwork();
     log("🧹 Voirie rationalisée : " + report.removed.length + " tronçon" +
       (report.removed.length > 1 ? "s" : "") + " redondant" + (report.removed.length > 1 ? "s" : "") +
       " retiré" + (report.removed.length > 1 ? "s" : "") + ", " + orphanStops.length +
       " arrêt" + (orphanStops.length > 1 ? "s" : "") + " de carrefour orphelin" + (orphanStops.length > 1 ? "s" : "") + ".");
+  } else if (straightened) {
+    rebuildNetwork();
   }
 }
 
@@ -1406,7 +1417,12 @@ function boot(seed, scenarioId, restoredPayload) {
     // V28 — carrefours : les voiries générées qui se croisent loin de
     // l'angle droit sont pliées à 90°, et un arrêt est posé sur chaque
     // carrefour (avant createNetwork : la jonction fusionne dans l'arrêt).
-    carrefourReport = developCityCarrefours(city, mulberry32(city.numericSeed ^ 0xCA2E), {}, null, () => {});
+    // V48 — skipGeneratedBends : les voiries d'arrêt à arrêt GÉNÉRÉES
+    // restent droites (fin des zigzags « arête de poisson » qui
+    // surchargeaient la carte) ; les croisements restent de simples X et
+    // l'arrêt de carrefour y est toujours posé. Les tracés du joueur
+    // (opts.road) conservent le redressement.
+    carrefourReport = developCityCarrefours(city, mulberry32(city.numericSeed ^ 0xCA2E), { skipGeneratedBends: true }, null, () => {});
     nextState = createState(city, scenario);
     nextState.network = createNetwork(city);
     nextState.undergroundNetwork = createUndergroundNetwork(city);
