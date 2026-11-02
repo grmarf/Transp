@@ -61,7 +61,7 @@ async function touch(x, y) {
   await cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 const btnCenter = (label) => `(() => { const b = [...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].find((x) => x.textContent.includes(${JSON.stringify(label)})); if (!b) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
-const visibleHas = (label) => `Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes(${JSON.stringify(label)}))`;
+const visibleHas = (label) => `Boolean([...document.querySelectorAll("#mapMenu .map-menu-page:not([hidden]) button")].some((b) => b.textContent.includes(${JSON.stringify(label)})))`;
 const finishCenter = '(() => { const b = document.getElementById("finishLineBtn"); if (!b || b.hidden || b.disabled) return null; const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()';
 const stateDiag = () => `(() => { const st = window.__vieTLignes.getState(); const f = document.getElementById("finishLineBtn"); return JSON.stringify({ lineMode: st.lineMode, pending: (st.pendingStops || []).length, lines: (st.lines || []).length, zoneMode: st.zoneMode, corner: !!st.pendingZoneCorner, zones: (st.city.zones || []).length, finish: f ? (f.hidden ? 'hidden' : (f.disabled ? 'disabled' : 'ok')) : 'absent', logs: (st.logs || []).slice(0, 4) }); })()`;
 const traceEvents = () => `(() => {
