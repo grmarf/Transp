@@ -2,7 +2,7 @@
 // Régressions joueur (mobile Samsung) : « impossible de descendre dans le
 // menu » (le tableau de bord plein écran, contenu coupé sous « Modifier »)
 // et « Terminer ne fonctionne pas toujours ». Ce test rejoue en viewport
-// mobile réel (360×740, tactile) : ouverture de la feuille, VRAI SWIPE qui
+// mobile réel (412×915, tactile) : ouverture de la feuille, VRAI SWIPE qui
 // doit la faire défiler, fermeture, création d'une ligne terminée par un
 // TAP DÉRIVÉ (dérapage de 12 px) sur ✅ Terminer, et scroll du panneau
 // en cascade.
@@ -121,7 +121,10 @@ try {
   await cdp('Runtime.enable');
   await cdp('Log.enable');
   await cdp('Page.enable');
-  await cdp('Emulation.setDeviceMetricsOverride', { width: 360, height: 740, deviceScaleFactor: 2, mobile: true });
+  // 412×915 : même palier mobile que le joueur (≤ 700 px → règles plein
+  // écran de la feuille V27.4/V39 actives), hauteur éprouvée par v35/v37
+  // pour poser des arrêts au doigt.
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 412, height: 915, deviceScaleFactor: 2, mobile: true });
   await cdp('Emulation.setTouchEmulationEnabled', { enabled: true, maxPoints: 2 });
   await cdp('Page.navigate', { url });
   await waitFor('jeu initialisé', () => evaluate('Boolean(window.__vieTLignes && window.__vieTLignes.getState && document.querySelector("#map"))'));
@@ -141,7 +144,7 @@ try {
   // ---- B. VRAI SWIPE : la feuille doit défiler au doigt ----------------
   async function swipeSheet() {
     const before = await evaluate('document.querySelector(".dashboard-body").scrollTop');
-    await swipe(180, 620, 0, -240);
+    await swipe(206, 620, 0, -240);
     await sleep(250);
     return await evaluate('document.querySelector(".dashboard-body").scrollTop') - before;
   }
