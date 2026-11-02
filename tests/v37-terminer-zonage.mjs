@@ -171,7 +171,7 @@ try {
   await touch(resBtn.x, resBtn.y);
   await waitFor('outil zonage armé', () => evaluate('window.__vieTLignes.getState().zoneMode === "zone"'), 5000)
     .catch(async function () { throw new Error('ZONER INERTE st=' + (await evaluate(stateDiag()))); });
-  const cand = await waitFor('bande le long d\'une route visible', () => evaluate(`(() => {
+  const cand = await waitFor('boite le long d\'une route visible', () => evaluate(`(() => {
     const st = window.__vieTLignes.getState();
     const cam = window.__vieTLignes.cameraState;
     const rect = document.querySelector("#map").getBoundingClientRect();
@@ -182,16 +182,11 @@ try {
       for (let i = 0; i + 1 < pts.length; i++) segs.push([pts[i], pts[i + 1]]);
       if (pts.length < 2 && r.start && r.end) segs.push([r.start, r.end]);
     }
-    window.__segsCount = segs.length;
     for (const pair of segs) {
       const a = pair[0], b = pair[1];
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const len = Math.hypot(dx, dy);
-      if (len < 100) continue;
-      const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      const c1 = { x: mx - ux * 55 - nx * 30, y: my - uy * 55 - ny * 30 };
-      const c2 = { x: mx + ux * 55 + nx * 30, y: my + uy * 55 + ny * 30 };
+      const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const c1 = { x: m.x - 40, y: m.y - 30 };
+      const c2 = { x: m.x + 40, y: m.y + 30 };
       const s1 = toScreen(c1.x, c1.y), s2 = toScreen(c2.x, c2.y);
       const onMap = (s) => s.sx >= rect.left + 10 && s.sx <= rect.right - 10 && s.sy >= rect.top + 10 && s.sy <= rect.bottom - 10 && (() => { const h = document.elementFromPoint(s.sx, s.sy); return h && h.id === "map"; })();
       if (!onMap(s1) || !onMap(s2)) continue;
@@ -199,10 +194,11 @@ try {
     }
     return null;
   })()`))
-    .catch(async function () { throw new Error('PAS DE BANDE CANDIDATE segs=' + (await evaluate('window.__segsCount')) + ' st=' + (await evaluate(stateDiag()))); });
+    .catch(async function () { throw new Error('PAS DE BOITE CANDIDATE st=' + (await evaluate(stateDiag()))); });
   await touch(cand.s1.sx, cand.s1.sy);
   await waitFor('premier coin posé', () => evaluate('Boolean(window.__vieTLignes.getState().pendingZoneCorner)'), 5000)
     .catch(async function () { throw new Error('COIN 1 SANS EFFET st=' + (await evaluate(stateDiag()))); });
+  await sleep(500); // évite le zoom double-tap entre les deux coins
   await touch(cand.s2.sx, cand.s2.sy);
   await waitFor('zone peinte', () => evaluate(`(window.__vieTLignes.getState().city.zones || []).length > ${zonesBefore}`), 10000)
     .catch(async function () {
