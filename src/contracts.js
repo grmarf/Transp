@@ -31,8 +31,11 @@ export function contractSummary(state, metrics = {}) {
   ensureContracts(state);
   return state.activeContracts.map(active => {
     const type = CONTRACT_TYPES.find(contract => contract.id === active.id);
-    const value = type?.metric(state, metrics, active) || 0;
-    return { ...active, ...type, value, progress: Math.max(0, Math.min(1, value / type.target)), remainingDays: Math.max(0, (state.contractsEndDay || 0) - (state.elapsedDays || 0)) };
+    const remainingDays = Math.max(0, (state.contractsEndDay || 0) - (state.elapsedDays || 0));
+    // V47 — id inconnu (sauvegarde éditée à la main) : résumé neutre sans crash.
+    if (!type) return { ...active, value: 0, progress: 0, remainingDays };
+    const value = type.metric(state, metrics, active) || 0;
+    return { ...active, ...type, value, progress: Math.max(0, Math.min(1, value / type.target)), remainingDays };
   });
 }
 
@@ -40,6 +43,8 @@ export function evaluateContracts(state, metrics = {}, log = () => {}) {
   ensureContracts(state);
   const completed = [];
   for (const contract of contractSummary(state, metrics)) {
+    // V47 — id inconnu : ignoré sans récompense ni corruption du budget.
+    if (!CONTRACT_TYPES.some(candidate => candidate.id === contract.id)) continue;
     const active = state.activeContracts.find(item => item.id === contract.id);
     if (!active || active.completed || contract.value < contract.target) continue;
     active.completed = true;

@@ -52,7 +52,7 @@ function maybeSpawnSatellite(state, rng, log, levels) {
   // lisible pour le joueur et évite une explosion artificielle de la carte.
   const candidates = state.city.stops
     // V28 — un carrefour est un arrêt de traversée, pas un quartier qui
-    // essime : exclu dès la sélection (l'ancien early-return annulait
+    // essaime de nouveau quartier : exclu dès la sélection (l'ancien early-return annulait
     // l'essaimage du jour dès que le candidat nº1 était un carrefour).
     .filter(s => s.population >= SATELLITE_POP_THRESHOLD && !String(s.id).startsWith("carrefour-"))
     .map(stop => ({
