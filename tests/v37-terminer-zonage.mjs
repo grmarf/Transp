@@ -177,10 +177,18 @@ try {
     const rect = document.querySelector("#map").getBoundingClientRect();
     const toScreen = (wx, wy) => ({ sx: (wx - cam.x) * cam.zoom + rect.width / 2 + rect.left, sy: (wy - cam.y) * cam.zoom + rect.height / 2 + rect.top });
     const segs = [];
+    const stopsById = new Map((st.city.stops || []).map(function (s) { return [s.id, s]; }));
     for (const r of st.city.roads || []) {
       const pts = r.points || [];
       for (let i = 0; i + 1 < pts.length; i++) segs.push([pts[i], pts[i + 1]]);
       if (pts.length < 2 && r.start && r.end) segs.push([r.start, r.end]);
+      // V48 — les voiries d'arrêt à arrêt générées ne portent plus de
+      // polyline (skipGeneratedBends) : leurs extrémités se résolvent
+      // via les ids d'arrêts a/b, comme le fait roadPoints dans le jeu.
+      if (pts.length < 2 && r.a && r.b) {
+        const sa = stopsById.get(r.a), sb = stopsById.get(r.b);
+        if (sa && sb) segs.push([sa, sb]);
+      }
     }
     for (const pair of segs) {
       const a = pair[0], b = pair[1];

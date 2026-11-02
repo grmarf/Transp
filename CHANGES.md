@@ -30,6 +30,10 @@ Deux irritants de la carte, signalés en zoom maximal ; anti-cache bumpé
   manger la carte, remonte quand la barre flottante est visible et
   s'escamote quand la feuille du bas est ouverte. Le desktop (≥960px) ne
   change pas.
+- **Test v37 adapté** — le parcours de zonage cherchait ses boîtes
+  candidates uniquement dans les polylines (`road.points`) : les voiries
+  générées n'en portant plus, le test résout désormais aussi leurs
+  extrémités via les ids d'arrêts `a`/`b` (comme `roadPoints` dans le jeu).
 
 ## V47 — Correctifs d'audit (affichage, contrats, avance rapide, sauvegardes)
 
