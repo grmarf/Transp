@@ -280,6 +280,15 @@ export function developCityCarrefours(city, rng = Math.random, opts = {}, isBloc
         } else if (added) bends += 1;
       }
     }
+  } else if (opts.skipGeneratedBends) {
+    // V48 — les voiries d'arrêt à arrêt générées par la ville restent
+    // DROITES : chaque croisement pliait la voirie la plus récente à 90°
+    // (bras de 22 px) et un segment qui en croisait plusieurs finissait en
+    // « arête de poisson » — zigzags et boucles illisibles au zoom maximal.
+    // Le redressement reste la règle pour les tracés du joueur (opts.road
+    // ci-dessus) ; les croisements générés deviennent de simples X, comme
+    // une vraie ville (esprit V29.6 « croisements simples »).
+    bends = 0;
   } else {
     bends = orthogonaliseRoads(city, isBlockedAll);
   }

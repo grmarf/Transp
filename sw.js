@@ -4,7 +4,7 @@
 // chargements (tous les modules sont importés au démarrage) ; ensuite le
 // jeu démarre intégralement hors ligne — Android (PWA installée) comme
 // Windows (fenêtre autonome installée via Edge/Chrome).
-const CACHE = "vtl-cache-v47";
+const CACHE = "vtl-cache-v48";
 // Précache intégral : TOUS les modules sont mis en cache à l'installation —
 // le jeu doit être jouable hors ligne dès la fin de la première visite,
 // sans attendre un second passage qui remplirait le cache au fil de l'eau.
@@ -63,7 +63,7 @@ self.addEventListener("fetch", function (event) {
   }
 
   // Ressources (modules, CSS, icônes) : cache d'abord, réseau ensuite.
-  // ignoreSearch : index.html référence main.js/style.css avec ?v=47 mais
+  // ignoreSearch : index.html référence main.js/style.css avec ?v=48 mais
   // les imports internes sont sans paramètre — même fichier, même cache.
   event.respondWith(
     caches.match(request, { ignoreSearch: true }).then(function (hit) {

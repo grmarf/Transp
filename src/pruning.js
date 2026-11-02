@@ -126,6 +126,29 @@ function pointNearRoad(p, polylines) {
   return false;
 }
 
+/** V48 — décrassage des « arêtes de poisson » héritées : les plis à 90°
+ *  (V28) s'accumulaient le long des voiries d'arrêt à arrêt générées par
+ *  la ville — un segment qui croisait ses voisins se pliait à chaque
+ *  croisement (bras de 22 px) jusqu'à former des zigzags et des boucles
+ *  illisibles au zoom maximal. Une voirie générée portant une polyline
+ *  retrouve sa géométrie directe (arrêt → arrêt) ; les voiries du joueur
+ *  (construites, corridors, tracés libres) ne sont JAMAIS retouchées.
+ *  Retourne le nombre de tracés redressés (idempotent). */
+export function straightenGeneratedRoads(city) {
+  const stops = (city && city.stops) || [];
+  const stopIds = new Set(stops.map(s => s.id));
+  let straightened = 0;
+  for (const road of (city && city.roads) || []) {
+    if (!Array.isArray(road.points) || road.points.length < 2) continue;
+    const isGenerated = road.a && road.b && stopIds.has(road.a) && stopIds.has(road.b)
+      && road.built !== true && !road.corridorId && road.startStopId === undefined;
+    if (!isGenerated) continue;
+    delete road.points;
+    straightened += 1;
+  }
+  return straightened;
+}
+
 /** Retire les arrêts de carrefour orphelins (plus desservis par aucune
  *  voirie). Retourne la liste des arrêts retirés. */
 export function pruneOrphanCarrefourStops(city, protectedIds) {

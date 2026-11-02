@@ -104,14 +104,14 @@ const log = () => {};
   assert.ok(!asState.city.landValueGrid && !asState.roadUndoStack, "le JSON final ne contient ni grille ni piles");
 }
 
-// --- 7. Divers : anti-cache uniforme v47, cache SW aligné, coquille ------
+// --- 7. Divers : anti-cache uniforme v48 (V48), cache SW aligné, coquille
 {
   const index = read("index.html");
   const versions = [...index.matchAll(/\?v=(\d+)/g)].map(m => m[1]);
   assert.equal(new Set(versions).size, 1, "anti-cache uniforme");
-  assert.equal(versions[0], "47", "anti-cache bumpé v47");
+  assert.equal(versions[0], "48", "anti-cache bumpé v48");
   const sw = read("sw.js");
-  assert.ok(sw.includes("vtl-cache-v47"), "version de cache du service worker alignée");
+  assert.ok(sw.includes("vtl-cache-v48"), "version de cache du service worker alignée");
   const carrefours = read("src/carrefours.js");
   assert.ok(!carrefours.includes("Carrefur"), "coquille « Carrefur » corrigée");
 }

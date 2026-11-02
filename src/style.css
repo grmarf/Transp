@@ -1512,6 +1512,29 @@ select { min-height:38px; max-width:180px; }
   .map-menu { bottom: calc(66px + env(safe-area-inset-bottom)); }
   body.toolbar-busy .map-menu { bottom: calc(134px + env(safe-area-inset-bottom)); }
 }
+/* V48 — mini-carte flottante : en vue mobile (≤959px) elle était posée en
+   bas à droite du canvas et le menu du bas la recouvrait. Elle devient
+   fixed, ancrée juste AU-DESSUS du menu du bas (elle peut en chevaucher
+   le haut si le menu grandit — il garde le dessus via son z-index 129),
+   réduite à 120×80 pour ne pas manger la carte, et escamotée quand la
+   feuille du bas est ouverte (body.sheet-open). Le desktop (≥960px) ne
+   change pas : la mini-carte y reste dans son coin du canvas. */
+@media (max-width: 959px) {
+  .mini-map {
+    position: fixed;
+    right: 10px;
+    width: 120px;
+    height: 80px;
+    z-index: 128;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+  body.toolbar-busy .mini-map { bottom: calc(158px + env(safe-area-inset-bottom, 0px)); }
+  body.sheet-open .mini-map { display: none; }
+}
+@media (max-width: 700px) {
+  .mini-map { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); }
+  body.toolbar-busy .mini-map { bottom: calc(206px + env(safe-area-inset-bottom, 0px)); }
+}
 /* Tactile : l'état hover « collant » des navigateurs mobiles ne doit pas
    laisser un bouton enfoncé après le tap. */
 @media (hover: none) {
