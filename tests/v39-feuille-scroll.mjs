@@ -138,20 +138,24 @@ try {
   const sheetCss = await evaluate('(() => { const b = document.querySelector(".dashboard-body"); const cs = getComputedStyle(b); return { overflowY: cs.overflowY, touchAction: cs.touchAction, overscroll: cs.overscrollBehaviorY }; })()');
   assert.equal(sheetCss.overflowY, 'auto', 'corps de feuille scrollable (overflow-y auto)');
   assert.equal(sheetCss.touchAction, 'pan-y', 'geste vertical attribué au panneau (pan-y)');
-  // Garantir un contenu plus haut que l'écran (comme chez le joueur) :
-  const forced = await evaluate('(() => { const b = document.querySelector(".dashboard-body"); if (b.scrollHeight - b.clientHeight >= 60) return false; b.style.paddingBottom = "600px"; return true; })()');
+  // Garantir un contenu plus haut que l'écran (comme chez le joueur) ET une
+  // zone de swipe neutre : un bloc factice de 700 px est inséré EN TÊTE du
+  // corps — le doigt glisse dessus, aucun bouton/résumé/select ne peut
+  // capter le geste ni produire de click parasite à la relâche.
+  const forcedDelta = await evaluate('(() => { const b = document.querySelector(".dashboard-body"); const d = document.createElement("div"); d.setAttribute("data-filler-sheet", "1"); d.style.height = "700px"; b.insertBefore(d, b.firstChild); return b.scrollHeight - b.clientHeight; })()');
+  assert.ok(forcedDelta > 60, 'feuille: contenu plus haut que l\'écran delta=' + forcedDelta);
 
   // ---- B. VRAI SWIPE : la feuille doit défiler au doigt ----------------
   async function swipeSheet() {
     const before = await evaluate('document.querySelector(".dashboard-body").scrollTop');
-    await swipe(206, 620, 0, -240);
+    await swipe(206, 400, 0, -240);
     await sleep(250);
     return await evaluate('document.querySelector(".dashboard-body").scrollTop') - before;
   }
   let moved = await swipeSheet();
   if (moved < 25) moved = await swipeSheet(); // une seule relance
   assert.ok(moved >= 25, 'SWIPE FEUILLE SANS DÉFILEMENT moved=' + moved + ' css=' + (await evaluate(sheetDiag())) + ' doc=' + (await evaluate('document.scrollingElement.scrollTop')));
-  if (forced) await evaluate('document.querySelector(".dashboard-body").style.paddingBottom = ""');
+  await evaluate('(() => { const d = document.querySelector("[data-filler-sheet]"); if (d) d.remove(); return true; })()');
 
   // ---- C. Fermer la feuille -------------------------------------------
   const closeHandle = await evaluate('(() => { const h = document.getElementById("sheetHandle"); const r = h.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()');
@@ -201,12 +205,12 @@ try {
   const cross = await waitFor('croix visible (page ligne)', () => evaluate(btnCenter('✕')));
   await touch(cross.x, cross.y);
   await waitFor('retour racine', () => evaluate(visibleHas('Voirie')));
-  await evaluate('(() => { const page = document.querySelector("#mapMenu .map-menu-page:not([hidden])"); for (let i = 0; i < 60; i++) { const b = document.createElement("button"); b.setAttribute("data-filler", "1"); b.type = "button"; b.textContent = "filler " + i; page.appendChild(b); } return true; })()');
-  const panelRect = await evaluate('(() => { const p = document.querySelector(".map-menu"); const r = p.getBoundingClientRect(); return { x: r.x + r.width / 2, y: Math.min(r.y + r.height - 40, r.y + 160) }; })()');
+  await evaluate('(() => { const page = document.querySelector("#mapMenu .map-menu-page:not([hidden])"); const d = document.createElement("div"); d.setAttribute("data-filler", "1"); d.style.height = "800px"; page.insertBefore(d, page.firstChild); return true; })()');
+  const panelRect = await evaluate('(() => { const p = document.querySelector(".map-menu"); const r = p.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + 80 }; })()');
   await swipe(panelRect.x, panelRect.y, 0, -200);
   await sleep(250);
   const panelScroll = await evaluate('(() => { const p = document.querySelector(".map-menu"); const s = p.scrollTop; const cs = getComputedStyle(p); return JSON.stringify({ s, oy: cs.overflowY, ta: cs.touchAction, mh: cs.maxHeight }); })()');
-  await evaluate('(() => { [...document.querySelectorAll("button[data-filler]")].forEach(function (b) { b.remove(); }); const p = document.querySelector(".map-menu"); p.scrollTop = 0; return true; })()');
+  await evaluate('(() => { const d = document.querySelector("[data-filler]"); if (d) d.remove(); const p = document.querySelector(".map-menu"); p.scrollTop = 0; return true; })()');
   assert.ok(JSON.parse(panelScroll).s > 20, 'SWIPE PANNEAU SANS DÉFILEMENT ' + panelScroll);
 
   assert.equal(consoleErrors.length, 0, 'erreurs navigateur : ' + consoleErrors.join(' ; ').slice(0, 200));
