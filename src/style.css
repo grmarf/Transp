@@ -1416,6 +1416,21 @@ eight:bold; color:#fff; }
   /* Onglets exclusifs : une pile de 6 onglets ouverts est illisible. */
   .dashboard.sheet-open .dashboard-tab { margin-bottom: 8px; }
   .dashboard.sheet-open .dashboard-body { padding: 8px 8px 32px; }
+  /* V39 — le contenu ouvert doit défiler au doigt de façon garantie :
+     geste vertical attribué au panneau (pan-y), défilement tactile natif
+     actif, et l'overscroll ne doit pas fuiter vers la page. */
+  .dashboard.sheet-open .dashboard-body {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+  }
+  /* V39 — CAUSE RACINE du « impossible de descendre » : les onglets sont
+     des flex-items du corps (flex column) et rétrécissaient par défaut
+     (flex-shrink: 1) — leur contenu se faisait rogné sous le bord au lieu
+     de faire débordé le corps : scrollHeight restait égal à clientHeight,
+     le défilement ne s'armait JAMAIS. Non-rétrécissables, ils débordent
+     réellement et overflow-y: auto devient effectif. */
+  .dashboard.sheet-open .dashboard-body > * { flex: 0 0 auto; }
 }
 
 

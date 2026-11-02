@@ -3,6 +3,34 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V39 — Feuille du tableau de bord défilante au doigt + taps robustes
+
+- **Le « menu » des captures est le tableau de bord** (bottom sheet
+  plein écran) : **cause racine du « impossible de descendre »** — les
+  onglets sont des flex-items du corps (flex column) et rétrécissaient
+  par défaut (`flex-shrink`), leur contenu se faisait rogné sous le bord
+  au lieu de faire déborder le corps : `scrollHeight` restait égal à
+  `clientHeight` et le défilement ne s'armait jamais. Ils sont désormais
+  non-rétrécissables (`flex: 0 0 auto`) et débordent réellement ; le
+  corps ouvert déclare en outre `touch-action: pan-y`,
+  `overscroll-behavior-y: contain` et `-webkit-overflow-scrolling:
+  touch` : geste vertical attribué au panneau, défilement natif garanti,
+  overscroll contenu.
+- **« Terminer ne fonctionne pas toujours »** : sur un vrai doigt, un
+  léger glissé (quelques pixels) suffit au navigateur pour confier le
+  geste à un conteneur défilable de la chaîne (page, barre horizontale,
+  panneau scrollable) — il émet `pointercancel`, ni click ni pointerup,
+  et le bouton paraît inerte par intermittence. `bindTap` et
+  `bindDelegatedTap` récupèrent maintenant ces taps annulés : touche
+  courte sans dérive de scroll des ancêtres (≤ 12 px) = c'était un tap —
+  le mini-dérapage est annulé et le handler invoqué.
+- **Sonde CI** : `tests/v39-feuille-scroll.mjs` rejoue sur viewport
+  mobile réel (360×740, tactile) l'ouverture de la feuille, un **vrai
+  swipe** (doigt qui glisse) qui doit la faire défiler, la fermeture,
+  la création d'une ligne terminée par un **tap dérivé** (dérapage
+  12 px) sur ✅ Terminer, et le scroll du panneau en cascade.
+- Anti-cache bumpé `?v=45`.
+
 ## V38 — Scroll des sous-menus sur smartphone
 
 - **Panneau défilant** : sur mobile (≤ 959 px), le panneau du menu en cascade

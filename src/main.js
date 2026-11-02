@@ -324,14 +324,52 @@ function bindTap(el, handler) {
   let lastTouch = 0;
   const invoke = function (e) {
     if (e && e.type === "click" && Date.now() - lastTouch < 700) return;
-    if (e && (e.type === "touchend" || e.type === "pointerup")) {
+    if (e && (e.type === "touchend" || e.type === "pointerup" || e.type === "pointercancel")) {
       lastTouch = Date.now();
       if (e.preventDefault) e.preventDefault();
     }
     handler(e);
   };
   if (window.PointerEvent) {
+    // V39 — tap réel robuste : sur un vrai doigt, un léger glissé (quelques
+    // pixels à peine) suffit au navigateur pour confier le geste à un
+    // conteneur défilable de la chaîne (page, barre horizontale, panneau
+    // scrollable) : il émet alors pointercancel — ni click ni pointerup —
+    // et le bouton paraît inerte, par intermittence (le « Terminer ne
+    // fonctionne pas toujours » du joueur). Une touche courte qui n'a fait
+    // dériver AUCUN ancêtre scrollable (ou ≤ 12 px : dérapage involontaire)
+    // était un tap : on annule ce mini-dérapage et on invoque le handler.
+    let downAt = 0;
+    let marks = null;
+    el.addEventListener("pointerdown", function (e) {
+      downAt = (e.pointerType !== "mouse" && e.isPrimary) ? Date.now() : 0;
+      marks = [];
+      let node = el;
+      while (node && node !== document.documentElement) {
+        marks.push([node, node.scrollLeft, node.scrollTop]);
+        node = node.parentElement;
+      }
+    }, { passive: true });
+    const scrollDrift = function () {
+      if (!marks) return Infinity;
+      let drift = 0;
+      for (let i = 0; i < marks.length; i++) {
+        drift = Math.max(drift,
+          Math.abs(marks[i][0].scrollLeft - marks[i][1]),
+          Math.abs(marks[i][0].scrollTop - marks[i][2]));
+      }
+      return drift;
+    };
     el.addEventListener("pointerup", invoke, { passive: false });
+    el.addEventListener("pointercancel", function (e) {
+      if (!downAt || Date.now() - downAt > 600) return;
+      if (scrollDrift() > 12) return;
+      for (let i = 0; i < marks.length; i++) {
+        if (marks[i][0].scrollLeft !== marks[i][1]) marks[i][0].scrollLeft = marks[i][1];
+        if (marks[i][0].scrollTop !== marks[i][2]) marks[i][0].scrollTop = marks[i][2];
+      }
+      invoke(e);
+    }, { passive: false });
     el.addEventListener("click", invoke);
     // V36 — click fantôme : le handler de pointerup peut changer la page du
     // menu (✕ → racine, « ▸ » → sous-page) ; le bouton tapé se masque alors
@@ -353,14 +391,45 @@ function bindDelegatedTap(container, selector, handler) {
     const target = e.target && e.target.closest ? e.target.closest(selector) : null;
     if (!target || !container.contains(target)) return;
     if (e.type === "click" && Date.now() - lastTouch < 700) return;
-    if (e.type === "touchend" || e.type === "pointerup") {
+    if (e.type === "touchend" || e.type === "pointerup" || e.type === "pointercancel") {
       lastTouch = Date.now();
       if (e.preventDefault) e.preventDefault();
     }
     handler(target, e);
   };
   if (window.PointerEvent) {
+    // V39 — même récupération des taps annulés que bindTap (voir ci-dessus).
+    let downAt = 0;
+    let marks = null;
+    container.addEventListener("pointerdown", function (e) {
+      downAt = (e.pointerType !== "mouse" && e.isPrimary) ? Date.now() : 0;
+      marks = [];
+      let node = container;
+      while (node && node !== document.documentElement) {
+        marks.push([node, node.scrollLeft, node.scrollTop]);
+        node = node.parentElement;
+      }
+    }, { passive: true });
+    const scrollDrift = function () {
+      if (!marks) return Infinity;
+      let drift = 0;
+      for (let i = 0; i < marks.length; i++) {
+        drift = Math.max(drift,
+          Math.abs(marks[i][0].scrollLeft - marks[i][1]),
+          Math.abs(marks[i][0].scrollTop - marks[i][2]));
+      }
+      return drift;
+    };
     container.addEventListener("pointerup", invoke, { passive: false });
+    container.addEventListener("pointercancel", function (e) {
+      if (!downAt || Date.now() - downAt > 600) return;
+      if (scrollDrift() > 12) return;
+      for (let i = 0; i < marks.length; i++) {
+        if (marks[i][0].scrollLeft !== marks[i][1]) marks[i][0].scrollLeft = marks[i][1];
+        if (marks[i][0].scrollTop !== marks[i][2]) marks[i][0].scrollTop = marks[i][2];
+      }
+      invoke(e);
+    }, { passive: false });
     container.addEventListener("click", invoke);
     // V36 — click fantôme : le handler de pointerup peut changer la page du
     // menu (✕ → racine, « ▸ » → sous-page) ; le bouton tapé se masque alors
