@@ -1475,6 +1475,17 @@ eight:bold; color:#fff; }
     border-radius: 12px;
     box-shadow: var(--shadow-sm);
     z-index: 129;
+    /* V38 — le panneau défile : une page plus haute que l'écran (police
+       système agrandie, écran court, paysage) ne masque plus ses boutons
+       sans recours. Plafond en dvh (repli vh), défilement au doigt, et le
+       glissé ne se propage ni à la carte ni à la page. */
+    max-height: calc(100vh - 180px);
+    max-height: calc(100dvh - 180px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: thin;
   }
   body.toolbar-busy .map-menu { bottom: 88px; }
   .map-menu .btn {
