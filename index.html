@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="favicon.png" type="image/png">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="src/style.css?v=45">
+  <link rel="stylesheet" href="src/style.css?v=46">
 </head>
 <body>
 <header class="topbar" aria-label="En-tête du jeu">
@@ -177,7 +177,7 @@
     "./src/events.js", "./src/progression.js", "./src/contracts.js",
     "./src/reports.js", "./src/seasons.js",
     "./src/demographics.js", "./src/coverage.js", "./src/advertising.js",
-    "./src/engine.js", "./src/stops.js", "./src/planning.js", "./src/worker-core.js", "./src/engine-worker.js", "./src/worker-client.js", "./src/renderer.js", "./src/main.js?v=45"
+    "./src/engine.js", "./src/stops.js", "./src/planning.js", "./src/worker-core.js", "./src/engine-worker.js", "./src/worker-client.js", "./src/renderer.js", "./src/main.js?v=46"
   ];
 
   var results = [];
@@ -205,7 +205,19 @@
   document.body.appendChild(b);
 })();
 </script>
-<script type="module" src="src/main.js?v=45"></script>
+<script>
+// V40 — service worker « 100 % local » : après la première visite en ligne,
+// le jeu démarre intégralement hors ligne et devient installable (PWA
+// Android : icône écran d'accueil ; Windows : fenêtre autonome Edge/Chrome).
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("./sw.js").catch(function (error) {
+      console.warn("Service worker non enregistré :", error);
+    });
+  });
+}
+</script>
+<script type="module" src="src/main.js?v=46"></script>
 </body>
 </html>
 

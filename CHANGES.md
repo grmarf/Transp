@@ -3,6 +3,30 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V40 — 100 % local : PWA installable et jeu hors ligne
+
+- **Service worker (`sw.js`)** : cache-first de tous les fichiers du jeu
+  (même origine). La première visite en ligne remplit le cache (tous les
+  modules sont chargés au démarrage) ; ensuite le jeu démarre
+  **intégralement hors ligne**, y compris après un rechargement. Les
+  versions de cache suivent l'anti-cache (`vtl-cache-v46`) ; les requêtes
+  ignorent le paramètre `?v=` côté cache (imports internes sans
+  paramètre).
+- **Installable partout** : le manifest est complété (id, scope,
+  description, orientation, icônes 192/512 + maskable) — **Android** :
+  Chrome propose « Installer l'app » (icône écran d'accueil, plein écran,
+  fonctionne sans réseau, même en avion). **Windows** : Edge/Chrome
+  proposent « Installer » (fenêtre autonome, raccourci menu démarrer).
+  Aucun fichier à distribuer : le site GitHub Pages devient l'app.
+- **Enregistrement** dans index.html après le chargement (échec
+  silencieux et sans impact si le SW est indisponible — le jeu en ligne
+  reste identique).
+- **Sonde CI** : `tests/v40-pwa-offline.mjs` charge le jeu, attend le
+  service worker actif, **coupe le réseau** (émulation CDP hors ligne),
+  recharge, et vérifie que le jeu démarre entièrement depuis le cache —
+  deux fois de suite.
+- Anti-cache bumpé `?v=46`.
+
 ## V39 — Feuille du tableau de bord défilante au doigt + taps robustes
 
 - **Le « menu » des captures est le tableau de bord** (bottom sheet
