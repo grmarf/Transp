@@ -1511,3 +1511,34 @@ eight:bold; color:#fff; }
   }
   .map-menu .btn.is-active:hover { background: var(--sun); }
 }
+
+
+/* ── V39 · Le tableau de bord défile vraiment ; « Terminer » survit ────
+   Constat joueur (Samsung, captures) : le panneau ouvert plein écran
+   masque son propre bas (« impossible de descendre dans le menu ») et
+   « Terminer » disparaît dès que la feuille est ouverte. La chaîne de
+   défilement est verrouillée (flex 1 1 0 + min-height 0 sur le
+   conteneur défilant, geste dédié pan-y, glissé contenu), et la barre
+   d'outils ne se retire QUE si aucune ligne n'est en cours : pendant
+   une création, « ✅ Terminer » reste visible et cliquable par-dessus
+   la feuille (le panneau cascade, lui, se cache). */
+@media (max-width: 700px) {
+  .dashboard.sheet-open .dashboard-body {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: thin;
+  }
+  body.sheet-open .map-menu {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  body.sheet-open.toolbar-busy .floating-toolbar {
+    visibility: visible;
+    pointer-events: auto;
+    z-index: 140;
+  }
+}
