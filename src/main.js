@@ -1441,3 +1441,955 @@ function boot(seed, scenarioId, restoredPayload) {
 
   // V29 — garde-fou dès le boot (ville neuve comme sauvegarde restaurée) :
   // le graphe reconstruit doit être sain, toute incohérence est journalisée.
+  reportNetworkViolations(state, log);
+  rationaliseCityRoads();
+
+  const nextRenderer = createRenderer(canvas, nextState);
+  rendererState.current = nextRenderer;
+
+  if (!restoredPayload) {
+    log("Bienvenue ! Ton budget de départ : " + state.money.toLocaleString("fr-FR") + " €.");
+    log("Ville générée : « " + state.city.name + " ».");
+    if (state.scenario) {
+      const objectives = scenarioObjectives(state.scenario);
+      if (objectives.length) {
+        log("Défi « " + state.scenario.name + " » (" + state.scenario.difficulty + ") — " +
+          objectives.map(function (o) { return o.label; }).join(" · ") +
+          (state.scenario.durationDays ? " · " + state.scenario.durationDays + " jours" : "") + ".");
+      } else {
+        log("Scénario : " + state.scenario.name + " — libre, aucun objectif.");
+      }
+    }
+    log("Touche la carte pour sélectionner un arrêt !");
+    if (carrefourReport && (carrefourReport.bends > 0 || carrefourReport.stops > 0)) {
+      log("Voirie : " + carrefourReport.bends + " carrefour" + (carrefourReport.bends > 1 ? "s" : "") +
+        " redressé" + (carrefourReport.bends > 1 ? "s" : "") + " à 90°, " +
+        carrefourReport.stops + " arrêt" + (carrefourReport.stops > 1 ? "s" : "") + " de carrefour.");
+    }
+  }
+
+  recenterCameraOnCity();
+  nextRenderer.render({
+    heatmap: nextState.showHeatmap ? congestionHeatmap(nextState) : null,
+    camera: cameraState,
+  });
+
+  state.demographicsEnabled = true;
+  // V27 — la génération OD depuis les bâtiments est active au boot
+  // navigateur ; les sauvegardes antérieures récupèrent des structures vides.
+  state.buildingsEnabled = true;
+  ensureBuildingsState(state);
+  // V27 — amorçage d'une nouvelle partie : quelques zones le long de la
+  // voirie générée pour que des bâtiments émergent dès les premières heures.
+  // Sans elles, la ville resterait grise et l'OD sans origines.
+  seedInitialZones(state, nextRng, log);
+  spawnInitialBuildings(state, nextRng, log);
+  state.advertisingEnabled = true;
+  state.staffCostsEnabled = true;
+  const fareLevelSelect = document.getElementById("fareLevelSelect");
+  if (fareLevelSelect) fareLevelSelect.value = String(state.fareLevel ?? 1);
+  const wageLevelSelect = document.getElementById("wageLevelSelect");
+  if (wageLevelSelect) wageLevelSelect.value = String(state.wageLevel ?? 1);
+  const scenarioSelect = document.getElementById("scenarioSelect");
+  if (scenarioSelect) scenarioSelect.value = (state.scenario && state.scenario.id) || "sandbox";
+  const pauseBtn = document.getElementById("pauseBtn");
+  if (pauseBtn) pauseBtn.textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
+  // V31 — le bouton d'avance rapide repart proprement après un boot.
+  const ffBootBtn = document.getElementById("ffBtn");
+  if (ffBootBtn) { ffBootBtn.textContent = "⏩ +1 j"; ffBootBtn.disabled = false; }
+  const speedBtn = document.getElementById("speedBtn");
+  if (speedBtn) speedBtn.textContent = "▶ " + state.speed + "×";
+  const toggle = document.getElementById("toggleHeatmapBtn");
+  if (toggle) toggle.setAttribute("aria-pressed", String(!!state.showHeatmap));
+
+  updateInstructions();
+  refreshUI();
+  updateSaveStatus();
+
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      if (rendererState.current && rendererState.current.resizeCanvas) rendererState.current.resizeCanvas();
+      recenterCameraOnCity();
+      refreshUI();
+    });
+  });
+
+  // V29.2 — ceinture finale : la carte ne doit jamais rester sans menu.
+  const mapMenuCheck = document.getElementById("mapMenu");
+  if (mapMenuCheck && !mapMenuCheck.querySelector("button")) setMapMenu("std");
+
+  startLoop();
+}
+
+function updateSaveStatus(message) {
+  const el = document.getElementById("saveStatus");
+  const text = document.getElementById("saveStatusText");
+  if (!el || !text) return;
+  if (message) { text.textContent = message; return; }
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) { text.textContent = "Aucune sauvegarde locale."; return; }
+    const payload = JSON.parse(raw);
+    const date = payload.savedAt ? new Date(payload.savedAt).toLocaleString("fr-FR") : "date inconnue";
+    text.textContent = "Sauvegarde locale : " + date;
+  } catch (e) {
+    text.textContent = "Sauvegarde locale indisponible.";
+  }
+}
+
+function setSaveActivity(active, label) {
+  const activity = document.getElementById("saveActivity");
+  if (!activity) return;
+  activity.hidden = !active;
+  activity.setAttribute("aria-hidden", String(!active));
+  activity.textContent = label || "Sauvegarde…";
+}
+
+function saveCurrentGame() {
+  try {
+
+    saveGame(state, rng && rng.getState ? rng.getState() : null);
+    updateSaveStatus("Partie sauvegardée localement.");
+    log("Partie sauvegardée.");
+    refreshUI();
+  } catch (error) {
+    updateSaveStatus("Échec de la sauvegarde.");
+    log("Sauvegarde impossible : " + error.message);
+  }
+}
+
+function loadCurrentGame() {
+  try {
+    const payload = readSavedGame();
+    if (!payload) { updateSaveStatus("Aucune sauvegarde locale."); return; }
+    boot(payload.state.city.seed, (payload.state.scenario && payload.state.scenario.id) || "sandbox", payload);
+    if (payload.migrationNotes && payload.migrationNotes.length) {
+      log("💾 Sauvegarde migrée (" + payload.migrationNotes.length + " étape" + (payload.migrationNotes.length > 1 ? "s" : "") + ") : " + payload.migrationNotes.join(" ; ") + ".");
+    }
+    updateSaveStatus("Partie chargée.");
+  } catch (error) {
+    updateSaveStatus("Sauvegarde invalide.");
+    log("Chargement impossible : " + error.message);
+  }
+}
+
+let editingLineId = null;
+let editingStopIds = [];
+function renderLineEditor() {
+  const list = document.getElementById("lineEditorStops");
+  const select = document.getElementById("lineEditorAddStop");
+  if (!list || !select || !state) return;
+  const line = state.lines.find(function (item) { return item.id === editingLineId; });
+  if (!line) return;
+  list.innerHTML = editingStopIds.map(function (id, index) {
+    const stop = state.city.stops.find(function (item) { return item.id === id; });
+    return '<div class="editor-stop-row"><span class="stop-index">' + (index + 1) + '</span><b>' + h(stop ? stop.name : id) + '</b>' +
+      '<button type="button" data-editor-action="up" data-editor-index="' + index + '"' + (index === 0 ? ' disabled' : '') + '>↑</button>' +
+      '<button type="button" data-editor-action="down" data-editor-index="' + index + '"' + (index === editingStopIds.length - 1 ? ' disabled' : '') + '>↓</button>' +
+      '<button type="button" data-editor-action="remove" data-editor-index="' + index + '"' + (editingStopIds.length <= 2 ? ' disabled' : '') + '>✕</button></div>';
+  }).join("");
+  const available = state.city.stops.filter(function (stop) { return editingStopIds.indexOf(stop.id) < 0; });
+  select.innerHTML = available.length
+    ? available.map(function (stop) { return '<option value="' + h(stop.id) + '">' + h(stop.name) + '</option>'; }).join("")
+    : '<option value="">Tous les arrêts sont déjà dans la ligne</option>';
+  select.disabled = !available.length;
+}
+function openLineEditor(lineId) {
+  if (!state) return;
+  const line = state.lines.find(function (item) { return item.id === lineId; });
+  if (!line) return;
+  editingLineId = lineId;
+  editingStopIds = [...line.stopIds];
+  renderLineEditor();
+  const modal = document.getElementById("lineEditorModal");
+  if (modal && typeof modal.showModal === "function") modal.showModal();
+  else if (modal) modal.setAttribute("open", "true");
+}
+function closeLineEditor() {
+  const modal = document.getElementById("lineEditorModal");
+  if (modal && typeof modal.close === "function") modal.close();
+  else if (modal) modal.removeAttribute("open");
+  editingLineId = null;
+  editingStopIds = [];
+}
+function applyEditorAction(action, index) {
+  if (!Number.isInteger(index) || index < 0 || index >= editingStopIds.length) return;
+  if (action === "up" && index > 0) {
+    [editingStopIds[index - 1], editingStopIds[index]] = [editingStopIds[index], editingStopIds[index - 1]];
+  } else if (action === "down" && index < editingStopIds.length - 1) {
+    [editingStopIds[index + 1], editingStopIds[index]] = [editingStopIds[index], editingStopIds[index + 1]];
+  } else if (action === "remove" && editingStopIds.length > 2) {
+    editingStopIds.splice(index, 1);
+  }
+  renderLineEditor();
+}
+bindTap(document.getElementById("newLineBtn"), function () {
+  if (!state) return;
+  if (state.lineMode) cancelLineMode(state);
+  else { state.stopToolMode = null; createLine(state); }
+  updateInstructions();
+  refreshUI();
+});
+
+// V30 — outils d'arrêts : boutons historiques branchés, pilotés par le menu
+// en cascade (page « 🚏 Arrêts »).
+bindTap(document.getElementById("buildStopBtn"), function () { if (state) setStopToolMode("build"); });
+bindTap(document.getElementById("demolishStopBtn"), function () { if (state) setStopToolMode("demolish"); });
+bindTap(document.getElementById("multimodalStopBtn"), function () { if (state) setStopToolMode("multimodal"); });
+
+bindTap(document.getElementById("gameMenuBtn"), function () { toggleGameMenu(); });
+bindTap(document.getElementById("voirieBtn"), function () {
+  const group = document.getElementById("voirieGroup");
+  if (group) group.dataset.open = group.dataset.open === "true" ? "false" : "true";
+  updateToolbarVisibility();
+});
+document.addEventListener("click", function (event) {
+  const menu = document.getElementById("gameMenuDropdown");
+  const button = document.getElementById("gameMenuBtn");
+  if (menu && button && !menu.contains(event.target) && event.target !== button) toggleGameMenu(false);
+});
+
+const roadTypeSelectEl = document.getElementById("roadTypeSelect");
+if (roadTypeSelectEl) roadTypeSelectEl.addEventListener("change", function () {
+  if (!state) return;
+  // V27 — les quatre types officiels, plus les alias historiques.
+  state.roadType = roadType(roadTypeSelectEl.value || "street").id;
+  updateInstructions();
+});
+
+function enterRoadMode(mode) {
+  if (!state) return;
+  if (state.lineMode) cancelLineMode(state);
+  // V27 — un outil d'urbanisme remplace l'outil de voirie armé.
+  state.zoneMode = null;
+  state.pendingZoneCorner = null;
+  state.roadEditMode = state.roadEditMode === mode ? null : mode;
+  state.pendingRoadPoint = null;
+  state.pendingRoadStopId = null;
+  state.roadTrace = null;
+  updateInstructions();
+  refreshUI();
+}
+
+// V27 — urbanisme -----------------------------------------------------------
+
+function zoneTypeSelectValue() {
+  const select = document.getElementById("zoneTypeSelect");
+  const value = select && select.value;
+  return ZONE_TYPES[value] ? value : "residential";
+}
+
+/** Outil de zonage armé : "zone", "unzone", "inspect" ; re-clic = désarme. */
+function enterZoneMode(mode) {
+  if (!state) return;
+  if (state.lineMode) cancelLineMode(state);
+  // Un outil de voirie remplace l'outil d'urbanisme armé.
+  state.roadEditMode = null;
+  state.pendingRoadPoint = null;
+  state.roadTrace = null;
+  state.zoneMode = state.zoneMode === mode ? null : mode;
+  state.pendingZoneCorner = null;
+  if (!state.zoneMode && state.selectedBuildingId) state.selectedBuildingId = null;
+  if (!state.zoneMode) renderBuildingPanel();
+  updateInstructions();
+  refreshUI();
+}
+
+/** Bâtiment sous le point (marge de tolérance 6 px). */
+function buildingAtPoint(p) {
+  const buildings = (state && state.city && state.city.buildings) || [];
+  for (const b of buildings) {
+    if (p.x >= b.x - 6 && p.x <= b.x + b.w + 6 && p.y >= b.y - 6 && p.y <= b.y + b.h + 6) return b;
+  }
+  return null;
+}
+
+/** Panneau latéral du bâtiment sélectionné (couverture, valeur, habitants…).
+ *  Ne reconstruit le DOM que si la sélection ou les stats changent. */
+let buildingPanelSignature = "";
+function renderBuildingPanel() {
+  const panel = document.getElementById("buildingPanel");
+  if (!panel || !state) return;
+  const building = ((state.city && state.city.buildings) || []).find(function (b) {
+    return b.id === state.selectedBuildingId;
+  });
+  if (!building) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    buildingPanelSignature = "";
+    return;
+  }
+  const signature = [building.id, building.residents, building.jobs, building.occupants,
+    building.landValue, building.abandoned, building.level, building.density].join("|");
+  if (signature === buildingPanelSignature && !panel.hidden) return;
+  buildingPanelSignature = signature;
+  const spec = BUILDING_TYPES[building.type] || BUILDING_TYPES.residential;
+  const zone = ((state.city && state.city.zones) || []).find(function (z) { return z.id === building.zoneId; });
+  const zoneLabel = zone ? (ZONE_TYPES[zone.type] || { label: zone.type }).label : "—";
+  const days = Math.floor((building.age || 0) / 24);
+  panel.hidden = false;
+  panel.innerHTML =
+    '<div class="building-panel-head"><span>' + (spec.icon || "🏠") + "</span><b>" + h(spec.label) + "</b>" +
+    '<button type="button" class="building-panel-close" data-building-close aria-label="Fermer le panneau du bâtiment">✕</button></div>' +
+    '<dl class="building-panel-stats">' +
+    "<dt>Densité</dt><dd>" + h(building.density || "low") + " · niveau " + (building.level || 1) + "</dd>" +
+    "<dt>Habitants</dt><dd>" + (building.residents || 0) + "</dd>" +
+    "<dt>Emplois</dt><dd>" + (building.jobs || 0) + "</dd>" +
+    "<dt>Occupation</dt><dd>" + Math.round((building.occupants || 0) * 100) + " %</dd>" +
+    "<dt>Valeur foncière</dt><dd>" + Math.round((building.landValue || 0) * 100) + " %</dd>" +
+    "<dt>Zone</dt><dd>" + h(zoneLabel) + "</dd>" +
+    "<dt>Âge</dt><dd>" + days + " jour" + (days > 1 ? "s" : "") + "</dd>" +
+    "</dl>" +
+    (building.abandoned ? '<p class="building-panel-warn">⚠️ Bâtiment abandonné : il ne génère plus de passagers.</p>' : "") +
+    '<button type="button" class="btn btn-warn" data-building-demolish="' + h(building.id) + '">🧨 Démolir</button>';
+}
+
+/** Démolition depuis le panneau : les résidents non relogés pèsent sur la satisfaction. */
+document.addEventListener("click", function (event) {
+  const target = event.target;
+  if (!target || !target.getAttribute) return;
+  if (target.getAttribute("data-building-close")) {
+    if (state) state.selectedBuildingId = null;
+    renderBuildingPanel();
+  } else if (target.getAttribute("data-building-demolish")) {
+    if (state) {
+      demolishBuilding(state, target.getAttribute("data-building-demolish"), log);
+      state.selectedBuildingId = null;
+      renderBuildingPanel();
+      refreshUI();
+    }
+  }
+});
+
+/** HUD — mini-barres verticales de demande par type de zone (0–100 %). */
+function updateDemandBars() {
+  const el = document.getElementById("demandBars");
+  if (!el || !state || !state.buildingsEnabled) return;
+  const stats = buildingStats(state);
+  const rows = [
+    { key: "residential", label: "Résidentiel", color: "#55b878" },
+    { key: "commercial", label: "Commercial", color: "#f4a261" },
+    { key: "industrial", label: "Industriel", color: "#8d6e63" },
+    { key: "service", label: "Services", color: "#4f8fc0" }
+  ];
+  el.innerHTML = rows.map(function (row) {
+    const pct = Math.round(Math.max(0, Math.min(1, (stats.demand && stats.demand[row.key]) || 0)) * 100);
+    return '<span class="demand-item" title="' + row.label + " : " + pct + ' %"><i class="demand-mini" aria-hidden="true">' +
+      '<b style="height:' + Math.max(4, pct * 0.16) + 'px;background:' + row.color + '"></b></i>' +
+      '<span class="demand-label">' + row.label + "</span></span>";
+  }).join("");
+}
+
+bindTap(document.getElementById("buildRoadBtn"), function () { enterRoadMode("build"); });
+bindTap(document.getElementById("removeRoadBtn"), function () { enterRoadMode("remove"); });
+bindTap(document.getElementById("upgradeRoadBtn"), function () { enterRoadMode("upgrade"); });
+bindTap(document.getElementById("oneWayRoadBtn"), function () { enterRoadMode("oneWay"); });
+bindTap(document.getElementById("undoRoadBtn"), function () { undoRoadAction(); });
+bindTap(document.getElementById("redoRoadBtn"), function () { redoRoadAction(); });
+
+// V27 — urbanisme : zonage, dézonage, inspection, affichages.
+bindTap(document.getElementById("urbanismeBtn"), function () {
+  const group = document.getElementById("urbanismeGroup");
+  if (group) group.dataset.open = group.dataset.open === "true" ? "false" : "true";
+  updateToolbarVisibility();
+});
+bindTap(document.getElementById("zoneBtn"), function () { enterZoneMode("zone"); });
+bindTap(document.getElementById("unzoneBtn"), function () { enterZoneMode("unzone"); });
+bindTap(document.getElementById("inspectBtn"), function () { enterZoneMode("inspect"); });
+bindTap(document.getElementById("toggleLandValueBtn"), function () {
+  if (!state) return;
+  state.showLandValue = !state.showLandValue;
+  const button = document.getElementById("toggleLandValueBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showLandValue));
+  refreshUI();
+});
+bindTap(document.getElementById("toggleZonesBtn"), function () {
+  if (!state) return;
+  state.showZones = !state.showZones;
+  const button = document.getElementById("toggleZonesBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showZones));
+  refreshUI();
+});
+
+// V29.5 — noms d'arrêts masquables : la carte reste lisible quand zones,
+// valeur foncière et couverture se superposent aux étiquettes.
+bindTap(document.getElementById("toggleStopNamesBtn"), function () {
+  if (!state) return;
+  state.showStopNames = !(state.showStopNames !== false);
+  const button = document.getElementById("toggleStopNamesBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showStopNames !== false));
+  refreshUI();
+});
+
+// V27 — clavier du tracé : Échap annule le tracé / le mode, Entrée termine la
+// chaîne de segments, Ctrl+Z / Ctrl+Shift+Z pilotent l'annulation voirie.
+document.addEventListener("keydown", function (e) {
+  if (!state) return;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement && document.activeElement.tagName || "");
+  if (e.key === "Escape") {
+    setMapMenu("std");
+    if (state.pendingRoadPoint) { endRoadTrace(); e.preventDefault(); return; }
+    if (state.roadEditMode) { enterRoadMode(state.roadEditMode); e.preventDefault(); return; }
+    if (state.zoneMode) { enterZoneMode(state.zoneMode); e.preventDefault(); }
+    return;
+  }
+  if (typing) return;
+  if (e.key === "Enter" && state.roadEditMode === "build" && state.pendingRoadPoint) {
+    endRoadTrace();
+    e.preventDefault();
+    return;
+  }
+  if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) {
+    if (e.shiftKey) redoRoadAction(); else undoRoadAction();
+    e.preventDefault();
+  }
+});
+
+// Double-clic : termine la chaîne de tracé de route.
+canvas.addEventListener("dblclick", function (e) {
+  if (state && state.roadEditMode === "build" && state.pendingRoadPoint) {
+    e.preventDefault();
+    endRoadTrace();
+  }
+});
+
+bindTap(document.getElementById("finishLineBtn"), function () {
+  if (!state) return;
+  const minStops = state.extendingLineId ? 1 : 2;
+  if (state.pendingStops.length < minStops) return;
+  const modeSelect = document.getElementById("modeSelect");
+  const created = state.extendingLineId
+    ? finishExtendLine(state, log, routeLine)
+    : finishLine(state, log, routeLine, (modeSelect && modeSelect.value) || "bus");
+  // V26 — retour haptique à la validation d'une ligne (mobile).
+  if (created) hapticFeedback(15);
+  updateInstructions();
+  refreshUI();
+});
+
+// V31 — Web Worker : avance rapide d'un jour entier sans bloquer l'interface.
+let ffBusy = false;
+function fastForwardOneDay() {
+  if (!state || ffBusy) return;
+  if (state.paused) { log("La partie est en pause — reprenez-la avant l'avance rapide."); return; }
+  const btn = document.getElementById("ffBtn");
+  ffBusy = true;
+  if (btn) { btn.textContent = "⏳ …"; btn.disabled = true; }
+  const savedPaused = state.paused;
+  const savedSpeed = state.speed;
+  state.paused = true; // gèle la boucle principale le temps de la simulation
+  const ticks = Math.max(1, Math.round(1440 / TICK_MINUTES));
+  const seed = ((((state.city && state.city.numericSeed) || 1) ^ ((state.elapsedDays || 0) + 0xB00C)) >>> 0) || 1;
+  const finish = function (result, mode) {
+    ffBusy = false;
+    const btn2 = document.getElementById("ffBtn");
+    if (btn2) { btn2.textContent = "⏩ +1 j"; btn2.disabled = false; }
+    if (!result || !result.state) { state.paused = savedPaused; state.speed = savedSpeed; refreshUI(); return; }
+    result.state.paused = savedPaused;
+    result.state.speed = savedSpeed;
+    boot(initialSeed, "sandbox", { state: result.state, rngState: null });
+    log("Avance rapide : 1 jour simulé en " + (mode === "worker" ? "arrière-plan (Web Worker)" : "mode synchronisé") + (result.ms ? " (" + result.ms + " ms)" : "") + ".");
+    refreshUI();
+  };
+  const mode = fastForwardDay(state, seed, ticks, finish);
+  if (mode === "worker") log("Avance rapide d'un jour en cours (Web Worker)…");
+}
+
+bindTap(document.getElementById("pauseBtn"), function () {
+  if (!state) return;
+  state.paused = !state.paused;
+  const btn = document.getElementById("pauseBtn");
+  if (btn) btn.textContent = state.paused ? "▶ Reprendre" : "⏸ Pause";
+  refreshUI();
+});
+
+bindTap(document.getElementById("speedBtn"), function () {
+  if (!state) return;
+  state.speed = state.speed === 1 ? 2 : state.speed === 2 ? 4 : state.speed === 4 ? 1000 : 1;
+  const btn = document.getElementById("speedBtn");
+  if (btn) btn.textContent = "▶ " + state.speed + "×";
+  refreshUI();
+});
+
+bindTap(document.getElementById("ffBtn"), fastForwardOneDay);
+
+// V33 — planification : ouvrir/fermer, valider, abandonner.
+bindTap(document.getElementById("planModeBtn"), function () {
+  if (!state) return;
+  if (state.planMode) {
+    const removed = clearPlan(state, state.planQueue || [], log);
+    state.planQueue = [];
+    rebuildNetwork();
+    log("📋 Plan abandonné : " + removed + " travail" + (removed > 1 ? "s" : "") + " retiré" + (removed > 1 ? "s" : "") + " sans frais.");
+    setPlanMode(false);
+    refreshUI();
+  } else {
+    setPlanMode(true);
+  }
+});
+bindTap(document.getElementById("planApplyBtn"), function () {
+  if (!state || !state.planMode) return;
+  const total = planTotalCost(state.planQueue || []);
+  if (!applyPlan(state, state.planQueue || [], log)) { refreshUI(); return; }
+  state.planQueue = [];
+  log("📋 Plan validé : " + total.toLocaleString("fr-FR") + " € dépensés — les travaux deviennent définitifs.");
+  setPlanMode(false);
+  refreshUI();
+});
+bindTap(document.getElementById("planClearBtn"), function () {
+  const modeBtn = document.getElementById("planModeBtn");
+  if (modeBtn) modeBtn.click(); // abandonner = même chemin que quitter le plan
+});
+
+bindTap(document.getElementById("resetZoomBtn"), resetCameraView);
+bindTap(document.getElementById("saveBtn"), saveCurrentGame);
+bindTap(document.getElementById("loadBtn"), loadCurrentGame);
+
+bindTap(document.getElementById("newCityBtn"), function () {
+  const seed = "CITY-" + Date.now() + "-" + Math.floor(Math.random() * 1000000);
+  const scenarioSelect = document.getElementById("scenarioSelect");
+  boot(seed, (scenarioSelect && scenarioSelect.value) || "sandbox");
+  toggleGameMenu(false);
+});
+
+bindMap();
+bindZoomReset();
+bindMiniMapClick();
+
+bindDelegatedTap(document.getElementById("lines"), "[data-buy-vehicle]", function (target) {
+  if (!state) return;
+  buyVehicleForLine(state, Number(target.dataset.buyVehicle), log);
+  refreshUI();
+});
+
+bindDelegatedTap(document.getElementById("lines"), "[data-sell-vehicle]", function (target) {
+  if (!state) return;
+  sellVehicleFromLine(state, Number(target.dataset.sellVehicle), Number(target.dataset.vehicleId), log);
+  refreshUI();
+});
+
+bindDelegatedTap(document.getElementById("lines"), "[data-delete-line]", function (target) {
+  if (!state) return;
+  const lineId = Number(target.dataset.deleteLine);
+  const line = state.lines.find(function (l) { return l.id === lineId; });
+  if (line && window.confirm && !window.confirm("Supprimer " + line.name + " ?")) return;
+  deleteLine(state, lineId, log);
+  refreshUI();
+});
+
+bindDelegatedTap(document.getElementById("lines"), "[data-extend-line]", function (target) {
+  if (!state) return;
+  startExtendLine(state, Number(target.dataset.extendLine));
+  updateInstructions();
+  refreshUI();
+});
+
+bindDelegatedTap(document.getElementById("lines"), "[data-edit-line]", function (target) {
+  openLineEditor(Number(target.dataset.editLine));
+});
+bindDelegatedTap(document.getElementById("advertisingPanel"), "[data-campaign]", function (target) {
+  if (!state) return;
+  startCampaign(state, target.dataset.campaign, log);
+  refreshUI();
+});
+bindTap(document.getElementById("advertisingBtn"), function () {
+  const panel = document.getElementById("advertisingPanel");
+  const details = panel && panel.closest("details");
+  if (details) details.open = true;
+  if (panel) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+const editorStopsEl = document.getElementById("lineEditorStops");
+if (editorStopsEl) {
+  bindDelegatedTap(editorStopsEl, "[data-editor-action]", function (target) {
+    applyEditorAction(target.dataset.editorAction, Number(target.dataset.editorIndex));
+  });
+}
+bindTap(document.getElementById("lineEditorAddBtn"), function () {
+  const select = document.getElementById("lineEditorAddStop");
+  if (!select || !select.value || editingStopIds.indexOf(select.value) >= 0) return;
+  editingStopIds.push(select.value);
+  renderLineEditor();
+});
+bindTap(document.getElementById("lineEditorCancelBtn"), closeLineEditor);
+bindTap(document.getElementById("lineEditorSaveBtn"), function () {
+  if (!state || editingLineId == null) return;
+  if (editLineStops(state, editingLineId, editingStopIds, routeLine, log)) {
+    closeLineEditor();
+    refreshUI();
+  }
+});
+
+bindTap(document.getElementById("toggleHeatmapBtn"), function () {
+  if (!state) return;
+  state.showHeatmap = !state.showHeatmap;
+  const button = document.getElementById("toggleHeatmapBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showHeatmap));
+  refreshUI();
+});
+
+bindTap(document.getElementById("toggleCoverageBtn"), function () {
+  if (!state) return;
+  state.showCoverage = !state.showCoverage;
+  const button = document.getElementById("toggleCoverageBtn");
+  if (button) button.setAttribute("aria-pressed", String(state.showCoverage));
+  refreshUI();
+});
+
+const fareLevelSelectEl = document.getElementById("fareLevelSelect");
+if (fareLevelSelectEl) fareLevelSelectEl.addEventListener("change", function () {
+  if (!state) return;
+  const value = Number(fareLevelSelectEl.value);
+  if (Number.isFinite(value) && value >= 0.8 && value <= 1.5) state.fareLevel = value;
+});
+
+const wageLevelSelectEl = document.getElementById("wageLevelSelect");
+if (wageLevelSelectEl) wageLevelSelectEl.addEventListener("change", function () {
+  if (!state) return;
+  const value = Number(wageLevelSelectEl.value);
+  if (Number.isFinite(value) && value >= 0.8 && value <= 1.2) state.wageLevel = value;
+});
+
+bindTap(document.getElementById("exportBtn"), function () {
+  setSaveActivity(true, "Export…");
+  try { exportGameToFile(state, rng && rng.getState ? rng.getState() : null); }
+  finally { setSaveActivity(false); }
+});
+
+const importFileEl = document.getElementById("importFile");
+if (importFileEl) {
+  importFileEl.addEventListener("change", async function (event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    setSaveActivity(true, "Import…");
+    try {
+      const payload = await importGameFromFile(file);
+      boot(payload.state.city.seed, (payload.state.scenario && payload.state.scenario.id) || "sandbox", payload);
+      if (payload.migrationNotes && payload.migrationNotes.length) {
+        log("💾 Sauvegarde migrée (" + payload.migrationNotes.length + " étape" + (payload.migrationNotes.length > 1 ? "s" : "") + ") : " + payload.migrationNotes.join(" ; ") + ".");
+      }
+      log("Partie importée avec succès.");
+      refreshUI();
+    } catch (error) {
+      log("Échec de l'import : " + error.message);
+    } finally {
+      setSaveActivity(false);
+      event.target.value = "";
+    }
+  });
+}
+
+let resizeTimer = null;
+window.addEventListener("resize", function () {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function () {
+    if (rendererState.current && rendererState.current.resizeCanvas) rendererState.current.resizeCanvas();
+    recenterCameraOnCity();
+    refreshUI();
+  }, 200);
+});
+
+const initialSeed = createSeedFromQuery();
+const cityNameInputEl = document.getElementById("cityNameInput");
+if (cityNameInputEl) {
+  cityNameInputEl.addEventListener("input", function () {
+    if (!state) return;
+    const value = cityNameInputEl.value.trim();
+    if (value) state.city.name = value;
+  });
+  cityNameInputEl.addEventListener("blur", function () {
+    if (!state) return;
+    if (!cityNameInputEl.value.trim()) cityNameInputEl.value = state.city.name;
+  });
+}
+// V26 — panneau coulissant mobile : replié par défaut, ouvert d'un tap au pouce.
+function bindSheet() {
+  const handle = document.getElementById("sheetHandle");
+  const dashboard = document.querySelector(".dashboard");
+  if (!handle || !dashboard) return;
+  handle.addEventListener("click", function () {
+    const open = dashboard.classList.toggle("sheet-open");
+    handle.setAttribute("aria-expanded", String(open));
+    // V27.4 — le panneau ouvert devient une vue plein écran : la classe
+    // body.sheet-open retire la barre d'outils flottante (elle recouvrait
+    // le bas du tableau de bord, z-index 130 > 120) et libère l'écran.
+    document.body.classList.toggle("sheet-open", open);
+    const label = document.getElementById("sheetHandleLabel");
+    if (label) label.textContent = open ? "✕ Fermer" : "📊 Tableau de bord";
+    // V27.2 — à l'ouverture, déplier le premier onglet si aucun ne l'est :
+    // sinon le tableau de bord paraît vide et inutile.
+    if (open) {
+      const tabs = dashboard.querySelectorAll("details.dashboard-tab");
+      const anyOpen = Array.prototype.some.call(tabs, function (tab) { return tab.open; });
+      if (!anyOpen && tabs.length) tabs[0].open = true;
+    }
+  });
+  // V27.4 — accordéon exclusif sur smartphone : ouvrir un onglet referme
+  // les autres (une pile de 6 onglets dépliés est illisible sur petit
+  // écran). Sur desktop, le comportement multi-onglets est inchangé.
+  const sheetTabs = dashboard.querySelectorAll("details.dashboard-tab");
+  Array.prototype.forEach.call(sheetTabs, function (tab) {
+    tab.addEventListener("toggle", function () {
+      if (!tab.open || !window.matchMedia("(max-width: 700px)").matches) return;
+      Array.prototype.forEach.call(sheetTabs, function (other) {
+        if (other !== tab) other.open = false;
+      });
+    });
+  });
+}
+
+// V26 — installation PWA quand le navigateur propose sa bannière native.
+function bindInstallPrompt() {
+  const btn = document.getElementById("installBtn");
+  if (!btn) return;
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    btn.hidden = false;
+  });
+  btn.addEventListener("click", function () {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function () {
+      deferredPrompt = null;
+      btn.hidden = true;
+    }).catch(function () { btn.hidden = true; });
+  });
+  window.addEventListener("appinstalled", function () { btn.hidden = true; });
+}
+
+
+// === V27.5 — Menu en cascade dans la carte : 3 boutons par niveau =========
+// std affiche 3 boutons ; chaque clic remplace le trio affiché (n1, n2,
+// pages annexes) ; ✕ revient à std. Les actions pilotent les contrôles
+// historiques, cachés mais présents (tests statiques + smoke test).
+const MAP_MENU = {
+  "std": [
+    { label: "🛣️ Voirie", goto: "voirie" },
+    { label: "🏙️ Urbanisme", goto: "urbanisme" },
+    { label: "🚌 Ligne", goto: "ligne" },
+    { label: "🚏 Arrêts ▸", goto: "arrets" }
+  ],
+  "voirie": [
+    { label: "🛣️ Construire ▸", goto: "voirie-types" },
+    { label: "🧹 Supprimer", act: "removeRoadBtn" },
+    { label: "🧰 Éditer ▸", goto: "voirie-edits" }
+  ],
+  "voirie-types": [
+    { label: "🏘️ Rue", select: "roadTypeSelect", value: "street", act: "buildRoadBtn" },
+    { label: "🔗 Avenue", select: "roadTypeSelect", value: "avenue", act: "buildRoadBtn" },
+    { label: "▸ Autres types", goto: "voirie-types-2" }
+  ],
+  "voirie-types-2": [
+    { label: "🛣️ Boulevard", select: "roadTypeSelect", value: "boulevard", act: "buildRoadBtn" },
+    { label: "🏎️ Voie rapide", select: "roadTypeSelect", value: "highway", act: "buildRoadBtn" },
+    { label: "◂ Retour", goto: "voirie-types" }
+  ],
+  "voirie-edits": [
+    { label: "⬆️ Améliorer", act: "upgradeRoadBtn" },
+    { label: "➡️ Sens unique", act: "oneWayRoadBtn" },
+    { label: "↩️ Historique ▸", goto: "voirie-history" }
+  ],
+  "voirie-history": [
+    { label: "↩️ Annuler", act: "undoRoadBtn" },
+    { label: "↪️ Rétablir", act: "redoRoadBtn" },
+    { label: "◂ Retour", goto: "voirie-edits" }
+  ],
+  "urbanisme": [
+    { label: "🖍️ Zoner ▸", goto: "urbanisme-zones" },
+    { label: "🚫 Dézoner", act: "unzoneBtn" },
+    { label: "🔍 Inspecter", act: "inspectBtn" }
+  ],
+  "urbanisme-zones": [
+    { label: "🏘️ Résidentiel", select: "zoneTypeSelect", value: "residential", act: "zoneBtn" },
+    { label: "🛍️ Commercial", select: "zoneTypeSelect", value: "commercial", act: "zoneBtn" },
+    { label: "▸ Autres zones", goto: "urbanisme-zones-2" }
+  ],
+  "urbanisme-zones-2": [
+    { label: "🏭 Industriel", select: "zoneTypeSelect", value: "industrial", act: "zoneBtn" },
+    { label: "🏫 Services", select: "zoneTypeSelect", value: "service", act: "zoneBtn" },
+    { label: "◂ Retour", goto: "urbanisme-zones" }
+  ],
+  "ligne": [
+    { label: "✏️ Nouvelle ligne", act: "newLineBtn" },
+    { label: "🚊 Mode ▸", goto: "ligne-modes" },
+    { label: "🎯 Recentrer", act: "resetZoomBtn" }
+  ],
+  "ligne-modes": [
+    { label: "🚌 Bus", select: "modeSelect", value: "bus" },
+    { label: "🚊 Tramway", select: "modeSelect", value: "tram" },
+    { label: "🚇 Métro", select: "modeSelect", value: "metro" }
+  ],
+  "arrets": [
+    { label: "➕ Construire", act: "buildStopBtn" },
+    { label: "➖ Supprimer", act: "demolishStopBtn" },
+    { label: "⬆️ Pôle multimodal", act: "multimodalStopBtn" }
+  ]
+};
+
+// V28.2 — un bouton d'action est surligné quand son outil est armé.
+function isMenuActArmed(act) {
+  if (!state) return false;
+  if (act === "buildRoadBtn") return state.roadEditMode === "build";
+  if (act === "removeRoadBtn") return state.roadEditMode === "remove";
+  if (act === "upgradeRoadBtn") return state.roadEditMode === "upgrade";
+  if (act === "oneWayRoadBtn") return state.roadEditMode === "oneWay";
+  if (act === "zoneBtn") return state.zoneMode === "zone";
+  if (act === "unzoneBtn") return state.zoneMode === "unzone";
+  if (act === "inspectBtn") return state.zoneMode === "inspect";
+  if (act === "newLineBtn") return !!state.lineMode;
+  if (act === "buildStopBtn") return state.stopToolMode === "build";
+  if (act === "demolishStopBtn") return state.stopToolMode === "demolish";
+  if (act === "multimodalStopBtn") return state.stopToolMode === "multimodal";
+  return false;
+}
+
+let mapMenuLevel = "std";
+
+// V36 — le menu est construit UNE FOIS pour toutes : chaque niveau du
+// cascade est une page (.map-menu-page) déjà présente dans le DOM et
+// masquée par [hidden]. setMapMenu se contente de basculer la page
+// visible et de rafraîchir le surlignage (classes uniquement) : AUCUN
+// bouton n'est jamais détruit au runtime. Les régressions à répétition
+// (✕ inerte, actions « qui ne réagissent pas », taps perdus entre deux
+// reconstructions) venaient toutes de la destruction/recréation des
+// boutons pendant ou juste après un tap : le « click » synthétique du
+// navigateur pouvait viser un bouton disparu ou reconstruit et
+// ré-invoquer le handler (armement puis désarmement immédiat).
+function buildMapMenuPages(container) {
+  container.textContent = "";
+  Object.keys(MAP_MENU).forEach(function (level) {
+    const page = document.createElement("div");
+    page.className = "map-menu-page";
+    page.dataset.level = level;
+    page.hidden = level !== mapMenuLevel;
+    // ✕ uniquement hors niveau std : revient au menu racine.
+    if (level !== "std") {
+      const back = document.createElement("button");
+      back.type = "button";
+      back.className = "btn btn-map-back";
+      back.setAttribute("aria-label", "Revenir au menu principal de la carte");
+      back.textContent = "✕";
+      bindTap(back, function () { setMapMenu("std"); });
+      page.appendChild(back);
+    }
+    for (const item of MAP_MENU[level]) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn";
+      btn.textContent = item.label;
+      btn.__menuGoto = item.goto || null;
+      btn.__menuAct = item.act || null;
+      if (item.goto) {
+        bindTap(btn, function () { setMapMenu(item.goto); });
+      } else {
+        bindTap(btn, function () {
+          if (item.select) {
+            const sel = document.getElementById(item.select);
+            if (sel) { sel.value = item.value; sel.dispatchEvent(new Event("change")); }
+          }
+          const target = item.act && document.getElementById(item.act);
+          if (target) target.click();
+          // V28.2 — on reste sur la page : changer de type de route ou de
+          // zone devient immédiat (l'outil armé est surligné). La croix ou
+          // Échap ramènent à la racine.
+          setMapMenu(mapMenuLevel);
+        });
+      }
+      page.appendChild(btn);
+    }
+    container.appendChild(page);
+  });
+}
+
+function setMapMenu(level) {
+  const container = document.getElementById("mapMenu");
+  if (!container) return;
+  mapMenuLevel = MAP_MENU[level] ? level : "std";
+  // V27.6 — retour visuel : la branche racine liée à l'outil armé
+  // (voirie / urbanisme / ligne / arrêts) reste surlignée sur la racine.
+  const armed = state && state.roadEditMode ? "voirie"
+    : state && state.zoneMode ? "urbanisme"
+    : state && (state.lineMode || (state.pendingStops && state.pendingStops.length)) ? "ligne"
+    : state && state.stopToolMode ? "arrets"
+    : null;
+  const pages = container.querySelectorAll(".map-menu-page");
+  for (const page of pages) {
+    page.hidden = page.dataset.level !== mapMenuLevel;
+    const isPageStd = page.dataset.level === "std";
+    const buttons = page.querySelectorAll("button");
+    for (const btn of buttons) {
+      const goto = btn.__menuGoto;
+      const act = btn.__menuAct;
+      // V28.2 — l'outil armé reste surligné sur sa propre page.
+      btn.classList.toggle("is-active",
+        (isPageStd && armed && goto === armed) ||
+        (!goto && act && isMenuActArmed(act)));
+    }
+  }
+}
+
+// Les contrôles historiques restent dans le DOM (branchés et testables) mais
+// cèdent la place au menu en cascade. « Terminer » garde sa logique propre.
+(function initMapMenu() {
+  // V29.1 — auto-réparation : le menu ne doit JAMAIS disparaître. Si le shell
+  // HTML est périmé (cache navigateur, copie locale ancienne), la barre
+  // flottante et son conteneur sont reconstruits de zéro ; et si
+  // l'initialisation échoue pour toute autre raison, les boutons historiques
+  // sont réaffichés en secours plutôt que de laisser une barre vide.
+  try {
+    let container = document.getElementById("mapMenu");
+    if (!container) {
+      let toolbar = document.querySelector(".floating-toolbar");
+      if (!toolbar) {
+        toolbar = document.createElement("div");
+        toolbar.className = "floating-toolbar";
+        toolbar.setAttribute("role", "toolbar");
+        toolbar.setAttribute("aria-label", "Outils de carte");
+        document.body.appendChild(toolbar);
+      }
+      container = document.createElement("div");
+      container.id = "mapMenu";
+      container.className = "map-menu";
+      container.setAttribute("aria-label", "Menu de la carte");
+      toolbar.insertBefore(container, toolbar.firstChild);
+    }
+    const legacy = document.querySelectorAll(".floating-toolbar > button:not(#finishLineBtn), .floating-toolbar > .tool-group");
+    Array.prototype.forEach.call(legacy, function (el) { el.hidden = true; });
+    buildMapMenuPages(container);
+    setMapMenu(mapMenuLevel);
+  } catch (error) {
+    console.warn("Menu en cascade indisponible — boutons historiques réaffichés.", error);
+    const fallback = document.querySelectorAll("button[id]");
+    Array.prototype.forEach.call(fallback, function (el) { el.hidden = false; });
+  }
+})();
+
+bindSheet();
+bindInstallPrompt();
+populateScenarioSelect();
+boot(initialSeed, "sandbox");
+
+const publicGameApi = {
+  getState: function () { return state; },
+  cameraState: cameraState,
+  recenterCameraOnCity: recenterCameraOnCity,
+  clickMap: clickMap,
+};
+window.__vieTLignes = publicGameApi;
+
+// === FIN DU FICHIER main.js ===
+
+
+
+
+
+
+
+
+
+
+
+
+
+
