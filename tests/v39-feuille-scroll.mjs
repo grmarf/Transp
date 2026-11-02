@@ -138,24 +138,24 @@ try {
   const sheetCss = await evaluate('(() => { const b = document.querySelector(".dashboard-body"); const cs = getComputedStyle(b); return { overflowY: cs.overflowY, touchAction: cs.touchAction, overscroll: cs.overscrollBehaviorY }; })()');
   assert.equal(sheetCss.overflowY, 'auto', 'corps de feuille scrollable (overflow-y auto)');
   assert.equal(sheetCss.touchAction, 'pan-y', 'geste vertical attribué au panneau (pan-y)');
-  // Garantir un contenu plus haut que l'écran (comme chez le joueur) ET une
-  // zone de swipe neutre : un bloc factice de 700 px est inséré EN TÊTE du
-  // corps — le doigt glisse dessus, aucun bouton/résumé/select ne peut
-  // capter le geste ni produire de click parasite à la relâche.
-  const forcedDelta = await evaluate('(() => { const b = document.querySelector(".dashboard-body"); const d = document.createElement("div"); d.setAttribute("data-filler-sheet", "1"); d.style.height = "700px"; b.insertBefore(d, b.firstChild); return b.scrollHeight - b.clientHeight; })()');
+  // Garantir un contenu plus haut que l'écran (comme chez le joueur) :
+  const forcedDelta = await evaluate('(() => { const b = document.querySelector(".dashboard-body"); b.style.paddingBottom = "600px"; return b.scrollHeight - b.clientHeight; })()');
   assert.ok(forcedDelta > 60, 'feuille: contenu plus haut que l\'écran delta=' + forcedDelta);
 
   // ---- B. VRAI SWIPE : la feuille doit défiler au doigt ----------------
+  // Point de départ neutre : aucun bouton/résumé/select sous le doigt.
+  const swipeY = await evaluate('(() => { for (let y = 120; y < 860; y += 16) { const el = document.elementFromPoint(206, y); if (!el) continue; const t = el.tagName; if (t === "BUTTON" || t === "SUMMARY" || t === "SELECT" || t === "A" || t === "INPUT" || t === "LABEL" || t === "CANVAS") continue; return y; } return null; })()');
+  assert.ok(swipeY, 'PAS DE POINT NEUTRE POUR LE SWIPE');
   async function swipeSheet() {
     const before = await evaluate('document.querySelector(".dashboard-body").scrollTop');
-    await swipe(206, 400, 0, -240);
+    await swipe(206, swipeY, 0, -240);
     await sleep(250);
     return await evaluate('document.querySelector(".dashboard-body").scrollTop') - before;
   }
   let moved = await swipeSheet();
   if (moved < 25) moved = await swipeSheet(); // une seule relance
-  assert.ok(moved >= 25, 'SWIPE FEUILLE SANS DÉFILEMENT moved=' + moved + ' css=' + (await evaluate(sheetDiag())) + ' doc=' + (await evaluate('document.scrollingElement.scrollTop')));
-  await evaluate('(() => { const d = document.querySelector("[data-filler-sheet]"); if (d) d.remove(); return true; })()');
+  assert.ok(moved >= 25, 'SWIPE FEUILLE SANS DÉFILEMENT moved=' + moved + ' y=' + swipeY + ' css=' + (await evaluate(sheetDiag())) + ' doc=' + (await evaluate('document.scrollingElement.scrollTop')));
+  await evaluate('document.querySelector(".dashboard-body").style.paddingBottom = ""');
 
   // ---- C. Fermer la feuille -------------------------------------------
   const closeHandle = await evaluate('(() => { const h = document.getElementById("sheetHandle"); const r = h.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()');

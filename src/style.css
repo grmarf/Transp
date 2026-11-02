@@ -1424,6 +1424,13 @@ eight:bold; color:#fff; }
     overscroll-behavior-y: contain;
     touch-action: pan-y;
   }
+  /* V39 — CAUSE RACINE du « impossible de descendre » : les onglets sont
+     des flex-items du corps (flex column) et rétrécissaient par défaut
+     (flex-shrink: 1) — leur contenu se faisait rogné sous le bord au lieu
+     de faire débordé le corps : scrollHeight restait égal à clientHeight,
+     le défilement ne s'armait JAMAIS. Non-rétrécissables, ils débordent
+     réellement et overflow-y: auto devient effectif. */
+  .dashboard.sheet-open .dashboard-body > * { flex: 0 0 auto; }
 }
 
 

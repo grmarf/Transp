@@ -6,13 +6,16 @@ résume l'état courant du jeu et les derniers changements.
 ## V39 — Feuille du tableau de bord défilante au doigt + taps robustes
 
 - **Le « menu » des captures est le tableau de bord** (bottom sheet
-  plein écran) : son contenu coupé sous « Modifier » ne pouvait pas être
-  atteint si le geste vertical était capté par la page ou un ancêtre. Le
-  corps ouvert (`.dashboard.sheet-open .dashboard-body`) déclare
-  désormais `touch-action: pan-y`, `overscroll-behavior-y: contain` et
-  `-webkit-overflow-scrolling: touch` : le geste vertical est attribué au
-  panneau, le défilement tactile natif est garanti et l'overscroll ne
-  fuit plus vers la page.
+  plein écran) : **cause racine du « impossible de descendre »** — les
+  onglets sont des flex-items du corps (flex column) et rétrécissaient
+  par défaut (`flex-shrink`), leur contenu se faisait rogné sous le bord
+  au lieu de faire déborder le corps : `scrollHeight` restait égal à
+  `clientHeight` et le défilement ne s'armait jamais. Ils sont désormais
+  non-rétrécissables (`flex: 0 0 auto`) et débordent réellement ; le
+  corps ouvert déclare en outre `touch-action: pan-y`,
+  `overscroll-behavior-y: contain` et `-webkit-overflow-scrolling:
+  touch` : geste vertical attribué au panneau, défilement natif garanti,
+  overscroll contenu.
 - **« Terminer ne fonctionne pas toujours »** : sur un vrai doigt, un
   léger glissé (quelques pixels) suffit au navigateur pour confier le
   geste à un conteneur défilable de la chaîne (page, barre horizontale,
