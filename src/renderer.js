@@ -1123,7 +1123,7 @@ export function createRenderer(canvas, state) {
       const report = latestReport(state);
       if (report) {
         reportEl.innerHTML = '<div class="report-header"><b>Jour ' + report.day + '</b><span class="' + (report.net >= 0 ? "positive" : "negative") + '">' + (report.net >= 0 ? "+" : "") + Math.round(report.net).toLocaleString("fr-FR") + ' €</span></div>' +
-          '<div class="report-metrics"><div>💰 Revenus : ' + Math.round(report.income).toLocaleString("fr-FR") + ' €</div><div>💸 Dépenses : ' + Math.round(report.expenses).toLocaleString("fr-FR") + ' €</div><div>😊 Satisfaction : ' + Math.round(report.satisfaction) + '%</div><div>⏳ Attente : ' + Math.round(report.avgWait) + ' min</div><div>🏃 Abandons : ' + report.abandoned + '</div></div>';
+          '<div class="report-metrics"><div>💰 Revenus : ' + Math.round(report.income).toLocaleString("fr-FR") + ' €</div><div>💸 Dépenses : ' + Math.round(report.expenses).toLocaleString("fr-FR") + ' €</div><div>😊 Satisfaction : ' + Math.round(report.satisfaction) + '%</div><div>⏳ Attente : ' + Math.round(report.avgWaitMinutes) + ' min</div><div>🏃 Abandons : ' + report.abandonedCount + '</div></div>';
       } else {
         reportEl.innerHTML = '<div class="muted">Ton premier rapport arrivera à la fin du jour 1.</div>';
       }
@@ -1142,7 +1142,7 @@ export function createRenderer(canvas, state) {
       if (contracts.length) {
         contractsEl.innerHTML = '<div class="muted">Renouvellement dans ' + contracts[0].remainingDays + ' jour(s)</div>' +
           contracts.map(function (c) {
-            return '<div class="contract-row ' + c.status + '"><b>' + h(c.label) + '</b><span>' + c.progress + '%</span></div>';
+            return '<div class="contract-row ' + (c.completed ? "completed" : "") + '"><b>' + h(c.label) + '</b><span>' + Math.round(c.progress * 100) + '%</span></div>';
           }).join("");
       } else {
         contractsEl.innerHTML = '<div class="muted">Les contrats arriveront au prochain jour.</div>';

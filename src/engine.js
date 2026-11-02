@@ -665,8 +665,11 @@ export function step(state, rng, log) {
     let contractsCompleted = [];
     if (state.contractsEnabled) {
       ensureContracts(state);
-      refreshContracts(state);
+      // V47 — l'évaluation précède le renouvellement : un objectif atteint
+      // pendant le dernier jour de validité (affiché « encore 1 jour »)
+      // doit être récompensé avant que la paire ne soit remplacée.
       contractsCompleted = evaluateContracts(state, { satisfaction: satisfaction(state), transferShare: intermodalStats(state).shareWithTransfer, coverage: coverageRatio(state) }, log);
+      refreshContracts(state);
     }
     evaluateScenario(state, log, { net: networkFinancials(state).net, currentSatisfaction: satisfaction(state) });
 
