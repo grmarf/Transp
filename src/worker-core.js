@@ -21,5 +21,7 @@ export function fastForwardState(state, seed, ticks) {
   const ms = now() - t0;
   state.paused = wasPaused;
   state.speed = wasSpeed;
-  return { state, ticks, ms };
+  // V47 — l'état final du générateur est renvoyé : le fil principal peut
+  // poursuivre le flux au lieu de redémarrer le sien après chaque avance.
+  return { state, ticks, ms, rngState: rng.getState() };
 }

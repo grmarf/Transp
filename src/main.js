@@ -762,6 +762,9 @@ function updatePlanButtons() {
 }
 
 function clickMap(e) {
+  // V47 — pendant l'avance rapide, l'état courant va être remplacé par le
+  // résultat du worker : toute action est refusée pour ne pas être écrasée.
+  if (ffBusy) return;
   // L’API publique historique reçoit des coordonnées dans le repère monde
   // du canvas (sans type d’événement). Les vrais pointer events passent par
   // la caméra et restent convertis par screenPoint().
@@ -1874,6 +1877,9 @@ function fastForwardOneDay() {
   if (state.paused) { log("La partie est en pause — reprenez-la avant l'avance rapide."); return; }
   const btn = document.getElementById("ffBtn");
   ffBusy = true;
+  // V47 — l'interface entière est gelée pendant la simulation : aucune
+  // action du joueur ne doit pouvoir être écrasée par l'état du worker.
+  document.body.classList.add("ff-busy");
   if (btn) { btn.textContent = "⏳ …"; btn.disabled = true; }
   const savedPaused = state.paused;
   const savedSpeed = state.speed;
@@ -1882,12 +1888,16 @@ function fastForwardOneDay() {
   const seed = ((((state.city && state.city.numericSeed) || 1) ^ ((state.elapsedDays || 0) + 0xB00C)) >>> 0) || 1;
   const finish = function (result, mode) {
     ffBusy = false;
+    document.body.classList.remove("ff-busy");
     const btn2 = document.getElementById("ffBtn");
     if (btn2) { btn2.textContent = "⏩ +1 j"; btn2.disabled = false; }
     if (!result || !result.state) { state.paused = savedPaused; state.speed = savedSpeed; refreshUI(); return; }
     result.state.paused = savedPaused;
     result.state.speed = savedSpeed;
-    boot(initialSeed, "sandbox", { state: result.state, rngState: null });
+    // V47 — l'état du générateur du worker est relayé à la place de null :
+    // l'aléa continue son cours au lieu de redémarrer le flux initial à
+    // chaque +1 j (répétitions d'événements).
+    boot(initialSeed, "sandbox", { state: result.state, rngState: result.rngState == null ? null : result.rngState });
     log("Avance rapide : 1 jour simulé en " + (mode === "worker" ? "arrière-plan (Web Worker)" : "mode synchronisé") + (result.ms ? " (" + result.ms + " ms)" : "") + ".");
     refreshUI();
   };

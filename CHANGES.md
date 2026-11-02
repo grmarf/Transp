@@ -3,13 +3,64 @@
 L'historique complet des évolutions est dans l'historique Git ; ce fichier
 résume l'état courant du jeu et les derniers changements.
 
+## V47 — Correctifs d'audit (affichage, contrats, avance rapide, sauvegardes)
+
+Correctifs issus de l'audit complet du code ; anti-cache bumpé `?v=47`
+(cache SW `vtl-cache-v47`), nouveaux gels de non-régression
+`tests/v47-bugfixes.mjs`.
+
+- **style.css — 3 déclarations cassées par un saut de ligne en plein mot**
+  (corruption silencieuse invisible en jeu) : `overscroll-behavior: none`
+  (le scroll chaining revient sur mobile quand un doigt glisse hors canvas),
+  `word-break: break-word` (débordements des noms longs dans les chips) et
+  `font-weight:bold` des badges de ligne (gras perdu). Recollées ; la CI ne
+  lintant pas le CSS, le nouveau test vérifie désormais l'intégrité.
+- **Rapport du jour (renderer)** : le panneau lisait `report.avgWait` /
+  `report.abandoned`, champs inexistants — il affichait « Attente : NaN min »
+  et « Abandons : undefined ». Il lit désormais les vrais champs
+  `avgWaitMinutes` / `abandonedCount` de `createDailyReport`.
+- **Panneau Contrats (renderer)** : la progression est une fraction 0–1
+  mais était affichée telle quelle (« 0.25% » au lieu de « 25 % »), et le
+  statut `c.status` n'existe pas (la classe `.completed` ne s'appliquait
+  jamais, `contract-row undefined` dans le DOM). Corrigé :
+  `Math.round(c.progress * 100)` et branchement sur `c.completed`.
+- **Contrats — off-by-one silencieux (engine)** : au passage du jour
+  d'échéance, `refreshContracts` remplaçait la paire **avant** l'évaluation :
+  un objectif atteint pendant le dernier jour affiché (« encore 1 jour »)
+  était perdu sans récompense. L'évaluation précède désormais le
+  renouvellement.
+- **Contrats — robustesse** : un id inconnu (sauvegarde éditée à la main)
+  faisait planter `contractSummary` (TypeError sur `type.target`) et
+  `evaluateContracts` créditait `NaN` ; les ids inconnus sont ignorés
+  proprement.
+- **Avance rapide (+1 j) — interface gelée** : pendant la simulation
+  (Web Worker), l'UI restait cliquable et toute action était silencieusement
+  écrasée au retour par l'état du worker. Le corps porte désormais
+  `ff-busy` (pointer-events coupés, curseur d'attente) et `clickMap`
+  refuse d'agir pendant la simulation.
+- **Avance rapide — aléa relayé** : `boot(..., { rngState: null })` remettait
+  le générateur principal à son flux initial à chaque +1 j (répétitions
+  d'événements aléatoires). Le protocole worker transporte désormais l'état
+  final du générateur (`rngState`) et le boot le réapplique.
+- **Sauvegardes allégées** : la grille de valeur foncière (`Float32Array`
+  sérialisée en objet `{0:…}` volumineux, de toute façon rejetée puis
+  reconstruite au premier cycle horaire) et les piles d'annulation voirie
+  (remises à zéro au démarrage) ne sont plus écrites dans les sauvegardes —
+  des dizaines de Ko de JSON mort en moins par sauvegarde.
+- **Coquilles** : « Carrefur des Acacias » → « Carrefour des Acacias »,
+  « n'essime pas » → « n'essaim pas »/« essaime » (commentaires).
+- Vérifié et **non modifié** : l'expiration des événements et campagnes au
+  jour `endsDay` est cohérente avec l'affichage « encore N jour(s) »
+  (sémantique verrouillée par `tests/v15-events.mjs`) — pas d'off-by-one
+  là-bas.
+
 ## V40 — 100 % local : PWA installable et jeu hors ligne
 
 - **Service worker (`sw.js`)** : cache-first de tous les fichiers du jeu
   (même origine). La première visite en ligne remplit le cache (tous les
   modules sont chargés au démarrage) ; ensuite le jeu démarre
   **intégralement hors ligne**, y compris après un rechargement. Les
-  versions de cache suivent l'anti-cache (`vtl-cache-v46`) ; les requêtes
+  versions de cache suivent l'anti-cache (`vtl-cache-v47`) ; les requêtes
   ignorent le paramètre `?v=` côté cache (imports internes sans
   paramètre).
 - **Installable partout** : le manifest est complété (id, scope,

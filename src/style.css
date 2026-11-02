@@ -66,8 +66,7 @@ html, body {
   background-image:
     radial-gradient(circle at 1px 1px, rgba(31, 35, 64, .08) 1px, transparent 0);
   background-size: 18px 18px;
-  overscr
-oll-behavior: none;
+  overscroll-behavior: none;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
@@ -561,8 +560,7 @@ button.active { background: var(--plum); color: #fff; }
   font-size: 1rem;
   font-weight: 900;
   color: var(--ink);
-  word-b
-reak: break-word;
+  word-break: break-word;
 }
 
 .stat.negative strong { color: var(--coral); }
@@ -843,8 +841,7 @@ reak: break-word;
 
 .report-metrics,
 .report-recommendations {
-  
-color: var(--ink-soft);
+  color: var(--ink-soft);
   font-size: .75rem;
   font-weight: 700;
   line-height: 1.5;
@@ -1124,8 +1121,7 @@ select { min-height:38px; max-width:180px; }
 .map-overlay-btn { pointer-events:auto; width:40px; height:40px; min-height:40px; padding:0; border-radius:50%; background:rgba(255,248,236,.9); border:2px solid var(--ink); cursor:pointer; font-size:18px; display:flex; align-items:center; justify-content:center; z-index:50; }
 .map-overlays > .map-overlay-btn { position:absolute; top:0; left:0; }
 .map-overlay-btn[aria-pressed="true"] { background:var(--sun); }
-.line-row .badge { display:inline-block; padding:2px 6px; border-radius:4px; font-size:.8em; font-w
-eight:bold; color:#fff; }
+.line-row .badge { display:inline-block; padding:2px 6px; border-radius:4px; font-size:.8em; font-weight:bold; color:#fff; }
 .line-details { display:none; margin-top:4px; font-size:.9em; color:#666; }
 .line-row:hover .line-details, .line-row:focus-within .line-details { display:block; }
 .dashboard-tab label { display:block; margin-top:8px; font-weight:800; }
@@ -1526,3 +1522,9 @@ eight:bold; color:#fff; }
   }
   .map-menu .btn.is-active:hover { background: var(--sun); }
 }
+
+/* V47 — avance rapide (+1 j) : l'interface est gelée le temps de la
+   simulation ; aucune action du joueur ne peut être silencieusement
+   écrasée par l'état du worker au retour. */
+body.ff-busy header, body.ff-busy main, body.ff-busy footer { pointer-events: none; }
+body.ff-busy { cursor: progress; }

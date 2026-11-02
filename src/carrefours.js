@@ -26,7 +26,7 @@ const CARREFOUR_NAMES = [
   "Carrefour du Marché", "Carrefour des Écoles", "Carrefour de la Mairie",
   "Carrefour Saint-Michel", "Carrefour des Tilleuls", "Carrefour de la Gare",
   "Carrefour du Moulin", "Carrefour des Platanes", "Carrefour de la Poste",
-  "Carrefur des Acacias", "Carrefour du Pont", "Carrefour Bellecour"
+  "Carrefour des Acacias", "Carrefour du Pont", "Carrefour Bellecour"
 ];
 
 /** Intersection stricte de deux segments, intérieure aux deux (t, u ∈ ]0.02, 0.98[). */
@@ -236,7 +236,7 @@ export function addCarrefourStop(city, x, y, rng = Math.random) {
     jobs,
     commerce: Math.round(60 + rng() * 120),
     density: Math.round(population / DISTRICT_AREA_KM2),
-    hasSpawnedSatellite: true, // un carrefour n'essime pas de nouveau quartier
+    hasSpawnedSatellite: true, // un carrefour n'essaim pas de nouveau quartier
     isCarrefour: true
   };
   stops.push(stop);

@@ -359,8 +359,17 @@ export function migrateSavePayload(payload) {
 }
 
 export function serializeState(state, rngState = null) {
+  // V47 — la grille de valeur foncière (Float32Array) et les piles
+  // d'annulation voirie ne sont pas persistées : la grille est reconstruite
+  // au premier cycle horaire simulé (ensureBuildingsState la rejette de
+  // toute façon une fois passée au JSON), et les piles sont remises à
+  // zéro au démarrage. On évite ainsi des dizaines de Ko de JSON mort
+  // dans chaque sauvegarde.
   const clean = clone({
     ...state,
+    city: { ...state.city, landValueGrid: undefined },
+    roadUndoStack: undefined,
+    roadRedoStack: undefined,
     network: state.network ? {
       version: state.network.version,
       closedEdgeIds: [...(state.network.closedEdgeIds || [])],
