@@ -5,7 +5,21 @@
 // jeu démarre intégralement hors ligne — Android (PWA installée) comme
 // Windows (fenêtre autonome installée via Edge/Chrome).
 const CACHE = "vtl-cache-v46";
-const PRECACHE = ["./", "./index.html", "./favicon.png", "./manifest.webmanifest"];
+// Précache intégral : TOUS les modules sont mis en cache à l'installation —
+// le jeu doit être jouable hors ligne dès la fin de la première visite,
+// sans attendre un second passage qui remplirait le cache au fil de l'eau.
+const SRC_MODULES = [
+  "advertising.js", "buildings.js", "carrefours.js", "city.js",
+  "constants.js", "contracts.js", "coverage.js", "demographics.js",
+  "disruptions.js", "engine-worker.js", "engine.js", "events.js",
+  "growth.js", "html.js", "main.js", "network.js", "od.js",
+  "passengers.js", "persistence.js", "planning.js", "progression.js",
+  "pruning.js", "renderer.js", "reports.js", "routing.js", "scenarios.js",
+  "seasons.js", "state.js", "stops.js", "vehicles.js",
+  "worker-client.js", "worker-core.js"
+];
+const PRECACHE = ["./", "./index.html", "./favicon.png", "./manifest.webmanifest", "./src/style.css"]
+  .concat(SRC_MODULES.map(function (name) { return "./src/" + name; }));
 
 self.addEventListener("install", function (event) {
   event.waitUntil(

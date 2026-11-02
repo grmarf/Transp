@@ -98,7 +98,7 @@ try {
   assert.ok(swState.ctrl, 'la page est contrôlée par le service worker');
   // Le cache est rempli (les modules ont été chargés par la page).
   const cacheInfo = await waitFor('cache rempli', () => evaluate('caches.keys().then(function (keys) { var k = keys[0]; return k ? caches.open(k).then(function (c) { return c.keys().then(function (reqs) { return { n: reqs.length, main: reqs.some(function (r) { return String(r.url).indexOf("main.js") >= 0; }) }; }); }) : null; })'));
-  assert.ok(cacheInfo && cacheInfo.n >= 10, 'cache rempli: ' + JSON.stringify(cacheInfo));
+  assert.ok(cacheInfo && cacheInfo.n >= 30, 'cache rempli: ' + JSON.stringify(cacheInfo));
   assert.ok(cacheInfo.main, 'main.js est dans le cache');
 
   // ---- 2. Réseau coupé : le jeu doit recharger depuis le cache --------
